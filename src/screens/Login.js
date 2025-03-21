@@ -1,0 +1,337 @@
+import React, { useState } from 'react';
+import {
+  SafeAreaView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Colors from '../../assets/Colors';
+import { useLogin } from '../hooks/useLogin';
+import i18n from '../../i18n';
+import { Picker } from '@react-native-picker/picker';
+import { useTranslation } from 'react-i18next';
+
+const Login = () => {
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
+  const { t, i18n: i18nInstance } = useTranslation();
+  const {
+
+    isConnected,
+    email,
+    password,
+    showPassword,
+    isChecked,
+    isLoading,
+    errors,
+    emailTouched,
+    passwordTouched,
+    setState,
+    handleLogin,
+    toggleCheckbox,
+    toggleShowPassword,
+    handleEmailChange,
+    handlePasswordChange,
+    handleSignUp,
+    handleForgotPassword,
+    handleLanguageChange
+  } = useLogin();
+
+  const changeLanguage = async (lng) => {
+    await i18n.changeLanguage(lng);
+    setShowLanguagePicker(false);
+  };
+
+  if (!isConnected) {
+    return (
+      <View style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: Colors.LIGHT_PURPLE,
+      }}>
+        <Image
+          source={require("../../assets/Icons/NoInternet.png")}
+          style={{ width: 80, height: 80 }}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
+      <View style={{ marginTop: "10%" }}>
+      <TouchableOpacity 
+        style={styles.languageSelector}
+        onPress={() => setShowLanguagePicker(!showLanguagePicker)}
+      >
+        <Image
+          source={require("../../assets/Icons/earth.png")}
+          style={styles.earthIcon}
+        />
+      </TouchableOpacity>
+
+      {showLanguagePicker && (
+        <View style={styles.languagePicker}>
+          <Picker
+            selectedValue={i18n.language}
+            onValueChange={(itemValue) => changeLanguage(itemValue)}
+          >
+            <Picker.Item label="English" value="en" />
+            <Picker.Item label="Français" value="fr" />
+            <Picker.Item label="Español" value="es" />
+            <Picker.Item label="العربية" value="ar" />
+         
+          </Picker>
+        </View>
+      )}
+        <View style={{ marginBottom: 90, marginLeft: "5%" }}>
+          <Text style={{ fontSize: 50, fontWeight: 15 }}>{t("Login")}</Text>
+        </View>
+
+        <View style={{ marginTop: -60 }}>
+          <Text style={{ marginLeft: "4%" }}>{t("Email")}</Text>
+          <View style={{
+            borderColor: emailTouched && errors.general ? "red" : "gray",
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 4,
+            marginBottom: 10,
+            marginTop: 5,
+            width: "92%",
+            marginLeft: "4%",
+          }}>
+            <TextInput
+              placeholder={t("Your email")}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={handleEmailChange}
+            />
+          </View>
+          {errors.general && (
+            <Text style={{ color: "red", marginLeft: "4%" }}>
+              {errors.general}
+            </Text>
+          )}
+
+          <Text style={{ marginLeft: "4%" }}>{t("Password")}</Text>
+          <View style={{
+            flexDirection: "row",
+            borderColor: passwordTouched && errors.password ? "red" : "gray",
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: 4,
+            marginBottom: 10,
+            marginTop: 5,
+            width: "92%",
+            marginLeft: "4%",
+          }}>
+            <TextInput
+              placeholder="*********"
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              value={password}
+              onChangeText={handlePasswordChange}
+              style={{ flex: 1 }}
+            />
+            <TouchableOpacity onPress={toggleShowPassword}>
+              <MaterialCommunityIcons
+                name={showPassword ? "eye-off" : "eye"}
+                size={24}
+                color="black"
+
+
+              />
+            </TouchableOpacity>
+          </View>
+          {errors.password && (
+            <Text style={{ color: "red", marginLeft: "4%" }}>
+              {errors.password}
+            </Text>
+          )}
+
+          <TouchableOpacity
+            onPress={handleLogin}
+            style={{
+              borderColor: "gray",
+              borderWidth: 1,
+              borderRadius: 8,
+              padding: 13,
+              marginBottom: 15,
+              alignSelf: "center",
+              alignItems: "center",
+              backgroundColor: Colors.PURPLE,
+              width: "92%",
+              marginLeft: "1%",
+            }}
+          >
+            <Text style={{ color: "#FFFFFF" }}>{t("Continue")}</Text>
+          </TouchableOpacity>
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              marginLeft: "2%",
+            }}
+          >
+            <TouchableOpacity
+              style={{ marginLeft: "2%" }}
+              onPress={toggleCheckbox}
+            >
+              <MaterialIcons
+                name={isChecked ? "check-box" : "check-box-outline-blank"}
+                size={20}
+                color={isChecked ? "green" : "black"}
+              />
+            </TouchableOpacity>
+            <Text>{t("Remember me?")}</Text>
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={{ marginLeft: "auto" }}
+            >
+              <Text style={{ color: Colors.PURPLE, marginRight: "4%" }}>
+                {t("Forgot Password")}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              marginTop: "5%",
+              justifyContent: "center",
+            }}
+          >
+            <View
+              style={{
+                borderBottomColor: "grey",
+                borderBottomWidth: 1,
+                width: "40%",
+                marginVertical: 5,
+                marginRight: "2%",
+              }}
+            />
+            <Text>{t("Or connect via")}</Text>
+            <View
+              style={{
+                borderBottomColor: "grey",
+                borderBottomWidth: 1,
+                width: "40%",
+                marginVertical: 5,
+                marginLeft: "2%",
+              }}
+            />
+          </View>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              marginTop: "5%",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: Colors.WHITE,
+                borderRadius: 50,
+                width: 50,
+                height: 50,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Image
+                source={require("../../assets/Icons/google.png")}
+                style={{ width: 45, height: 45, backgroundColor: Colors.WHITE }}
+              />
+            </View>
+            <View
+              style={{
+                borderRadius: 50,
+                width: 50,
+                height: 50,
+                alignItems: "center",
+                justifyContent: "center",
+                marginLeft: "10%",
+              }}
+            >
+              <Image
+                source={require("../../assets/Icons/facebook.png")}
+                style={{ width: 45, height: 45 }}
+              />
+            </View>
+          </View>
+          <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            marginTop: "5%",
+          }}
+        >
+          <Text>{t("Not a member yet?")}</Text>
+          <TouchableOpacity onPress={handleSignUp} style={{ marginLeft: "2%" }}>
+            <Text style={{ color: Colors.PURPLE }}>{t("Register here")}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View
+          style={{
+            alignItems: "center",
+            justifyContent: "center",
+            position: "absolute",
+            marginTop: "195%",
+            left: 0,
+            right: 0,
+          }}
+        >
+          <Text style={{ color: "gray" }}>
+            © {new Date().getUTCFullYear()} -{" "}
+            {t("Tawasalna - All Rights Reserved.")}
+          </Text>
+        </View>
+        </View>
+
+        {isLoading && (
+          <View style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+          }}>
+            <ActivityIndicator size="large" color={Colors.PURPLE} />
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+};
+const styles = {
+  languageSelector: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 1000
+  },
+  earthIcon: {
+    width: 30,
+    height: 30
+  },
+  languagePicker: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: Colors.WHITE,
+    borderRadius: 5,
+    elevation: 3,
+    zIndex: 1000,
+    width: 150
+  },
+
+};
+export default Login;

@@ -119,5 +119,6 @@
   "Code has expired!": "Le code a expiré !",
   "Email doesn't exist!": "L'adresse e-mail n'existe pas !",
   "Email is required!": "L'adresse e-mail est requise !",  
-  "Password is required!": "Le mot de passe est requis !" 
+  "Password is required!": "Le mot de passe est requis !" ,
+    "Complete your registration": "Complétez votre inscription"
 }

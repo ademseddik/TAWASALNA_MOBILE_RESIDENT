@@ -8,7 +8,7 @@ export default Colors = {
   BLUE1: "#EEF3F7",
   DARK_YELLOW: "#F7C77E",
   PRIMARY: "#242760",
-  PURPLE: "#770b7b",
+  PURPLE: "#2A003A",
   LIGHT_WHITE: "#f0f2f5",
   LIGHT_PURPLE: "#900562",
   PUPRLE2: "#723881",

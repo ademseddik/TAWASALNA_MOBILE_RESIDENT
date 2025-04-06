@@ -119,5 +119,6 @@
   "No notifications yet": "Nenhuma notificação ainda",
   "Email doesn't exist!": "O e-mail não existe!",
   "Email is required!": "O e-mail é obrigatório!",  
-  "Password is required!": "A senha é obrigatória!"  
+  "Password is required!": "A senha é obrigatória!" ,
+    "Complete your registration": "Conclua seu registro"
 }

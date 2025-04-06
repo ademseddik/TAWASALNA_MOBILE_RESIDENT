@@ -18,6 +18,8 @@ const VerifyAccount = () => {
     isConnected,
     code,
     email,
+    timeLeft,
+    isExpired,
     codeError,
     isLoading,
     codeInputRefs,

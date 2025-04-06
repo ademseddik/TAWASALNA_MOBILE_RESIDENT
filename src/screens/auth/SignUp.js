@@ -266,7 +266,7 @@ useEffect(() => {
 
           <Text style={{ marginLeft: "4%" }}>
             {t("Date Of Birth")}
-            <Text style={{ color: dateofbirthError ? "red" : "black" }}>*</Text>
+            <Text style={{ color: dateofbirthError ? "red" : "red" }}>*</Text>
           </Text>
           <View
             style={{
@@ -495,7 +495,7 @@ useEffect(() => {
           }}
         >
           <TouchableOpacity
-            style={{ marginLeft: "2%" }}
+            style={{ marginLeft: "5%" }}
             onPress={toggleCheckbox}
           >
             <MaterialIcons
@@ -504,7 +504,7 @@ useEffect(() => {
               color={isChecked ? "green" : "black"}
             />
           </TouchableOpacity>
-          <Text style={{ marginLeft: 15 }}>{t("I accept the")} </Text>
+          <Text style={{ marginLeft: 10 }}>{t("I accept the")} </Text>
           <TouchableOpacity onPress={toggleTermsModal}>
             <Text
               style={{

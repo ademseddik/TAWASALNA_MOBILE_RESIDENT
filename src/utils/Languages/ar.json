@@ -120,5 +120,6 @@
   "No notifications yet": "لا توجد إشعارات بعد",
   "Email is required!": "البريد الإلكتروني مطلوب!",  
   "Password is required!": "كلمة المرور مطلوبة!",
-   "Unauthorized access: Invalid user role": "وصول غير مصرح به: دور المستخدم غير صالح"
+   "Unauthorized access: Invalid user role": "وصول غير مصرح به: دور المستخدم غير صالح",
+     "Complete your registration": "أكمل تسجيلك"
 }

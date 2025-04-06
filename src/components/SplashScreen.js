@@ -31,11 +31,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#5024d4',
+    backgroundColor: '#2A003A',
   },
   animation: {
-    width: 300,
-    height: 300,
+    width: 700,
+    height: 700,
   },
 });
 

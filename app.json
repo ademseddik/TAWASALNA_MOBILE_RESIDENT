@@ -4,7 +4,7 @@
     "slug": "TAWASALNA",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Icons/TawasalnaLogoW1.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -19,13 +19,19 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
+      },
+      "splash": {
+        "resizeMode": "contain",
+        "image": "./assets/Icons/TawasalnaLogoW1.png",
+        "backgroundColor": "#2A003A"
       }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-localization"
+      "expo-localization",
+      "expo-secure-store"
     ]
   }
 }

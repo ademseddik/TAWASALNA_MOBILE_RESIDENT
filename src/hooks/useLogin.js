@@ -28,20 +28,20 @@ export const useLogin = () => {
   useEffect(() => {
     const checkRememberMe = async () => {
       const rememberMe = await AsyncStorage.getItem("RememberMe");
-      // if (rememberMe === "true") {
-      //   const [userId, token, timestamp] = await Promise.all([
-      //     AsyncStorage.getItem("userId"),
-      //     AsyncStorage.getItem("USER_ACCESS"),
-      //     AsyncStorage.getItem("lastLoginTimestamp")
-      //   ]);
+      if (rememberMe === "true") {
+        const [userId, token, timestamp] = await Promise.all([
+          AsyncStorage.getItem("userId"),
+          AsyncStorage.getItem("USER_ACCESS"),
+          AsyncStorage.getItem("lastLoginTimestamp")
+        ]);
 
-      //   if (userId && token && timestamp) {
-      //     const sevenDays = 7 * 24 * 60 * 60 * 1000;
-      //     if (Date.now() - parseInt(timestamp) < sevenDays) {
-      //       navigation.navigate("TABBAR");
-      //     }
-      //   }
-      // }
+        if (userId && token && timestamp) {
+          const sevenDays = 7 * 24 * 60 * 60 * 1000;
+          if (Date.now() - parseInt(timestamp) < sevenDays) {
+            navigation.navigate("ProfileScreen");
+          }
+        }
+      }
     };
     checkRememberMe();
   }, []);
@@ -83,7 +83,7 @@ export const useLogin = () => {
         AsyncStorage.setItem("lastLoginTimestamp", Date.now().toString())
       ]);
 
-      navigation.navigate("TABBAR");
+      navigation.navigate("ProfileScreen");
     } catch (error) {
       handleLoginError(error);
     } finally {

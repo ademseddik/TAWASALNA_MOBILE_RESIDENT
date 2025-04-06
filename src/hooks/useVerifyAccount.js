@@ -10,7 +10,7 @@ export const useVerifyAccount = () => {
   const route = useRoute();
   const { t } = useTranslation();
   const isConnected = useNetworkMonitor();
-  const [timeLeft, setTimeLeft] = useState(10); // 15 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(120); // 15 minutes in seconds
   const [isExpired, setIsExpired] = useState(false);
   const timerRef = useRef(null);
   const codeInputRefs = useRef([]);

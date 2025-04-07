@@ -109,7 +109,7 @@ export const useLogin = () => {
         navigation.navigate("Verify your account", { email: state.email });
         break;
       case 'Invalid credentials':
-        errors.general = t("Invalid credentials");
+        errors.password = t("Invalid credentials");
         handleInvalidCredentials();
         break;
       default:

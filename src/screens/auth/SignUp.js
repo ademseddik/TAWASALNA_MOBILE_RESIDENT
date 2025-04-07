@@ -9,19 +9,18 @@ import {
   ActivityIndicator,
   ScrollView,
   BackHandler,
+  Image,
 } from "react-native";
 import Colors from "../../../assets/Colors";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Termsofservices from "../../components/pupUps/Termsofservices";
 import PrivacyPolicy from "../../components/pupUps/PrivacyPolicy";
 import DateTimePicker from "@react-native-community/datetimepicker";
-//import createAxiosInstance from "../../core/config/Axios";
 import { APP_ENV } from "../../../src/utils/BaseUrl";
 import { I18nextProvider, useTranslation } from "react-i18next";
-//import i18n from "../../../i18n";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Axios from "axios";
-
+import { Picker } from '@react-native-picker/picker';
+import { AuthService } from '../../services/auth.service';
 
 const SignUp = () => {
   const navigation = useNavigation();
@@ -46,23 +45,28 @@ const SignUp = () => {
   const [isTermsModalVisible, setTermsModalVisible] = useState(false);
   const [isPrivacyPolicyModalVisible, setPrivacyPolicyModalVisible] =
     useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
+  //////////////////////////////////////////////communioty//////////////////////////////////////
+
 
   /////////////////////////////////////////////////////////////////
-useEffect(() => {
-  const backAction = () => {
-    navigation.navigate("Login");
-    return true; // Prevent default behavior
-  };
+  useEffect(() => {
+    const backAction = () => {
+      navigation.navigate("Login");
+      return true; // Prevent default behavior
+    };
 
-  const backHandler = BackHandler.addEventListener(
-    "hardwareBackPress",
-    backAction
-  );
+    const backHandler = BackHandler.addEventListener(
+      "hardwareBackPress",
+      backAction
+    );
 
-  return () => backHandler.remove();
-}, []);
+    return () => backHandler.remove();
+  }, []);
+
+ 
   //////////////////////////////////////////////////////////////////
   const togglePrivacyPolicyModal = () => {
     setPrivacyPolicyModalVisible(!isPrivacyPolicyModalVisible);
@@ -107,9 +111,9 @@ useEffect(() => {
   /////////////////////////////////////////////////////////////////////
   const handleSignUp = async () => {
     const passwordValidation = isValidPassword(password);
-     if (new Date(dateOfBirth) > new Date()) {
+    if (new Date(dateOfBirth) > new Date()) {
       setDateOfBirthError("Date of birth cannot be in the future");
-     }
+    }
     else if (!fullname.trim()) {
       setFullNameError("FullName is required!");
     } else if (!email.trim()) {
@@ -162,7 +166,7 @@ useEffect(() => {
 
     try {
       const response = await Axios.post(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/signup`,
-      
+
         {
           fullname,
           dateOfBirth: new Date(dateOfBirth),
@@ -173,7 +177,12 @@ useEffect(() => {
         }
       )
       console.log("Sign-up successful:", response.data);
-      console.log("date of birth", dateOfBirth);
+
+      const userResponse = await Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
+      const userId = userResponse.data;
+
+
+
       navigation.navigate("Verify email", { email });
     } catch (error) {
       if (error.response) {
@@ -205,27 +214,34 @@ useEffect(() => {
     setShowPicker(!showPicker);
   };
 
- const onchangeDatePicker = (event, selectedDate) => {
-   if (selectedDate) {
-     setDate(selectedDate);
-     const formattedDate = `${selectedDate.getFullYear()}-${
-       selectedDate.getMonth() + 1
-     }-${selectedDate.getDate()}`;
-     setDateOfBirth(formattedDate); 
-   }
-   setShowPicker(false); 
- };
+  const onchangeDatePicker = (event, selectedDate) => {
+    if (selectedDate) {
+      setDate(selectedDate);
+      const formattedDate = `${selectedDate.getFullYear()}-${selectedDate.getMonth() + 1
+        }-${selectedDate.getDate()}`;
+      setDateOfBirth(formattedDate);
+    }
+    setShowPicker(false);
+  };
 
- 
+
 
 
   return (
     <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
       <ScrollView style={{ marginTop: "10%" }}>
-        <View style={{ marginLeft: "5%", marginBottom: "-1%" }}>
-          <Text style={{ fontSize: 50, fontWeight: "bold" }}>
-            {t("Register")}
-          </Text>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginLeft: '5%',
+          marginBottom: 90
+        }}>
+          <Image
+            source={require('../../../assets/Icons/logo.png')}
+            style={{ width: 50, height: 50, marginRight: 10 }} // adjust size as needed
+            resizeMode="contain"
+          />
+          <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Register')}</Text>
         </View>
         <View style={{ marginTop: 20 }}>
           <Text style={{ marginLeft: "4%" }}>
@@ -352,10 +368,12 @@ useEffect(() => {
               {emailError || "Invalid email address"}
             </Text>
           ) : null}
+
           <Text style={{ marginLeft: "4%" }}>
             {t("Password")}
             <Text style={{ color: password.trim() ? "black" : "red" }}>*</Text>
           </Text>
+
           <View
             style={{
               flexDirection: "row",
@@ -405,7 +423,7 @@ useEffect(() => {
             />
             <TouchableOpacity onPress={toggleShowPassword}>
               <MaterialCommunityIcons
-                name={showPassword ? "eye-off" : "eye"}
+                name={showPassword ? "eye" : "eye-off"}
                 size={24}
                 color="black"
               />
@@ -428,7 +446,7 @@ useEffect(() => {
               alignItems: "center",
               borderColor:
                 confirmpasswordError ||
-                (confirmPassword.trim() && password !== confirmPassword)
+                  (confirmPassword.trim() && password !== confirmPassword)
                   ? "red"
                   : "gray",
               borderWidth: 1,
@@ -452,7 +470,7 @@ useEffect(() => {
             />
             <TouchableOpacity onPress={toggleShowConfirmPassword}>
               <MaterialCommunityIcons
-                name={showConfirmPassword ? "eye-off" : "eye"}
+                name={showConfirmPassword ? "eye" : "eye-off"}
                 size={24}
                 color="black"
               />
@@ -565,7 +583,7 @@ useEffect(() => {
             flexDirection: "row",
             marginLeft: "28%",
             marginTop: "5%",
-            marginBottom:'3%'
+            marginBottom: '3%'
           }}
         >
           <Text style={{ alignItems: "center" }}>
@@ -576,7 +594,7 @@ useEffect(() => {
           onPress={navigateToLogin}
           style={{ alignItems: "center" }}
         >
-          <Text style={{ color: Colors.PURPLE, marginLeft: "5%" , marginBottom:'10%'}}>
+          <Text style={{ color: Colors.PURPLE, marginLeft: "5%", marginBottom: '10%' }}>
             {t("Login now!")}
           </Text>
         </TouchableOpacity>

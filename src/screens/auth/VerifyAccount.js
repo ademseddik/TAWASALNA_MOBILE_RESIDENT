@@ -82,7 +82,7 @@ const VerifyAccount = () => {
             <Text style={styles.resendText}>{t("Resend")}</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.timerContainer}>
+        <View style={{ marginBottom: "6%", marginLeft: "21%" }}>
           {!isExpired ? (
             <Text style={styles.timerText}>
               {t('Code will expire in')} {timeLeft}

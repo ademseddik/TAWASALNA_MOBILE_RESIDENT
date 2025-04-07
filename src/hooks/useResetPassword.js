@@ -30,50 +30,57 @@ export const useResetPassword = () => {
       symbol: /[!@#$%^&*(),.?":{}|<>]/.test(password),
       number: /\d/.test(password),
     };
-
-    return {
-      isValid: Object.values(errors).every(valid => valid),
-      errors
-    };
+  
+    let errorMessage = "";
+    if (!errors.minLength) errorMessage += "Password must be at least 8 characters long.\n";
+    else if (!errors.uppercase) errorMessage += "Password must contain one uppercase letter.\n";
+    else if (!errors.lowercase) errorMessage += "Password must contain one lowercase letter.\n";
+    else if (!errors.symbol) errorMessage += "Password must contain one symbol.\n";
+    else if (!errors.number) errorMessage += "Password must contain one number.\n";
+  
+    return { isValid: Object.values(errors).every(v => v), errorMessage };
   };
-
-  const validateForm = () => {
-    const passwordValidation = isValidPassword(state.newPassword);
-    let newPasswordError = "";
-    
-    if (!state.newPassword.trim()) {
-      newPasswordError = t("Password is required");
-    } else if (!passwordValidation.isValid) {
-      newPasswordError = Object.entries(passwordValidation.errors)
-        .filter(([_, valid]) => !valid)
-        .map(([key]) => {
-          switch(key) {
-            case 'minLength': return t("Password must be at least 8 characters long");
-            case 'uppercase': return t("Password must contain at least one uppercase letter");
-            case 'lowercase': return t("Password must contain at least one lowercase letter");
-            case 'symbol': return t("Password must contain at least one symbol");
-            case 'number': return t("Password must contain at least one number");
-            default: return "";
-          }
-        })
-        .join("\n");
+  const handleChange = (name, value) => {
+    // Update state
+    setState(prev => ({ ...prev, [name]: value }));
+  
+    // Validate new password
+    if (name === "newPassword") {
+      const { isValid, errorMessage } = isValidPassword(value);
+      setState(prev => ({
+        ...prev,
+        newPasswordError: isValid ? "" : errorMessage.trim()
+      }));
     }
-
-    const confirmPasswordError = state.newPassword !== state.confirmPassword 
-      ? t("Passwords do not match") 
-      : "";
-
-    setState(prev => ({
-      ...prev,
-      newPasswordError,
-      confirmPasswordError
-    }));
-
-    return !newPasswordError && !confirmPasswordError;
+  
+    // Validate password match
+    if (name === "confirmPassword" || name === "newPassword") {
+      setState(prev => ({
+        ...prev,
+        confirmPasswordError: 
+          prev.confirmPassword && value !== prev.newPassword 
+            ? "Passwords do not match" 
+            : ""
+      }));
+    }
   };
+
+
 
   const handleResetPassword = async () => {
-    if (!validateForm()) return;
+    
+    const passwordValid = isValidPassword(state.newPassword).isValid;
+    const passwordsMatch = state.newPassword === state.confirmPassword;
+
+
+  if (!passwordValid || !passwordsMatch) {
+    setState(prev => ({
+      ...prev,
+      newPasswordError: !passwordValid ? prev.newPasswordError : "",
+      confirmPasswordError: !passwordsMatch ? "Passwords do not match" : ""
+    }));
+    return;
+  }
     
     setState(prev => ({ ...prev, isLoading: true }));
     
@@ -107,6 +114,7 @@ export const useResetPassword = () => {
     ...state,
     t,
     isConnected,
+    handleChange,
     setState: (update) => setState(prev => ({ ...prev, ...update })),
     handleResetPassword,
     toggleShowPassword: () => setState(prev => ({

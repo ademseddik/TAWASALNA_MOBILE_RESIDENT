@@ -49,14 +49,10 @@ const ProfileScreen = ({ navigation }) => {
 
       );
 
-
       setProfileData(response.data);
-     
+    
+      if(!response.data.dateOfBirth)
           setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
-        
-
-
-      
     } catch (error) {
       console.error("Error fetching profile data:", error);
     }
@@ -78,7 +74,7 @@ const ProfileScreen = ({ navigation }) => {
       const base64Image = encode(response.data);
       setProfilePhoto(user.imageUrl);
     } catch (error) {
-      console.error("Error fetching profilphoto:", error);
+     
       setProfilePhoto(null);
     }
   };
@@ -92,7 +88,7 @@ const ProfileScreen = ({ navigation }) => {
 
     try {
       // Clear stored credentials
-      await AsyncStorage.multiRemove(["userId", "token"]);
+      await AsyncStorage.multiRemove(["userId", "token","SOCIAL_AUTH"]);
 
       // Reset navigation stack and navigate to Login
       navigation.dispatch(

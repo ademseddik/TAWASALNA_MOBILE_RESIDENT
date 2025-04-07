@@ -74,7 +74,7 @@ export const useEnterCode = () => {
         code: enteredCode
       });
 
-      console.log("jawna fesfes",response)
+      console.log(response)
     
       await AsyncStorage.setItem("CodeFromEnterCode", enteredCode);
       navigation.navigate("Reset your password", { email: state.email });

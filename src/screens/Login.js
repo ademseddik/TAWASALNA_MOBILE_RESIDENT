@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  Modal,
+  FlatList
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import Colors from '../../assets/Colors';
@@ -32,6 +34,14 @@ export const useWarmUpBrowser = () => {
     };
   }, []);
 };
+const languages = [
+  { code: 'en', name: 'English', flag: require('../../assets/flags/enFlag.png') },
+  { code: 'fr', name: 'Français', flag: require('../../assets/flags/FranceFlag.png') },
+  { code: 'es', name: 'Español', flag: require('../../assets/flags/SpainFlag.png') },
+  { code: 'ar', name: 'العربية', flag: require('../../assets/flags/ArFlag.png') },
+  { code: 'pr', name: 'Portuguese', flag: require('../../assets/flags/portugalFlag.png') },
+  { code: 'al', name: 'German', flag: require('../../assets/flags/GermanyFlag.png') },
+];
 
 const SocialLoginButton = ({ strategy }) => {
   const getStrategy = () => {
@@ -148,6 +158,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
     }
   }, [user]);
   const handleSigninSocial = async (provider) => {
+    await AsyncStorage.setItem('SOCIAL_AUTH', "true");
     try {
       const concatenated = `${provider}_${user.primaryEmailAddress?.emailAddress}`;
       console.log(concatenated); // Output: "google_user@example.com"
@@ -228,7 +239,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
 
   return (
     <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
-      <View style={{ marginTop: '10%' }}>
+      <View style={{ marginTop: '6%' }}>
         <TouchableOpacity
           style={styles.languageSelector}
           onPress={() => setShowLanguagePicker(!showLanguagePicker)}
@@ -237,26 +248,50 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
         </TouchableOpacity>
 
         {showLanguagePicker && (
-          <View style={styles.languagePicker}>
-            <Picker
-              selectedValue={i18n.language}
-              onValueChange={(itemValue) => changeLanguage(itemValue)}
+  <Modal
+    transparent={true}
+    visible={showLanguagePicker}
+    onRequestClose={() => setShowLanguagePicker(false)}
+  >
+    <Pressable 
+      style={styles.modalOverlay} 
+      onPress={() => setShowLanguagePicker(false)}
+    >
+      <View style={styles.languageListContainer}>
+        <FlatList
+          data={languages}
+          keyExtractor={(item) => item.code}
+          renderItem={({ item }) => (
+            <Pressable
+              style={styles.languageItem}
+              onPress={() => {
+                changeLanguage(item.code);
+                setShowLanguagePicker(false);
+              }}
             >
-              <Picker.Item label="English" value="en" />
-              <Picker.Item label="Français" value="fr" />
-              <Picker.Item label="Español" value="es" />
-              <Picker.Item label="العربية" value="ar" />
-              <Picker.Item label="Portuguese" value="pr" />
-              <Picker.Item label="German" value="al" />
-
-            </Picker>
-          </View>
-        )}
-
-        <View style={{ marginBottom: 90, marginLeft: '5%' ,alignContent:'center'}}>
-          <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Login')}</Text>
-        </View>
-
+              <Image source={item.flag} style={styles.flagIcon} />
+              <Text style={styles.languageText}>{item.name}</Text>
+            </Pressable>
+          )}
+        />
+      </View>
+    </Pressable>
+  </Modal>
+)}
+      <View style={{
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginLeft: '5%',
+  marginBottom: 90,
+  marginTop:50
+}}>
+  <Image
+    source={require('../../assets/Icons/logo.png')}
+    style={{ width: 50, height: 50, marginRight: 10 }} // adjust size as needed
+    resizeMode="contain"
+  />
+  <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Login')}</Text>
+</View>
         <View style={{ marginTop: -60 }}>
           <Text style={{ marginLeft: '4%' }}>{t('Email')}</Text>
           <View
@@ -307,11 +342,12 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
             />
             <TouchableOpacity onPress={toggleShowPassword}>
               <MaterialCommunityIcons
-                name={showPassword ? 'eye-off' : 'eye'}
+                name={showPassword ? 'eye' : 'eye-off'}
                 size={24}
                 color="black"
               />
             </TouchableOpacity>
+
           </View>
           {errors.password && (
             <Text style={{ color: 'red', marginLeft: '4%' }}>{errors.password}</Text>
@@ -449,6 +485,34 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
 };
 
 const styles = {
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  languageListContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    maxHeight: '60%',
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  flagIcon: {
+    width: 30,
+    height: 20,
+    marginRight: 15,
+    borderRadius: 3,
+  },
+  languageText: {
+    fontSize: 16,
+  },
   languageSelector: {
     position: 'absolute',
     top: 20,

@@ -136,8 +136,8 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
           </TouchableOpacity>
 
           <ScrollView>
-            <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 20 }}>
-              {t("Complete your registration")}
+            <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 20,marginTop:10 }}>
+              {t("Complete your informations")}
             </Text>
 
             <Text style={{ marginBottom: 4 }}>{t("Your ID")}</Text>
@@ -182,20 +182,7 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
               </TouchableOpacity>
             </View>
 
-            <View style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 8,
-              marginBottom: 12
-            }}>
-              <Switch
-                value={dontShowAgain}
-                onValueChange={handleCheckboxToggle}
-                thumbColor={dontShowAgain ? Colors.PURPLE : "#ccc"}
-              />
-              <Text style={{ marginLeft: 10 }}>{t("Don't show this again")}</Text>
-            </View>
-
+         
             <TouchableOpacity
               onPress={handleSignUp}
               style={{

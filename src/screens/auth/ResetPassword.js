@@ -24,6 +24,7 @@ const ResetPassword = () => {
     isConnected,
     newPasswordError,
     confirmPasswordError,
+    handleChange,
     setState,
     handleResetPassword,
     toggleShowPassword,
@@ -54,7 +55,7 @@ const ResetPassword = () => {
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               value={newPassword}
-              onChangeText={(text) => setState({ newPassword: text })}
+              onChangeText={(text) => handleChange("newPassword", text)}
               style={styles.input}
             />
             <TouchableOpacity onPress={toggleShowPassword}>
@@ -66,7 +67,11 @@ const ResetPassword = () => {
             </TouchableOpacity>
           </View>
           {newPasswordError && (
-            <Text style={styles.errorText}>{newPasswordError}</Text>
+            <View style={styles.errorContainer}>
+              {newPasswordError.split('\n').map((line, index) => (
+                line && <Text key={index} style={styles.errorText}>{line}</Text>
+              ))}
+            </View>
           )}
         </View>
 
@@ -78,7 +83,7 @@ const ResetPassword = () => {
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
               value={confirmPassword}
-              onChangeText={(text) => setState({ confirmPassword: text })}
+              onChangeText={(text) => handleChange("confirmPassword", text)}
               style={styles.input}
             />
             <TouchableOpacity onPress={toggleShowConfirmPassword}>
@@ -94,8 +99,8 @@ const ResetPassword = () => {
           )}
         </View>
 
-        <TouchableOpacity 
-          onPress={handleResetPassword} 
+        <TouchableOpacity
+          onPress={handleResetPassword}
           style={styles.submitButton}
         >
           <MaterialIcons name="send" size={24} color={Colors.LIGHT_WHITE} />
@@ -125,7 +130,7 @@ const styles = {
   },
   inputContainer: {
     marginBottom: 20,
-    
+
   },
   label: {
     marginBottom: 5,
@@ -134,11 +139,11 @@ const styles = {
   passwordInput: {
     flexDirection: "row",
     borderColor: "gray",
-    width:"100%",
+    width: "100%",
     borderWidth: 1,
     borderRadius: 8,
     padding: 8,
-   
+
     alignItems: "center"
   },
   input: {

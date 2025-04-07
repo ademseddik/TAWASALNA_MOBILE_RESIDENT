@@ -24,7 +24,8 @@ import { useTranslation } from "react-i18next";
 import { APP_ENV } from "../../../src/utils/BaseUrl";
 import Axios from "axios";
 import { useNavigation } from "@react-navigation/native";
-import {  useUser } from '@clerk/clerk-expo';
+import { useUser } from '@clerk/clerk-expo';
+import { Picker } from '@react-native-picker/picker';
 
 
 
@@ -53,7 +54,13 @@ const EditProfile = () => {
   const [errorAddress, setErrorAddress] = useState("");
   const [errorAge, setErrorAge] = useState("");
   const [errorResidentId, setErrorResidentId] = useState("");
-    const { user } = useUser();
+  const { user } = useUser();
+  const [communities, setCommunities] = useState([]);
+  const [selectedCommunity, setSelectedCommunity] = useState('');
+  const [UserID, setUserID] = useState('');
+  const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
+  const [communityError, setCommunityError] = useState('');
+  const [isSocialAuth, setIsSocialAuth] = useState(false);
   //////////////////////////////////////////////////////////////////////
   const handleCloseSubmit = () => {
     setModalVisible(false);
@@ -90,6 +97,24 @@ const EditProfile = () => {
     //navigation.navigate("ProfileScreen");
   };
 
+  useEffect(() => {
+    const fetchCommunities = async () => {
+      try {
+        setIsLoadingCommunities(true);
+        const response = await Axios.get(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/community/findAll`);
+        setCommunities(response.data);
+
+
+      } catch (error) {
+        setCommunityError('Failed to load communities');
+        console.error('Error fetching communities:', error);
+      } finally {
+        setIsLoadingCommunities(false);
+      }
+    };
+
+    fetchCommunities();
+  }, []);
   //////////////////////////////////////////////////////////////////
   useEffect(() => {
     if (shouldUpdatePicture) {
@@ -142,6 +167,9 @@ const EditProfile = () => {
 
   ///////////////////////////////////////////////////////////////////////////
   const fetchProfile = useCallback(async () => {
+    const socialAuth = await AsyncStorage.getItem("SOCIAL_AUTH");
+    setIsSocialAuth(socialAuth === 'true'); // Add this line
+
     setIsLoading(true);
     try {
       const userId = await AsyncStorage.getItem("userId");
@@ -246,11 +274,11 @@ const EditProfile = () => {
     try {
       const userId = await AsyncStorage.getItem("userId");
       const token = await AsyncStorage.getItem("token");
-     
+
       await Axios.put(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/updateresidenprofile/${userId}`,
         {
-          
+
           residentId,
           fullName,
           address,
@@ -266,11 +294,19 @@ const EditProfile = () => {
           },
         }
       );
+      await Axios.put(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/community/${selectedCommunity}/userAdd/${userId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          }
+        }
+      );
       fetchProfile();
       showToastSuccess();
       navigation.navigate("ProfileScreen");
     } catch (error) {
-      console.error("Error Updating resident profile:", error);
+      navigation.navigate("ProfileScreen");
     }
   };
   /////////////////////////////////////////////////////////////////////////
@@ -305,7 +341,7 @@ const EditProfile = () => {
       console.log("Update Image successful");
       fetchProfilePhoto();
     } catch (error) {
-      console.error("Error updating profile photo:", error);
+
       throw new Error(error);
     }
   };
@@ -313,13 +349,13 @@ const EditProfile = () => {
   const fetchProfilePhoto = async () => {
     if (user) {
       await user.reload();
-      
-      console.log("photo uri is "+user.imageUrl)
 
-  } else {
-     
+      console.log("photo uri is " + user.imageUrl)
 
-  }
+    } else {
+
+
+    }
     setIsLoading(true);
     try {
       // const userId = await AsyncStorage.getItem("userId");
@@ -333,12 +369,12 @@ const EditProfile = () => {
       //     responseType: "arraybuffer",
       //   }
       // );
-     
+
       // const base64Image = encode(response.data);
       // const imageUrl = user.imageUrl;
       setSelectedImage(user.imageUrl);
     } catch (error) {
-      console.error("Error getting profile photo:", error);
+
     } finally {
       setIsLoading(false);
     }
@@ -418,6 +454,7 @@ const EditProfile = () => {
             </View>
           </View>
           <ScrollView
+            style={{ marginBottom: -60 }}
             contentContainerStyle={styles.containerInput}
             nestedScrollEnabled
           >
@@ -547,7 +584,46 @@ const EditProfile = () => {
                 </View>
               </View>
             </View>
-
+            <View style={{ marginLeft: "4%", marginTop: 15 }}>
+              <Text style={{ marginBottom: 5 }}>
+                {t("Community")}
+                <Text style={{ color: "red" }}>*</Text>
+              </Text>
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderRadius: 8,
+                  borderColor: communityError ? 'red' : 'gray',
+                  width: 320,
+                  marginBottom: 1,
+                }}
+              >
+                {isLoadingCommunities ? (
+                  <ActivityIndicator size="small" color={Colors.PURPLE} />
+                ) : (
+                  <Picker
+                    selectedValue={selectedCommunity}
+                    onValueChange={(itemValue) => {
+                      setSelectedCommunity(itemValue);
+                      setCommunityError('');
+                    }}
+                    style={{ color: Colors.BLACK }}
+                  >
+                    <Picker.Item label={t("Select a community")} value="" />
+                    {communities.map((community) => (
+                      <Picker.Item
+                        key={community.id}
+                        label={community.name}
+                        value={community.id}
+                      />
+                    ))}
+                  </Picker>
+                )}
+              </View>
+              {communityError && (
+                <Text style={{ color: 'red', marginLeft: '3%' }}>{communityError}</Text>
+              )}
+            </View>
             <View style={styles.interestsContainer}>
               {interestsData.map((interest) => (
                 <TouchableOpacity
@@ -569,7 +645,14 @@ const EditProfile = () => {
                 </TouchableOpacity>
               ))}
             </View>
-
+            {!isSocialAuth && (
+              <TouchableOpacity
+                
+                style={[styles.button, { backgroundColor: Colors.GRAY }]}
+              >
+                <Text style={styles.textBtn}>{t("Change Password")}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity onPress={handleOpenSubmit} style={styles.button}>
               <Text style={styles.textBtn}>{t("Save")}</Text>
             </TouchableOpacity>
@@ -593,6 +676,15 @@ const styles = StyleSheet.create({
 
     backgroundColor: "white",
     flex: 1,
+  },
+  button: { 
+    backgroundColor: Colors.LIGHT_PURPLE,
+    padding: 15,
+    alignItems: "center",
+    borderRadius: 5,
+    width: width * 0.9,
+    height: height * 0.07,
+    marginVertical: 10, // Add margin between buttons
   },
   bigContainer: {
 
@@ -653,8 +745,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   containerInput: {
-    justifyContent: "center",
-    alignItems: "center",
     gap: 10,
     padding: 20,
   },
@@ -671,7 +761,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   containerNested: {
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "space-between",
     width: width * 0.9,
   },

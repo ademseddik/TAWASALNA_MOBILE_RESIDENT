@@ -65,6 +65,11 @@ const EditProfile = () => {
   const handleCloseSubmit = () => {
     setModalVisible(false);
   };
+  const handlechangepassword = () => {
+    console.log("hello")
+   navigation.navigate("change password");
+  };
+
   const handleOpenSubmit = () => {
     setModalVisible(true);
   };
@@ -647,7 +652,7 @@ const EditProfile = () => {
             </View>
             {!isSocialAuth && (
               <TouchableOpacity
-                
+                onPress={handlechangepassword}
                 style={[styles.button, { backgroundColor: Colors.GRAY }]}
               >
                 <Text style={styles.textBtn}>{t("Change Password")}</Text>

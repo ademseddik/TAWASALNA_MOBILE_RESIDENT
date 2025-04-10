@@ -109,7 +109,9 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
       visible={isVisible}
       onRequestClose={onClose}
     >
-      <View style={{
+      <TouchableOpacity onPress={onClose}
+      ActivityIndicator={1}
+      style={{
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
@@ -122,19 +124,7 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
           width: "90%",
           maxHeight: "80%",
         }}>
-          <TouchableOpacity
-            onPress={onClose}
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              padding: 5,
-              zIndex: 1,
-            }}
-          >
-            <Ionicons name="close" size={24} color="black" />
-          </TouchableOpacity>
-
+     
           <ScrollView>
             <Text style={{ fontSize: 22, fontWeight: "bold", marginBottom: 20,marginTop:10 }}>
               {t("Complete your informations")}
@@ -214,7 +204,7 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
             </View>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };

@@ -177,6 +177,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
         }
       )
       await AsyncStorage.setItem('userId', response.data.id);
+      console.log(response.data.token)
       await AsyncStorage.setItem('USER_ACCESS', response.data.token);
       await AsyncStorage.setItem("USER_REFRESH", response.data.refreshToken),
       console.log("Sign-in successful:", response.data);

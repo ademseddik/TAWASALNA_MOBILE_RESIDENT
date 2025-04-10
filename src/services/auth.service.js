@@ -115,7 +115,20 @@ export const AuthService = {
       } catch (error) {
         throw error;
       }
-    }
- 
+    },
+ ///////////////////////////////////////////CHANGE PASSWORD////////////////////////////////////////////
 
+ ChangePassword: async (credentials) => {
+
+  try {
+    const response = await Axios.patch(
+      `${APP_ENV.AUTH_PORT}/tawasalna-user/residentmanagement/updatepassword/${credentials.userId}`,
+      credentials
+    );
+    
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+},
 };

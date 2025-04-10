@@ -13,6 +13,7 @@ import signup_with_social_media from './src/screens/auth/SignUpSocial';
 import VerifyAccount from './src/screens/auth/VerifyAccount';
 import EditProfile from './src/screens/profile/EditProfile';
 import ProfileScreen from "./src/screens/profile/UserProfile";
+import ChangePassword from './src/screens/profile/ChangePassword';
 //////////////////////////////////////////////////////////////////
 import { I18nextProvider } from 'react-i18next';
 import { ClerkProvider } from '@clerk/clerk-expo';
@@ -84,9 +85,14 @@ const App = () => {
               component={EditProfile}
               options={{ headerShown: false }}
             />
-                        <Stack.Screen
+            <Stack.Screen
               name="ProfileScreen"
               component={ProfileScreen}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="change password"
+              component={ChangePassword}
               options={{ headerShown: false }}
             />
           </Stack.Navigator>

@@ -70,7 +70,7 @@ export const useLogin = () => {
         email: state.email,
         password: state.password
       });
-      console.log(response.roles)
+      console.log(response)
       if (!response.roles?.includes("ROLE_COMMUNITY_MEMBER")) {
         throw new Error("UNAUTHORIZED_ROLE");
       }

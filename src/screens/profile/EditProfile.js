@@ -32,7 +32,7 @@ import { Picker } from '@react-native-picker/picker';
 
 const EditProfile = () => {
   //////////////////////////////////////////////////////////////////////
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImage, setSelectedImage] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -67,7 +67,7 @@ const EditProfile = () => {
   };
   const handlechangepassword = () => {
     console.log("hello")
-   navigation.navigate("change password");
+    navigation.navigate("change password");
   };
 
   const handleOpenSubmit = () => {
@@ -103,22 +103,36 @@ const EditProfile = () => {
   };
 
   useEffect(() => {
-    const fetchCommunities = async () => {
+    const fetchUserAndCommunities = async () => {
       try {
         setIsLoadingCommunities(true);
-        const response = await Axios.get(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/community/findAll`);
-        setCommunities(response.data);
 
+        const userId = await AsyncStorage.getItem("userId");
+        const userResponse = await Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/user/${userId}`);
+        console.log(userResponse)
+        const userCommunityId = userResponse?.data?.community?.id;
+
+        // Then fetch all communities
+        const communitiesResponse = await Axios.get(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/community/findAll`);
+        const allCommunities = communitiesResponse.data;
+
+        // Set states
+        setCommunities(allCommunities);
+
+        // Preselect user's community in the picker
+        if (userCommunityId) {
+          setSelectedCommunity(userCommunityId);
+        }
 
       } catch (error) {
         setCommunityError('Failed to load communities');
-        console.error('Error fetching communities:', error);
+        console.error('Error fetching communities or user:', error);
       } finally {
         setIsLoadingCommunities(false);
       }
     };
 
-    fetchCommunities();
+    fetchUserAndCommunities();
   }, []);
   //////////////////////////////////////////////////////////////////
   useEffect(() => {
@@ -141,7 +155,7 @@ const EditProfile = () => {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
-      console.log("Selected Image URI:", result.assets[0].uri);
+      console.log("Selected Image URI:", result.assets[0].name);
       if (selectedImage !== result.assets[0].uri) {
         setShouldUpdatePicture(true);
       }
@@ -189,7 +203,7 @@ const EditProfile = () => {
       );
       setData(response.data);
       const residentProfile = response.data;
-      console.log(residentProfile);
+      setSelectedImage(response.data.profilephoto);
       setFullName(residentProfile.fullName);
       if (!residentProfile.bio) {
         console.log("Bio is empty in the profile data");
@@ -430,34 +444,18 @@ const EditProfile = () => {
 
   return (
     <View style={styles.lastCont}>
-      <ScrollView contentContainerStyle={{ backgroundColor: "white", flex: 1 }}>
+      <ScrollView contentContainerStyle={{ backgroundColor: "white", flex: 1, }}>
         <View style={styles.bigContainer}>
-          <View style={styles.containerPhoto}>
-            {selectedImage !== "data:image/jpeg;base64," ? (
-              <Image source={{ uri: selectedImage }} style={styles.image} />
-            ) : (
-              <Image
-                source={require("../../../assets/profileimage.jpg")}
-                style={styles.image}
-              />
-            )}
-            <TouchableOpacity
-              style={styles.picker}
-              onPress={() => handleImageSelection()}
-            >
-              <View style={styles.iconContainer}>
-                <EvilIcons name="camera" size={20} color="white" />
-              </View>
-            </TouchableOpacity>
-            <View style={styles.containerText}>
-              <Text style={styles.textOne}>{fullName}</Text>
-              {residentId ? (
-                <Text style={styles.textTwo}>ID: {residentId}</Text>
-              ) : (
-                <Text style={styles.textTwo}></Text>
-              )}
-            </View>
-          </View>
+        <View style={styles.avatarContainer}>
+        <Image source={{ uri: selectedImage }} style={styles.avatar} />
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => handleImageSelection()}
+          >
+           <EvilIcons name="camera" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+
           <ScrollView
             style={{ marginBottom: -60 }}
             contentContainerStyle={styles.containerInput}
@@ -519,7 +517,7 @@ const EditProfile = () => {
                     name="calendar"
                     size={24}
                     color="black"
-                    style={{ marginLeft: -25 }}
+                    style={{ marginLeft: -35 }}
                   />
                 </TouchableOpacity>
               )}
@@ -653,15 +651,16 @@ const EditProfile = () => {
             {!isSocialAuth && (
               <TouchableOpacity
                 onPress={handlechangepassword}
-                style={[styles.button, { backgroundColor: Colors.GRAY }]}
+                style={[styles.button, { backgroundColor: Colors.GRAY, marginBottom: 40 }]}
               >
                 <Text style={styles.textBtn}>{t("Change Password")}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={handleOpenSubmit} style={styles.button}>
-              <Text style={styles.textBtn}>{t("Save")}</Text>
-            </TouchableOpacity>
+
           </ScrollView>
+          <TouchableOpacity onPress={handleOpenSubmit} style={styles.button}>
+            <Text style={styles.textBtn}>{t("Save")}</Text>
+          </TouchableOpacity>
         </View>
         <SuccessUpdatingProfile
           handleCloseSubmit={handleCloseSubmit}
@@ -682,7 +681,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     flex: 1,
   },
-  button: { 
+  button: {
     backgroundColor: Colors.LIGHT_PURPLE,
     padding: 15,
     alignItems: "center",
@@ -691,14 +690,7 @@ const styles = StyleSheet.create({
     height: height * 0.07,
     marginVertical: 10, // Add margin between buttons
   },
-  bigContainer: {
 
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 5,
-    height: height * 0.8,
-    backgroundColor: "white",
-  },
   containerPhoto: {
     marginTop: 20,
     justifyContent: "center",
@@ -708,6 +700,27 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     gap: 15,
   },
+  avatarContainer: {
+      position: "relative",
+      marginBottom: 20,
+      marginTop:50,
+    },
+    avatar: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      borderWidth: 3,
+      borderColor: Colors.LIGHT_PURPLE,
+    },
+    editButton: {
+      position: "absolute",
+      bottom: -2,
+      right: 4,
+      backgroundColor: Colors.LIGHT_PURPLE,
+      padding: 8, // Reduced padding
+      borderRadius: 20,
+      elevation: 3,
+    },
   image: {
     borderRadius: 100,
     height: height * 0.15,
@@ -810,15 +823,18 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   lastCont: {
+
     backgroundColor: "white",
     flex: 1,
   },
   bigContainer: {
-    justifyContent: "space-between",
+
+    justifyContent: "flex-end",
     alignItems: "center",
     gap: 5,
-    height: height * 0.8,
+    height: height * 1,
     backgroundColor: "white",
+
   },
   containerInput: {
     justifyContent: "center",
@@ -826,6 +842,7 @@ const styles = StyleSheet.create({
   },
   interestsContainer: {
     marginVertical: 10,
+    marginBottom:20
   },
   label: {
     fontWeight: "bold",
@@ -838,6 +855,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
     width: "90%",
+
   },
   textBtn: {
     color: "white",

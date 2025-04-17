@@ -27,7 +27,7 @@ const ProfileScreen = ({ navigation }) => {
 
   const { t } = useTranslation();
   const [profileData, setProfileData] = useState(null);
-  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
   const [loading, setLoading] = useState(true);
   const [isCompleteInformationsModalVisible, setCompleteInformationsModalVisible] = useState(false);
 
@@ -36,21 +36,35 @@ const ProfileScreen = ({ navigation }) => {
     setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
   };
   const fetchProfileData = async () => {
+   
     try {
       const userId = await AsyncStorage.getItem("userId");
       const token = await AsyncStorage.getItem("token");
+     
       const hideCompleteInformations = await AsyncStorage.getItem("hideCompleteInformations");
       const response = await Axios.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
-
-
       );
 
-      setProfileData(response.data);
+      const userinformations = await Axios.get(
+        `${APP_ENV.AUTH_PORT}/tawasalna-user/user/${userId}`);
+
+        const residentData = response.data;
+        const userCommunity = userinformations.data?.community?.name || null;
     
+        // Merge the two
+        const mergedData = {
+          ...residentData,
+          community: userCommunity
+        };
+        setProfilePhoto(residentData.profilephoto); // Use residentData instead of profileData
+        setProfileData(mergedData);
+    
+
+  
       if(!response.data.dateOfBirth)
           setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
     } catch (error) {
@@ -58,26 +72,7 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const fetchProfilePhoto = async () => {
-    try {
-      const userId = await AsyncStorage.getItem("userId");
-      const token = await AsyncStorage.getItem("token");
 
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          responseType: "arraybuffer",
-        }
-      );
-
-      const base64Image = encode(response.data);
-      setProfilePhoto(user.imageUrl);
-    } catch (error) {
-     
-      setProfilePhoto(null);
-    }
-  };
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -87,10 +82,10 @@ const ProfileScreen = ({ navigation }) => {
     }
 
     try {
-      // Clear stored credentials
+     
       await AsyncStorage.multiRemove(["userId", "token","SOCIAL_AUTH"]);
 
-      // Reset navigation stack and navigate to Login
+
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
@@ -104,7 +99,8 @@ const ProfileScreen = ({ navigation }) => {
   useEffect(() => {
     const loadData = async () => {
       await fetchProfileData();
-      await fetchProfilePhoto();
+    
+   
       setLoading(false);
     };
 
@@ -124,19 +120,12 @@ const ProfileScreen = ({ navigation }) => {
 
       <View style={styles.profileHeader}>
         <View style={styles.avatarContainer}>
-          {profilePhoto ? (
-            <Image source={{ uri: profilePhoto }} style={styles.avatar} />
-          ) : (
-            <Image
-              source={require("../../../assets/profileimage.jpg")}
-              style={styles.avatar}
-            />
-          )}
+        <Image source={{ uri: profilePhoto }} style={styles.avatar} />
           <TouchableOpacity
             style={styles.editButton}
             onPress={() => navigation.navigate("Edit profile")}
           >
-            <Text style={styles.editButtonText}>{t("Edit Profile")}</Text>
+           <EvilIcons name="pencil" size={24} color="white" />
           </TouchableOpacity>
         </View>
 
@@ -197,6 +186,13 @@ const ProfileScreen = ({ navigation }) => {
         </View>
       </View>
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{t("Community")}</Text>
+        <View style={styles.infoRow}>
+          <Text style={styles.infoLabel}>{t("Community name")}:</Text>
+          <Text style={styles.infoValue}>{profileData?.community || "-"}</Text>
+        </View>
+      </View>
+      <View style={styles.section}>
         <TouchableOpacity
           style={styles.signOutButton}
           onPress={handleSignOut}
@@ -236,11 +232,10 @@ const styles = StyleSheet.create({
   },
   editButton: {
     position: "absolute",
-    bottom: -10,
-    right: -10,
+    bottom: -2,
+    right: 4,
     backgroundColor: Colors.LIGHT_PURPLE,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    padding: 8, // Reduced padding
     borderRadius: 20,
     elevation: 3,
   },

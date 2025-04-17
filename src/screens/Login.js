@@ -163,7 +163,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
       const concatenated = `${provider}_${user.primaryEmailAddress?.emailAddress}`;
       console.log(concatenated); // Output: "google_user@example.com"
       console.log(user.fullName)
-      console.log(user.primaryEmailAddress?.emailAddress)
+      console.log("user inforamen",user.imageUrl)
       console.log(role)
       const email = user.primaryEmailAddress?.emailAddress;
       const fullname = user.fullName;
@@ -174,6 +174,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
           provider: provider,
           fullname: fullname,
           role,
+          image:user.imageUrl
         }
       )
       await AsyncStorage.setItem('userId', response.data.id);

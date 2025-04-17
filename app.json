@@ -4,7 +4,7 @@
     "slug": "TAWASALNA",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Icons/TawasalnaLogoW1.png",
+    "icon": "./assets/Icons/logoc.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -13,7 +13,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "splash": {
+        "resizeMode": "contain",
+        "image": "./assets/Icons/TawasalnaLogoW1.png",
+        "backgroundColor": "#2A003A"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +29,8 @@
         "resizeMode": "contain",
         "image": "./assets/Icons/TawasalnaLogoW1.png",
         "backgroundColor": "#2A003A"
-      }
+      },
+      "package": "com.adem1.TAWASALNA"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -32,6 +38,11 @@
     "plugins": [
       "expo-localization",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "39ac4e1b-45e6-49ab-ab00-f2bd3f15f08e"
+      }
+    }
   }
 }

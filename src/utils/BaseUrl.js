@@ -1,7 +1,9 @@
 
 export const APP_ENV = {
-    AUTH_PORT: "http://192.168.148.112:8070",
-    SOCIAL_PORT: "http://192.168.148.112:8093",
+    // AUTH_PORT: "http://194.146.13.51:30265",
+    // SOCIAL_PORT: "http://194.146.13.51:31499",
+        AUTH_PORT: "http://192.168.1.15:8070",
+    SOCIAL_PORT: "http://192.168.1.15:8093",
     HOST: process.env.EXPO_PUBLIC_HOST,
   };
   

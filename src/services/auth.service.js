@@ -119,16 +119,27 @@ export const AuthService = {
  ///////////////////////////////////////////CHANGE PASSWORD////////////////////////////////////////////
 
  ChangePassword: async (credentials) => {
+  console.log(credentials)
+  console.log(`token from the service ${credentials.token}`)
 
   try {
     const response = await Axios.patch(
       `${APP_ENV.AUTH_PORT}/tawasalna-user/residentmanagement/updatepassword/${credentials.userId}`,
-      credentials
-    );
-    
+      credentials,
+      {
+        headers: {
+          Authorization: `Bearer ${credentials.token}`, // Include token in headers
+        },
+      });
+  
+
     return response.data;
   } catch (error) {
     throw error;
   }
 },
+///////////////////////////////////get user id by email 
+getUserByEmail: async (email) => {
+  return Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
+}
 };

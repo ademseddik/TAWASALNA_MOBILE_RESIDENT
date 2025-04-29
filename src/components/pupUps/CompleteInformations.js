@@ -8,7 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons,  MaterialCommunityIcons } from "@expo/vector-icons";
+import {  MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import Axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -28,20 +28,11 @@ const CompleteInformations = ({ isVisible, onClose }) => {
   const [dateofbirthError, setDateOfBirthError] = useState("");
   const { t } = useTranslation();
   const { user } = useUser();
-  const [dontShowAgain, setDontShowAgain] = useState(false);
 
 
 
 
 
-  const handleCheckboxToggle = () => {
-    setDontShowAgain((prev) => !prev);
-  };
-  const isValidDateOfBirth = () => {
-    if (new Date(dateOfBirth) > new Date()) {
-      setDateOfBirthError("Date of birth cannot be in the future");
-    }
-  };
 
   const handleSignUp = async () => {
     if (new Date(dateOfBirth) > new Date()) {
@@ -68,19 +59,24 @@ const CompleteInformations = ({ isVisible, onClose }) => {
     const provider = await AsyncStorage.getItem('socialProvider');
 console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
     try {
-      const response = await Axios.put(
+      const userId = await AsyncStorage.getItem("userId");
+      const token = await AsyncStorage.getItem("token");
+
+     const responce= await Axios.put(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/updateresidenprofile/${userId}`,
         {
           residentId,
           provider:provider,
-          fullName:user.fullName,
           dateOfBirth: new Date(dateOfBirth),
-       
-     
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
       );
      
-      console.log("complete info successful:", response.data);
+      console.log("complete info successful:", responce.data);
       onClose();
     } catch (error) {
       console.error("complete info error:", error);

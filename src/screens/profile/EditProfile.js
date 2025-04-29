@@ -33,6 +33,8 @@ import { Picker } from '@react-native-picker/picker';
 const EditProfile = () => {
   //////////////////////////////////////////////////////////////////////
   const [selectedImage, setSelectedImage] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
+  const [coverImage, setCoverImage] = useState("https://i.ibb.co/fzzgjg27/profile-photo.jpg");
+
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -61,6 +63,7 @@ const EditProfile = () => {
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
   const [communityError, setCommunityError] = useState('');
   const [isSocialAuth, setIsSocialAuth] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   //////////////////////////////////////////////////////////////////////
   const handleCloseSubmit = () => {
     setModalVisible(false);
@@ -164,6 +167,65 @@ const EditProfile = () => {
     }
     console.log("Current selected image:", selectedImage);
   };
+  //////////////////////////////////Update the cover picture //////////
+  const handleCoverImageSelection = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [3, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const newUri = result.assets[0].uri;
+      setCoverImage(newUri); // For UI update
+      console.log(`Selected new cover URI: ${newUri}`);
+      UpdateCoverPicture(newUri); // Pass the new URI directly
+    }
+  };
+
+  const UpdateCoverPicture = async (imageUri) => {
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+      const token = await AsyncStorage.getItem("USER_ACCESS");
+
+      const formData = new FormData();
+      formData.append("coverPhoto", {
+        uri: imageUri, // Use passed-in URI
+        name: "cover.jpg",
+        type: "image/jpeg",
+      });
+
+      const res = await Axios.put(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/updatecoverpictures/${userId}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      Toast.show({
+        type: "success",
+        position: "top",
+        text1: "Cover Updated",
+        text2: "Your cover picture has been updated.",
+        visibilityTime: 3000,
+      });
+    } catch (error) {
+      console.error("Error uploading cover photo:", error);
+      Toast.show({
+        type: "error",
+        position: "top",
+        text1: "Upload Failed",
+        text2: "Something went wrong while updating your cover.",
+      });
+    }
+  };
+
+
 
   ////////////////////////////////////////////////////////////////
   const OnchangeBio = (event) => {
@@ -203,7 +265,13 @@ const EditProfile = () => {
       );
       setData(response.data);
       const residentProfile = response.data;
-      setSelectedImage(response.data.profilephoto);
+      if (response.data.profilephoto) {
+        setSelectedImage(response.data.profilephoto);
+      }
+      if (response.data.coverphoto) {
+        setCoverImage(response.data.coverphoto);
+      }
+
       setFullName(residentProfile.fullName);
       if (!residentProfile.bio) {
         console.log("Bio is empty in the profile data");
@@ -289,7 +357,7 @@ const EditProfile = () => {
     }
 
     if (hasError) return;
-
+    setIsSubmitting(true); 
     try {
       const userId = await AsyncStorage.getItem("userId");
       const token = await AsyncStorage.getItem("token");
@@ -323,9 +391,12 @@ const EditProfile = () => {
       );
       fetchProfile();
       showToastSuccess();
-      navigation.navigate("ProfileScreen");
+     
+      navigation.navigate("TABBAR", { screen: "Profile" });
     } catch (error) {
-      navigation.navigate("ProfileScreen");
+      navigation.navigate("TABBAR", { screen: "Profile" });
+    } finally {
+      setIsSubmitting(false);  // Add this line
     }
   };
   /////////////////////////////////////////////////////////////////////////
@@ -338,7 +409,7 @@ const EditProfile = () => {
         return;
       }
       const response = await fetch(selectedImage);
-      const blob = await response.blob();
+
 
       const formData = new FormData();
       formData.append("profilePhoto", {
@@ -446,23 +517,49 @@ const EditProfile = () => {
     <View style={styles.lastCont}>
       <ScrollView contentContainerStyle={{ backgroundColor: "white", flex: 1, }}>
         <View style={styles.bigContainer}>
-        <View style={styles.avatarContainer}>
-        <Image source={{ uri: selectedImage }} style={styles.avatar} />
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => handleImageSelection()}
-          >
-           <EvilIcons name="camera" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.profileHeaderWrapper}>
+            <View style={{ marginBottom: 20 }}>
+              <Image
+                source={{ uri: coverImage }}
+                style={{
+                  width: width,
+                  height: 200,
+                  resizeMode: "cover",
+                }}
+              />
+              <TouchableOpacity
+                onPress={handleCoverImageSelection}
+                style={{
+                  position: "absolute",
+                  bottom: 10,
+                  right: 10,
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                  padding: 8,
+                  borderRadius: 10,
+                }}
+              >
+                <Text style={{ color: "#fff" }}>Change Cover</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.avatarWrapper}>
+              <Image source={{ uri: selectedImage }} style={styles.avatar} />
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => handleImageSelection()}
+              >
+                <EvilIcons name="camera" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
           <ScrollView
-            style={{ marginBottom: -60 }}
+
             contentContainerStyle={styles.containerInput}
             nestedScrollEnabled
           >
             <Text
-              style={{ color: "grey", marginLeft: "-60%", marginBottom: -15 }}
+              style={styles.label2}
             >
               {t("FullName")}
             </Text>
@@ -475,14 +572,14 @@ const EditProfile = () => {
             />
             {errorFullName ? (
               <Text
-                style={{ color: "red", marginLeft: "-20%", marginTop: "-5%" }}
+                style={styles.label}
               >
                 {errorFullName}
               </Text>
             ) : null}
 
             <Text
-              style={{ color: "grey", marginLeft: "-60%", marginBottom: -15 }}
+              style={styles.label2}
             >
               {t("Date Of Birth")}
             </Text>
@@ -502,7 +599,7 @@ const EditProfile = () => {
                   onPress={toggleDatePicker}
                   style={{
                     flexDirection: "row",
-                    justifyContent: "flex-end",
+                    justifyContent: "center",
                     alignItems: "center",
                   }}
                 >
@@ -523,19 +620,20 @@ const EditProfile = () => {
               )}
             </View>
             <Text
-              style={{ color: "grey", marginLeft: -290, marginBottom: -15 }}
+              style={styles.label2}
             >
               {t("Bio")}
             </Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { height: 120, textAlignVertical: 'top', maxWidth: 300 }]} // make it taller and text start from top
               value={bio}
               onChangeText={OnchangeBio}
               placeholder="Bio"
+              multiline
             />
             {errorBio ? <Text style={styles.errorText}>{errorBio}</Text> : null}
             <Text
-              style={{ color: "grey", marginLeft: -260, marginBottom: -15 }}
+              style={styles.label2}
             >
               {t("Address")}
             </Text>
@@ -546,26 +644,37 @@ const EditProfile = () => {
               placeholder="Address"
             />
             {errorAddress ? <Text style={styles.errorText}>{errorAddress}</Text> : null}
-            <View style={styles.containerNested}>
-              <TextInput
-                style={styles.input}
-                value={age.toString()}
-                onChangeText={OnchangeAge}
-                placeholder="Age"
-                keyboardType="numeric"
-              />
-              {errorAge ? <Text style={styles.errorText}>{errorAge}</Text> : null}
-              <TextInput
-                style={styles.input}
-                value={residentId.toString()}
-                onChangeText={OnchangeResidentId}
-                placeholder="Resident ID"
-                keyboardType="numeric"
-              />
-              {errorResidentId ? <Text style={styles.errorText}>{errorResidentId}</Text> : null}
-            </View>
+            <Text
+              style={styles.label2}
+            >
+              {t("Age")}
+            </Text>
+
+
+            <TextInput
+              style={styles.input}
+              value={age.toString()}
+              onChangeText={OnchangeAge}
+              placeholder="Age"
+              keyboardType="numeric"
+            />
+            {errorAge ? <Text style={styles.errorText}>{errorAge}</Text> : null}
+            <Text
+              style={styles.label2}
+            >
+              {t("Resident ID")}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={residentId.toString()}
+              onChangeText={OnchangeResidentId}
+              placeholder="Resident ID"
+              keyboardType="numeric"
+            />
+            {errorResidentId ? <Text style={styles.errorText}>{errorResidentId}</Text> : null}
+
             <View style={styles.genderCont}>
-              <Text style={styles.gender}>{t("Gender")}</Text>
+              <Text style={styles.label2}>{t("Gender")}</Text>
               <View style={styles.nestedRadio}>
                 <View style={styles.radioButton}>
                   <RadioButton
@@ -587,17 +696,18 @@ const EditProfile = () => {
                 </View>
               </View>
             </View>
-            <View style={{ marginLeft: "4%", marginTop: 15 }}>
-              <Text style={{ marginBottom: 5 }}>
+            <View style={{  marginTop: 15 }}>
+              <Text style={styles.label3}>
                 {t("Community")}
-                <Text style={{ color: "red" }}>*</Text>
+        
               </Text>
               <View
                 style={{
                   borderWidth: 1,
                   borderRadius: 8,
                   borderColor: communityError ? 'red' : 'gray',
-                  width: 320,
+                  width: 310,
+                  
                   marginBottom: 1,
                 }}
               >
@@ -648,17 +758,18 @@ const EditProfile = () => {
                 </TouchableOpacity>
               ))}
             </View>
-            {!isSocialAuth && (
-              <TouchableOpacity
-                onPress={handlechangepassword}
-                style={[styles.button, { backgroundColor: Colors.GRAY, marginBottom: 40 }]}
-              >
-                <Text style={styles.textBtn}>{t("Change Password")}</Text>
-              </TouchableOpacity>
-            )}
+
 
           </ScrollView>
-          <TouchableOpacity onPress={handleOpenSubmit} style={styles.button}>
+          {!isSocialAuth && (
+            <TouchableOpacity
+              onPress={handlechangepassword}
+              style={[styles.button, { backgroundColor: 'transparent',borderColor:Colors.LIGHT_PURPLE,borderWidth:2 }]}
+            >
+              <Text style={styles.textBtnchangepassword}>{t("Change Password")}</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleOpenSubmit} style={[styles.button,{height:53}]}>
             <Text style={styles.textBtn}>{t("Save")}</Text>
           </TouchableOpacity>
         </View>
@@ -667,6 +778,7 @@ const EditProfile = () => {
           modalVisible={modalVisible}
           showToastSuccess={showToastSuccess}
           onConfirm={UpdateProfile}
+          isSubmitting={isSubmitting}
         />
       </ScrollView>
     </View>
@@ -681,15 +793,46 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     flex: 1,
   },
-  button: {
-    backgroundColor: Colors.LIGHT_PURPLE,
-    padding: 15,
-    alignItems: "center",
-    borderRadius: 5,
-    width: width * 0.9,
-    height: height * 0.07,
-    marginVertical: 10, // Add margin between buttons
+  profileHeaderWrapper: {
+    position: "relative",
+    width: "100%",
+    height: 200, // Adjust height as needed
+    backgroundColor: "#f0f0f0",
+    marginBottom: 60, // space below the avatar
   },
+
+  coverImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+
+  avatarWrapper: {
+    position: "absolute",
+    bottom: -55,
+    alignSelf: "center",
+    alignItems: "center",
+  },
+
+  avatar: {
+    width: 100,
+    height: 100,
+
+    borderColor: "white",
+  },
+
+  editButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: "#8A2BE2", // or any color you like
+    padding: 6,
+    borderRadius: 20,
+    elevation: 3,
+  },
+ 
 
   containerPhoto: {
     marginTop: 20,
@@ -701,26 +844,25 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   avatarContainer: {
-      position: "relative",
-      marginBottom: 20,
-      marginTop:50,
-    },
-    avatar: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      borderWidth: 3,
-      borderColor: Colors.LIGHT_PURPLE,
-    },
-    editButton: {
-      position: "absolute",
-      bottom: -2,
-      right: 4,
-      backgroundColor: Colors.LIGHT_PURPLE,
-      padding: 8, // Reduced padding
-      borderRadius: 20,
-      elevation: 3,
-    },
+    position: "relative",
+    marginBottom: 20,
+    marginTop: 50,
+  },
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+
+  },
+  editButton: {
+    position: "absolute",
+    bottom: -2,
+    right: 4,
+    backgroundColor: Colors.LIGHT_PURPLE,
+    padding: 8, // Reduced padding
+    borderRadius: 20,
+    elevation: 3,
+  },
   image: {
     borderRadius: 100,
     height: height * 0.15,
@@ -772,6 +914,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingVertical: 10,
     paddingHorizontal: 5,
+    maxWidth: 300,
     width: width * 0.9,
   },
   errorText: {
@@ -782,6 +925,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     justifyContent: "space-between",
     width: width * 0.9,
+    maxWidth: 300
   },
   nestedInputesOne: {
     flex: 1,
@@ -795,7 +939,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
-    marginLeft: 17,
+   paddingEnd:12,
     marginTop: 5,
   },
   gender: {
@@ -810,17 +954,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  button: {
-    backgroundColor: Colors.LIGHT_PURPLE,
-    padding: 15,
-    alignItems: "center",
-    borderRadius: 5,
-    width: width * 0.9,
-    height: height * 0.07,
-  },
-  textBtn: {
-    color: "#fff",
+ 
+  textBtnchangepassword: {
+    color: Colors.LIGHT_PURPLE,
     fontWeight: "bold",
+    fontSize: 20,
   },
   lastCont: {
 
@@ -840,14 +978,26 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  interestsContainer: {
-    marginVertical: 10,
-    marginBottom:20
-  },
+
   label: {
     fontWeight: "bold",
     marginBottom: 5,
   },
+  label2: {
+    fontWeight: "bold",
+    color: "black", marginLeft: 30,
+    marginBottom: 5,
+    marginLeft: 40,
+    alignSelf: "flex-start"
+  },
+  label3: {
+    fontWeight: "bold",
+    color: "black", 
+    marginBottom: 5,
+    marginLeft: 3,
+    alignSelf: "flex-start"
+  },
+
   button: {
     backgroundColor: Colors.LIGHT_PURPLE,
     padding: 10,
@@ -872,6 +1022,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 10,
+    marginLeft:20,
   },
   interestButton: {
     backgroundColor: "#f0f0f0",

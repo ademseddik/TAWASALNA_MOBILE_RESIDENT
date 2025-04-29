@@ -26,6 +26,7 @@ export const useSignUp = () => {
     passwordError: "",
     confirmpasswordError: "",
     termspolicyError: "",
+    
     isTermsModalVisible: false,
     isPrivacyPolicyModalVisible: false,
     isLoading: false,

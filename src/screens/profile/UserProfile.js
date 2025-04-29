@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  ScrollView,
   Image,
   StyleSheet,
   Dimensions,
@@ -16,18 +15,41 @@ import Colors from "../../../assets/Colors";
 import Axios from "axios";
 import { useTranslation } from "react-i18next";
 import { APP_ENV } from "../../../src/utils/BaseUrl";
-import { encode } from "base64-arraybuffer";
-import { useOAuth, useAuth, useUser } from '@clerk/clerk-expo';
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import CompleteInformations from "../../components/pupUps/CompleteInformations";
-const { width, height } = Dimensions.get("window");
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
+import InfoRoute from './InfoRoute';
+import FriendsRoute from './FriendsRoute';
+import PostsRoute from './PostsRoute';
+import { ScrollView } from 'react-native-virtualized-view';
+// Remove the existing ScrollView import from 'react-native'
+
+
+
+
+const initialLayout = { width: Dimensions.get('window').width };
 
 const ProfileScreen = ({ navigation }) => {
-  const {user } = useUser(); // User data from Clerk
+  const [index, setIndex] = useState(0);
+  const [routes] = useState([
+    { key: 'posts', title: 'Posts' },
+    { key: 'friends', title: 'Friends' },
+    { key: 'info', title: 'Info' },
+  ]);
+
+  const renderScene = SceneMap({
+    posts: PostsRoute,
+    friends: FriendsRoute,
+    info: InfoRoute,
+  });
+  const { user } = useUser(); // User data from Clerk
   const { signOut } = useAuth();
 
   const { t } = useTranslation();
   const [profileData, setProfileData] = useState(null);
   const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
+  const [coverImage, setCoverImage] = useState("https://i.ibb.co/fzzgjg27/profile-photo.jpg");
+
   const [loading, setLoading] = useState(true);
   const [isCompleteInformationsModalVisible, setCompleteInformationsModalVisible] = useState(false);
 
@@ -36,12 +58,11 @@ const ProfileScreen = ({ navigation }) => {
     setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
   };
   const fetchProfileData = async () => {
-   
+
     try {
       const userId = await AsyncStorage.getItem("userId");
       const token = await AsyncStorage.getItem("token");
-     
-      const hideCompleteInformations = await AsyncStorage.getItem("hideCompleteInformations");
+
       const response = await Axios.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`,
         {
@@ -52,21 +73,29 @@ const ProfileScreen = ({ navigation }) => {
       const userinformations = await Axios.get(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/user/${userId}`);
 
-        const residentData = response.data;
-        const userCommunity = userinformations.data?.community?.name || null;
-    
-        // Merge the two
-        const mergedData = {
-          ...residentData,
-          community: userCommunity
-        };
+      const residentData = response.data;
+      const userCommunity = userinformations.data?.community?.name || null;
+   console.log(userinformations.data?.community?.id)
+    AsyncStorage.setItem("USERCOMMUNITY", userinformations.data?.community?.id)
+      // Merge the two
+      const mergedData = {
+        ...residentData,
+        community: userCommunity
+      };
+      if (residentData.profilephoto) {
         setProfilePhoto(residentData.profilephoto); // Use residentData instead of profileData
-        setProfileData(mergedData);
-    
 
-  
-      if(!response.data.dateOfBirth)
-          setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
+      }
+      if (residentData.coverphoto) {
+        setCoverImage(residentData.coverphoto);
+      }
+
+      setProfileData(mergedData);
+
+
+
+      if (!response.data.dateOfBirth)
+        setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
     } catch (error) {
       console.error("Error fetching profile data:", error);
     }
@@ -82,8 +111,8 @@ const ProfileScreen = ({ navigation }) => {
     }
 
     try {
-     
-      await AsyncStorage.multiRemove(["userId", "token","SOCIAL_AUTH"]);
+
+      await AsyncStorage.multiRemove(["userId", "token", "SOCIAL_AUTH"]);
 
 
       navigation.dispatch(
@@ -99,8 +128,8 @@ const ProfileScreen = ({ navigation }) => {
   useEffect(() => {
     const loadData = async () => {
       await fetchProfileData();
-    
-   
+
+
       setLoading(false);
     };
 
@@ -117,89 +146,77 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
+   
+   <View style={styles.profileHeaderWrapper}>
+  <View style={styles.coverImageWrapper}>
+    <TouchableOpacity
+      style={styles.signOutButton}
+      onPress={handleSignOut}
+    >
+      <Image
+              source={require("../../../assets/Icons/logout.png")} 
+              style={styles.signOutIcon}
+            />
+    </TouchableOpacity>
+    <Image source={{ uri: coverImage }} style={styles.coverImage} />
+  </View>
+  
+  <View style={styles.avatarWrapper}>
+    <Image source={{ uri: profilePhoto }} style={styles.avatar} />
+    <TouchableOpacity
+      style={styles.editButton}
+      onPress={() => navigation.navigate("Edit profile")}
+    >
+      <EvilIcons name="pencil" size={24} color="white" />
+    </TouchableOpacity>
+  </View>
 
-      <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-        <Image source={{ uri: profilePhoto }} style={styles.avatar} />
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => navigation.navigate("Edit profile")}
-          >
-           <EvilIcons name="pencil" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.profileInfo}>
-          <Text style={styles.name}>{profileData?.fullName || ""}</Text>
-          {profileData?.residentId && (
-            <Text style={styles.residentId}>ID: {profileData.residentId}</Text>
-          )}
-        </View>
-      </View>
+  <View style={styles.profileInfo}>
+    <Text style={styles.name}>{profileData?.fullName || ""}</Text>
+    {profileData?.residentId && (
+      <Text style={styles.residentId}>ID: {profileData.residentId}</Text>
+    )}
+    <Text style={styles.bio}> {profileData.bio}</Text>
+  </View>
+</View>
       <CompleteInformations
         isVisible={isCompleteInformationsModalVisible}
         onClose={toggleCompleteInformationsModal}
       />
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("About Me")}</Text>
-        <Text style={styles.sectionContent}>
-          {profileData?.bio || t("No bio availabe")}
-        </Text>
+      <View style={{ flex: 1, height: Dimensions.get('window').height * 0.6 }}>
+
+        <TabView
+          style={{ flex: 1 }}
+          navigationState={{ index, routes }}
+          renderScene={renderScene}
+          onIndexChange={setIndex}
+          initialLayout={initialLayout}
+          overScrollMode={"always"}
+          renderTabBar={props => (
+            <TabBar
+              {...props}
+              indicatorStyle={{ backgroundColor: "white" ,height:3}}
+              style={{ backgroundColor: Colors.LIGHT_PURPLE,elevation:30}}
+
+              renderLabel={({ route }) => (
+                <Text style={{
+                  color: 'black',
+                  fontWeight: 'bold',
+                  textShadowColor: 'black',
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 0,
+                }}>
+                  {route.title}
+                </Text>
+              )}
+            />
+          )}
+        />
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("Personal Information")}</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t("Age")}:</Text>
-          <Text style={styles.infoValue}>{profileData?.age || "-"}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t("Gender")}:</Text>
-          <Text style={styles.infoValue}>
-            {profileData?.gender ? t(profileData.gender) : "-"}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t("Date of Birth")}:</Text>
-          <Text style={styles.infoValue}>
-            {profileData?.dateOfBirth ?
-              new Date(profileData.dateOfBirth).toLocaleDateString()
-              : "-"}
-          </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t("Address")}:</Text>
-          <Text style={styles.infoValue}>
-            {profileData?.address || t("No address provided")}
-          </Text>
-        </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("Interests")}</Text>
-        <View style={styles.interestsContainer}>
-          {profileData?.interests?.map((interest, index) => (
-            <View key={index} style={styles.interestTag}>
-              <Text style={styles.interestText}>{t(interest)}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t("Community")}</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>{t("Community name")}:</Text>
-          <Text style={styles.infoValue}>{profileData?.community || "-"}</Text>
-        </View>
-      </View>
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.signOutButton}
-          onPress={handleSignOut}
-        >
-          <Text style={styles.signOutText}>{t("Sign Out")}</Text>
-        </TouchableOpacity>
-      </View>
+    
+
     </ScrollView>
   );
 };
@@ -207,9 +224,39 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "white",
-    padding: 20,
-    marginTop: 20
+
+   
   },
+  signOutIcon: {
+    width: 24,
+    height: 24,
+  },
+  coverImageWrapper: {
+    position: "relative",
+    width: "100%",
+  },
+
+  signOutButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: Colors.RED,
+    padding: 8,
+    borderRadius: 20,
+    zIndex: 1, // Ensure it's above the image
+  },
+  signOutText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+
+  coverImage: {
+    width: "100%",
+    height: 180,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -219,15 +266,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 30,
   },
+  profileHeaderWrapper: {
+    marginBottom: 30,
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  scene: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  
+
   avatarContainer: {
     position: "relative",
     marginBottom: 20,
+    marginTop: -10
   },
   avatar: {
+    position: "relative",
     width: 120,
     height: 120,
     borderRadius: 60,
-    borderWidth: 3,
+    marginTop: -70,
+
     borderColor: Colors.LIGHT_PURPLE,
   },
   editButton: {
@@ -235,7 +298,7 @@ const styles = StyleSheet.create({
     bottom: -2,
     right: 4,
     backgroundColor: Colors.LIGHT_PURPLE,
-    padding: 8, // Reduced padding
+    padding: 8,
     borderRadius: 20,
     elevation: 3,
   },
@@ -255,7 +318,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.GRAY,
   },
+  bio: {
+    fontSize: 16,
+    color: Colors.GRAY,
+    maxWidth: 300,
+  },
   section: {
+    marginRight: 10,
+    marginLeft: 10,
     marginBottom: 25,
     backgroundColor: Colors.LIGHT_WHITE,
     borderRadius: 10,
@@ -304,20 +374,8 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
   },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.RED,
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  signOutText: {
-    color: 'white',
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
+ 
+ 
 });
 
 export default ProfileScreen;

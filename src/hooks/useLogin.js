@@ -38,7 +38,7 @@ export const useLogin = () => {
         if (userId && token && timestamp) {
           const sevenDays = 7 * 24 * 60 * 60 * 1000;
           if (Date.now() - parseInt(timestamp) < sevenDays) {
-            navigation.navigate("ProfileScreen");
+            navigation.navigate("TABBAR");
           }
         }
       }
@@ -83,7 +83,7 @@ export const useLogin = () => {
         AsyncStorage.setItem("lastLoginTimestamp", Date.now().toString())
       ]);
 
-      navigation.navigate("ProfileScreen");
+      navigation.navigate("TABBAR");
     } catch (error) {
       handleLoginError(error);
     } finally {

@@ -1,163 +1,153 @@
-import React from 'react';
-// import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  FlatList,
-  TouchableOpacity,
-  SafeAreaView,
-  // ActivityIndicator,
-  StyleSheet
-} from 'react-native';
-// import { useNavigation } from '@react-navigation/native';
-// import axios from 'axios';
-// import { APP_ENV } from '../../core/utils/BaseUrl';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
+// src/screens/HomeScreen.js
 
-const HomeScreen = () => {
-  // Comment out all state management
-  // const [posts, setPosts] = useState([]);
-  // const [loading, setLoading] = useState(true);
-  // const [error, setError] = useState(null);
-  // const navigation = useNavigation();
+import React, { useEffect, useState, useCallback } from 'react';
+import { Animated, BackHandler, View, Image, Text, StyleSheet } from 'react-native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator } from '@react-navigation/drawer'; // << ADD THIS
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { ProfileService } from '../services/profile.service';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-  // Comment out API calls
-  /*
-  useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const token = await AsyncStorage.getItem('USER_ACCESS');
-        const response = await axios.get(`${APP_ENV.SOCIAL_PORT}/posts`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setPosts(response.data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+// Screens
+import Home from './tabs/HomeScreen';
+import Search from './tabs/SearchScreen';
+import AddPost from './tabs/AddPost';
+import Reels from './tabs/ReelScreen';
+import Profile from './profile/UserProfile';
+
+const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator(); 
+
+const HomeScreen = ({ route }) => {
+  const [scrollY] = useState(new Animated.Value(0));
+  const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
+  const [initialTab] = useState(route.params?.initialTab || "Home");
+  const [currentTab, setCurrentTab] = useState(initialTab); // <<< NEW
+
+  const fetchProfileData = async () => {
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+      const token = await AsyncStorage.getItem("token");
+      const response = await ProfileService.GetProfileData({
+        userId: userId,
+        token: token,
+      });
+      if (response.profilephoto) {
+        setProfilePhoto(response.profilephoto);
       }
-    };
-    
-    fetchPosts();
-  }, []);
-  */
-
-  // Comment out interaction handlers
-  /*
-  const handlePostPress = (postId) => {
-    navigation.navigate('PostDetails', { postId });
+      console.log(response);
+    } catch (error) {
+      console.error("Error fetching profile data:", error);
+    }
   };
-  */
 
-  // Comment out render items
-  /*
-  const renderPostItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.postContainer}
-      onPress={() => handlePostPress(item.id)}
-    >
-      <Text style={styles.postTitle}>{item.title}</Text>
-      <Text>{item.content}</Text>
-    </TouchableOpacity>
+  useEffect(() => {
+    const loadData = async () => {
+      await fetchProfileData();
+    };
+    loadData();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        BackHandler.exitApp();
+        return true;
+      };
+
+      BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      return () => {
+        BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+      };
+    }, [])
   );
-  */
 
-  // Static UI only
+  const renderCustomHeader = () => {
+    return (
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>{currentTab}</Text>
+      </View>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Home</Text>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-        />
-      </View>
+    <View style={{ flex: 1 }}>
+      {renderCustomHeader()}
 
-      {/* Example static content */}
-      <View style={styles.postContainer}>
-        <Text style={styles.postTitle}>Sample Post Title 1</Text>
-        <Text>This is a sample post content to demonstrate the UI layout.</Text>
-      </View>
-
-      <View style={styles.postContainer}>
-        <Text style={styles.postTitle}>Sample Post Title 2</Text>
-        <Text>Another example of static content for the home feed.</Text>
-      </View>
-
-      {/* Commented out dynamic content */}
-      {/* {loading ? (
-        <ActivityIndicator size="large" />
-      ) : error ? (
-        <Text>Error loading posts</Text>
-      ) : (
-        <FlatList
-          data={posts}
-          renderItem={renderPostItem}
-          keyExtractor={item => item.id.toString()}
-        />
-      )} */}
-
-      {/* Static bottom navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navButton}>
-          <Text>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}>
-          <Text>Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}>
-          <Text>Settings</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      <Tab.Navigator
+        initialRouteName={initialTab}
+        screenOptions={({ route }) => ({
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarStyle: {
+            backgroundColor: '#fff',
+            borderTopWidth: 0.5,
+            borderTopColor: '#ccc',
+          },
+          tabBarIcon: ({ focused, color, size }) => {
+            switch (route.name) {
+              case 'Home':
+                return <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />;
+              case 'Search':
+                return <Feather name="search" size={24} color={color} />;
+              case 'Add':
+                return <Ionicons name="add-circle-outline" size={28} color={color} />;
+              case 'Reels':
+                return <MaterialCommunityIcons name="movie-open-play-outline" size={24} color={color} />;
+              case 'Profile':
+                return (
+                  <Image
+                    source={{ uri: profilePhoto }}
+                    style={{
+                      width: focused ? 30 : 26,
+                      height: focused ? 30 : 26,
+                      borderRadius: 15,
+                      borderWidth: focused ? 2 : 1,
+                      borderColor: focused ? 'black' : 'gray',
+                    }}
+                  />
+                );
+              default:
+                return null;
+            }
+          },
+          tabBarActiveTintColor: 'black',
+          tabBarInactiveTintColor: 'gray',
+        })}
+        screenListeners={{
+          state: (e) => {
+            const index = e.data.state.index;
+            const routeName = e.data.state.routeNames[index];
+            setCurrentTab(routeName); // <<< when tab changes, update the header title
+          },
+        }}
+      >
+        <Tab.Screen name="Home" component={Home} />
+        <Tab.Screen name="Search" component={Search} />
+        <Tab.Screen name="Add" component={AddPost} />
+        <Tab.Screen name="Reels" component={Reels} />
+        <Tab.Screen name="Profile" component={Profile} />
+      </Tab.Navigator>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  headerContainer: {
+    height: 80,
     backgroundColor: '#fff',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    justifyContent: 'center',
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#ccc',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    marginTop:10
   },
-  logo: {
-    width: 40,
-    height: 40,
-  },
-  postContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  postTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  bottomNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-  },
-  navButton: {
-    padding: 8,
-  }
 });
 
 export default HomeScreen;

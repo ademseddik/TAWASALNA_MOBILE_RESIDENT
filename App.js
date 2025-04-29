@@ -1,6 +1,9 @@
 import React from 'react';
+import { enableScreens } from 'react-native-screens';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+
 ///////////////////////screens import/////////////////////////////
 import SplashScreen from './src/components/SplashScreen';
 import LoginScreen from './src/screens/Login';
@@ -20,11 +23,11 @@ import { ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
 //import { Slot } from 'expo-router';
 import i18n from './i18n';
+enableScreens();
 const Stack = createStackNavigator();
-
+const Drawer = createDrawerNavigator();
 const App = () => {
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY
-  console.log(publishableKey)
   if (!publishableKey) {
     throw new Error('Add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env')
   }
@@ -78,7 +81,7 @@ const App = () => {
             <Stack.Screen
               name="TABBAR"
               component={HomeScreen}
-              options={{ headerShown: false }}
+              options={{ headerShown: false}}
             />
             <Stack.Screen
               name="Edit profile"

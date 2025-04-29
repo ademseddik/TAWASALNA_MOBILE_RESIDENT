@@ -7,6 +7,7 @@ import {
     Dimensions,
     Image,
     TextInput,
+    ActivityIndicator
   } from "react-native";
   import React, { useState } from "react";
   import Colors from "../../../assets/Colors";
@@ -17,6 +18,7 @@ import {
     handleCloseSubmit,
     showToastSuccess,
     onConfirm,
+    isSubmitting,
   }) => {
     return (
       <View>
@@ -43,18 +45,27 @@ import {
                 >
                   <Text style={styles.textCancel}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.submitbtn}>
-                  <Text
-                    style={styles.textSubmit}
-                    onPress={() => {
-                      showToastSuccess();
-                      handleCloseSubmit();
-                      onConfirm();
-                    }}
-                  >
-                    Submit
-                  </Text>
-                </TouchableOpacity>
+                <TouchableOpacity 
+          style={styles.submitbtn} 
+          onPress={async () => {
+            if (!isSubmitting) {
+              try {
+                await onConfirm();
+                showToastSuccess();
+              
+              } catch (error) {
+                // Handle error if needed
+              }
+            }
+          }}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Text style={styles.textSubmit}>Submit</Text>
+          )}
+        </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -113,13 +124,14 @@ import {
       alignItems: "center",
       borderRadius: 10,
     },
-    submitbtn:{
-      height:height*0.05,
-      width:width*0.30,
+    submitbtn: {
+      height: height*0.05,
+      width: width*0.30,
       backgroundColor: Colors.PURPLE,
       justifyContent: "center",
       alignItems: "center",
       borderRadius: 10,
+      opacity: 1,  // Ensure full opacity when not disabled
     },
     textCancel:{
       fontSize:18,

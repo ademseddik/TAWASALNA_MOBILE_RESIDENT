@@ -49,7 +49,7 @@ const SignUp = () => {
   const [selectedCommunity, setSelectedCommunity] = useState('');
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
   const [communityError, setCommunityError] = useState('');
-  const [authToken, setAuthToken] = useState('eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJhZGVtc2VkZGlrYWRlbUBnbWFpbC5jb20iLCJpYXQiOjE3NDQ4MjUwMjIsImV4cCI6MTc0NTQyOTgyMn0.QVJXe22-b_mWfS6c2pP0Np_fhcjm-TVv6lX5wz02PSVwxUU68ktoJQFArwCYv2LGgDpwzqfJlCKmtQtXaiPGzw'); // Your hardcoded token
+  const [authToken, setAuthToken] = useState('eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3NDU1MjM3NDMsImV4cCI6MTc1MDcwNzc0M30.lYAhJCya5jUvhMTigBRVpXwCrzHZ34e8cC1WgudKIkn80Bph0fiTl0ttpeHVwvWVOpT1udpLHwU-itVbz34zEQ'); // Your hardcoded token
 
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
@@ -193,27 +193,29 @@ if (!fullname.trim()) {
         password,
         role,
         residentId,
+        communityId:selectedCommunity
       });
-      const userResponse = await Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
-   console.log("Sign-up successful:",userResponse);
+     // const userResponse = await Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
+   
+     console.log("Sign-up successful:",response);
 
 
-      const AddUserToCommunity = await Axios.put(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/community/${selectedCommunity}/userAdd/${userResponse.data}`
-        , null, {
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          "Content-Type": "application/json"
-        }
-      }
-      );
-console.log(`responce of the addcommunity ${AddUserToCommunity}`)
+//       const AddUserToCommunity = await Axios.put(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/community/${selectedCommunity}/userAdd/${userResponse.data}`
+//         , null, {
+//         headers: {
+//           Authorization: `Bearer ${authToken}`,
+//           "Content-Type": "application/json"
+//         }
+//       }
+//       );
+// console.log(`responce of the addcommunity ${AddUserToCommunity}`)
 
 
 
-     const userId = userResponse.data._id || userResponse.data.id;
+    // const userId = userResponse.data._id || userResponse.data.id;
 
 
-      navigation.navigate("Verify email", { email, userId }); // Pass userId if needed
+      navigation.navigate("Verify email", { email }); // Pass userId if needed
     } catch (error) {
     //  console.error('Error during sign-up or fetching user:', error);
       if (error.response) {

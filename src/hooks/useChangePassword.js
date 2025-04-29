@@ -90,14 +90,20 @@ export const useChangePassword = () => {
   };
 
   const handleResetPassword = async () => {
+ 
     if (!validateForm()) return;
 
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
       const userId = await AsyncStorage.getItem("userId");
+      const token = await AsyncStorage.getItem("USER_ACCESS");
+      console.log(`token from the hook ${token}`)
+
+      console.log(userId)
       await AuthService.ChangePassword({
         userId,
+        token,
         currentpassword: state.currentpassword,
         newpassword: state.newPassword,
         confirmpassword: state.confirmPassword,

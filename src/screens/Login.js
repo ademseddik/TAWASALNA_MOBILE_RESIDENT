@@ -182,7 +182,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
       await AsyncStorage.setItem('USER_ACCESS', response.data.token);
       await AsyncStorage.setItem("USER_REFRESH", response.data.refreshToken),
       console.log("Sign-in successful:", response.data);
-       navigation.navigate("ProfileScreen");
+       navigation.navigate("TABBAR");
     } catch (error) {
       if (error.response) {
         console.log(error.response)
@@ -246,7 +246,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
           style={styles.languageSelector}
           onPress={() => setShowLanguagePicker(!showLanguagePicker)}
         >
-          <Image source={require('../../assets/Icons/earth.png')} style={styles.earthIcon} />
+          <Image source={require('../../assets/Icons/earth2.png')} style={styles.earthIcon} />
         </TouchableOpacity>
 
         {showLanguagePicker && (
@@ -281,17 +281,26 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
   </Modal>
 )}
       <View style={{
-  flexDirection: 'row',
-  alignItems: 'center',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
   marginLeft: '5%',
   marginBottom: 90,
-  marginTop:50
+  marginTop:10
+}}>
+      <View style={{
+width: 384, height: 50,
+marginLeft:-19,
+backgroundColor:Colors.PURPLE,
+paddingLeft:10,
+borderBottomStartRadius:10,
+borderBottomEndRadius:10
 }}>
   <Image
-    source={require('../../assets/Icons/logo.png')}
-    style={{ width: 50, height: 50, marginRight: 10 }} // adjust size as needed
+    source={require('../../assets/Icons/TawasalnaLogoW1.png')}
+    style={{ width: 150, height: 50, marginRight: 15 }} // adjust size as needed
     resizeMode="contain"
   />
+  </View>
   <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Login')}</Text>
 </View>
         <View style={{ marginTop: -60 }}>

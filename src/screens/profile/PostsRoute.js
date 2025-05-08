@@ -6,12 +6,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
 
-function PostsRoute() {
+function PostsRoute({ userId }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const fetchPosts = async () => {
-    const userId = await AsyncStorage.getItem("userId");
+    //const userId = await AsyncStorage.getItem("userId");
     try {
       const response = await fetch(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentposts/${userId}/${userId}`
@@ -19,7 +19,7 @@ function PostsRoute() {
       const data = await response.json();
       setPosts(data);
     } catch (error) {
-      console.error('Failed to fetch posts:', error);
+   //   console.error('Failed to fetch posts:', error);
     } finally {
       setLoading(false);
     }
@@ -33,18 +33,21 @@ function PostsRoute() {
     <View style={styles.container}>
       {loading ? (
         <LottieView
-        source={loadingAnimation}
-        autoPlay
-        loop
-        style={styles.loadingAnimation} // Add custom styling if needed
-      />
+          source={loadingAnimation}
+          autoPlay
+          loop
+          style={styles.loadingAnimation}
+        />
+      ) : posts.length === 0 ? (
+        <View style={styles.noPostsContainer}>
+          <Text style={styles.noPostsText}>No posts available</Text>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>
-      
           {posts.map((item) => {
             const user = item.user?.residentProfile;
             const hasPhoto = item.photos && item.photos.length > 0;
-
+  
             return (
               <View key={item.id.toString()} style={styles.postCard}>
                 <View style={styles.userInfo}>
@@ -54,23 +57,20 @@ function PostsRoute() {
                   />
                   <Text style={styles.username}>{user?.fullName}</Text>
                 </View>
-
+  
                 {hasPhoto && (
-                  <Image
-                    source={{ uri: item.photos[0] }}
-                    style={styles.postImage}
-                  />
+                  <Image source={{ uri: item.photos[0] }} style={styles.postImage} />
                 )}
-
+  
                 <Text style={styles.caption}>{item.caption}</Text>
               </View>
             );
           })}
-        
         </ScrollView>
       )}
     </View>
   );
+  
 }
 
 const styles = StyleSheet.create({
@@ -124,6 +124,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
+  noPostsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noPostsText: {
+    fontSize: 18,
+    color: '#777',
+    fontWeight: 'bold',
+  },
+  
 });
 
 export default PostsRoute;

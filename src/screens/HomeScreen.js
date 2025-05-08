@@ -3,21 +3,24 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Animated, BackHandler, View, Image, Text, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createDrawerNavigator } from '@react-navigation/drawer'; // << ADD THIS
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { ProfileService } from '../services/profile.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 // Screens
 import Home from './tabs/HomeScreen';
 import Search from './tabs/SearchScreen';
 import AddPost from './tabs/AddPost';
-import Reels from './tabs/ReelScreen';
-import Profile from './profile/UserProfile';
 
+import Notifications from './tabs/ReelScreen';
+import Profile from './profile/UserProfile';
+import HelpScreen from './screenstotest/HelpScreen';
+import SettingsScreen from './screenstotest/SettingsScreen';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { createDrawerNavigator } from '@react-navigation/drawer';
 const Tab = createBottomTabNavigator();
-const Drawer = createDrawerNavigator(); 
+const Drawer = createDrawerNavigator();
+
 
 const HomeScreen = ({ route }) => {
   const [scrollY] = useState(new Animated.Value(0));
@@ -64,6 +67,31 @@ const HomeScreen = ({ route }) => {
     }, [])
   );
 
+
+  
+  const screens = [
+    { name: 'Profile', component: Profile },
+    { name: 'Help', component: HelpScreen },
+    { name: 'Settings', component: SettingsScreen },
+  ];
+  
+  const ProfileDrawer = () => {
+    return (
+      <Drawer.Navigator
+        screenOptions={{
+          headerShown: false,
+          drawerActiveTintColor: Colors.PURPLE,
+          drawerInactiveTintColor: Colors.GRAY,
+          drawerLabelStyle: { fontWeight: 'bold' },
+        }}
+      >
+        {screens.map((screen, index) => (
+          <Drawer.Screen key={index} name={screen.name} component={screen.component} />
+        ))}
+      </Drawer.Navigator>
+    );
+  };
+
   const renderCustomHeader = () => {
     return (
       <View style={styles.headerContainer}>
@@ -73,14 +101,15 @@ const HomeScreen = ({ route }) => {
   };
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+
     <View style={{ flex: 1 }}>
-      {renderCustomHeader()}
 
       <Tab.Navigator
         initialRouteName={initialTab}
         screenOptions={({ route }) => ({
           headerShown: false,
-          tabBarShowLabel: false,
+          tabBarShowLabel: true,
           tabBarStyle: {
             backgroundColor: '#fff',
             borderTopWidth: 0.5,
@@ -94,8 +123,8 @@ const HomeScreen = ({ route }) => {
                 return <Feather name="search" size={24} color={color} />;
               case 'Add':
                 return <Ionicons name="add-circle-outline" size={28} color={color} />;
-              case 'Reels':
-                return <MaterialCommunityIcons name="movie-open-play-outline" size={24} color={color} />;
+                case 'Notifications':
+                  return <MaterialCommunityIcons name="bell-outline" size={24} color={color} />;
               case 'Profile':
                 return (
                   <Image
@@ -127,10 +156,11 @@ const HomeScreen = ({ route }) => {
         <Tab.Screen name="Home" component={Home} />
         <Tab.Screen name="Search" component={Search} />
         <Tab.Screen name="Add" component={AddPost} />
-        <Tab.Screen name="Reels" component={Reels} />
-        <Tab.Screen name="Profile" component={Profile} />
+        <Tab.Screen name="Notifications" component={Notifications} />
+        <Tab.Screen name="Profile" component={ProfileDrawer} />
       </Tab.Navigator>
     </View>
+    </GestureHandlerRootView>
   );
 };
 

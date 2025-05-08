@@ -22,7 +22,7 @@ import InfoRoute from './InfoRoute';
 import FriendsRoute from './FriendsRoute';
 import PostsRoute from './PostsRoute';
 import { ScrollView } from 'react-native-virtualized-view';
-// Remove the existing ScrollView import from 'react-native'
+import { Ionicons } from '@expo/vector-icons';
 
 
 
@@ -30,17 +30,20 @@ import { ScrollView } from 'react-native-virtualized-view';
 const initialLayout = { width: Dimensions.get('window').width };
 
 const ProfileScreen = ({ navigation }) => {
+  const [userId, setuserId] = useState(null);
   const [index, setIndex] = useState(0);
   const [routes] = useState([
+
     { key: 'posts', title: 'Posts' },
     { key: 'friends', title: 'Friends' },
     { key: 'info', title: 'Info' },
   ]);
 
   const renderScene = SceneMap({
-    posts: PostsRoute,
-    friends: FriendsRoute,
-    info: InfoRoute,
+    
+    posts:  () => <PostsRoute userId={userId} />,
+    friends: () => <FriendsRoute userId={userId} navigation={navigation}  />,
+    info: () => <InfoRoute userId={userId} />,
   });
   const { user } = useUser(); // User data from Clerk
   const { signOut } = useAuth();
@@ -48,7 +51,7 @@ const ProfileScreen = ({ navigation }) => {
   const { t } = useTranslation();
   const [profileData, setProfileData] = useState(null);
   const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
-  const [coverImage, setCoverImage] = useState("https://i.ibb.co/fzzgjg27/profile-photo.jpg");
+  const [coverImage, setCoverImage] = useState("https://i.ibb.co/Zqy4r4F/profile-photo.jpg");
 
   const [loading, setLoading] = useState(true);
   const [isCompleteInformationsModalVisible, setCompleteInformationsModalVisible] = useState(false);
@@ -61,6 +64,7 @@ const ProfileScreen = ({ navigation }) => {
 
     try {
       const userId = await AsyncStorage.getItem("userId");
+      setuserId(userId)
       const token = await AsyncStorage.getItem("token");
 
       const response = await Axios.get(
@@ -75,7 +79,12 @@ const ProfileScreen = ({ navigation }) => {
 
       const residentData = response.data;
       const userCommunity = userinformations.data?.community?.name || null;
-   console.log(userinformations.data?.community?.id)
+    
+      const privacySetting = userinformations.data.residentProfile.accountType;
+      // Save to AsyncStorage
+      if (privacySetting !== undefined) {
+        await AsyncStorage.setItem("PRIVACY", String(privacySetting));
+      }
     AsyncStorage.setItem("USERCOMMUNITY", userinformations.data?.community?.id)
       // Merge the two
       const mergedData = {
@@ -146,7 +155,7 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-   
+
    <View style={styles.profileHeaderWrapper}>
   <View style={styles.coverImageWrapper}>
     <TouchableOpacity
@@ -186,7 +195,7 @@ const ProfileScreen = ({ navigation }) => {
       <View style={{ flex: 1, height: Dimensions.get('window').height * 0.6 }}>
 
         <TabView
-          style={{ flex: 1 }}
+              style={{ flex: 1 }}
           navigationState={{ index, routes }}
           renderScene={renderScene}
           onIndexChange={setIndex}
@@ -196,7 +205,7 @@ const ProfileScreen = ({ navigation }) => {
             <TabBar
               {...props}
               indicatorStyle={{ backgroundColor: "white" ,height:3}}
-              style={{ backgroundColor: Colors.LIGHT_PURPLE,elevation:30}}
+              style={{ backgroundColor: Colors.PUPRLE2,elevation:30}}
 
               renderLabel={({ route }) => (
                 <Text style={{
@@ -224,8 +233,15 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "white",
-
+    padding: 10 
    
+  },
+  menuButton: {
+    position: "absolute",
+    top: 10,
+    left: 10,
+    zIndex: 1,
+    padding: 8,
   },
   signOutIcon: {
     width: 24,
@@ -250,12 +266,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  coverImage: {
-    width: "100%",
-    height: 180,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
-  },
+  coverImage: { width: "100%", height: 180, borderRadius: 30 },
 
   loadingContainer: {
     flex: 1,
@@ -320,7 +331,7 @@ const styles = StyleSheet.create({
   },
   bio: {
     fontSize: 16,
-    color: Colors.GRAY,
+    color: Colors.LIGHT_BLACK,
     maxWidth: 300,
   },
   section: {

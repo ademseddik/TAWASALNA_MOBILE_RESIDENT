@@ -16,7 +16,10 @@ import signup_with_social_media from './src/screens/auth/SignUpSocial';
 import VerifyAccount from './src/screens/auth/VerifyAccount';
 import EditProfile from './src/screens/profile/EditProfile';
 import ProfileScreen from "./src/screens/profile/UserProfile";
+import UsersProfile from './src/screens/profile/UsersProfile';
 import ChangePassword from './src/screens/profile/ChangePassword';
+import SearchScreen from './src/screens/tabs/SearchScreen';
+import ShowGroup from './src/screens/groups/ShowGroup';
 //////////////////////////////////////////////////////////////////
 import { I18nextProvider } from 'react-i18next';
 import { ClerkProvider } from '@clerk/clerk-expo';
@@ -93,6 +96,22 @@ const App = () => {
               component={ProfileScreen}
               options={{ headerShown: false }}
             />
+                       <Stack.Screen
+              name="UsersProfile"
+              component={UsersProfile}
+              options={{ headerShown: false }}
+            />
+                                   <Stack.Screen
+              name="Showgroup"
+              component={ShowGroup}
+              options={{ headerShown: false }}
+            />
+                                  <Stack.Screen
+              name="Search"
+              component={SearchScreen}
+              options={{ headerShown: false }}
+            />
+
             <Stack.Screen
               name="change password"
               component={ChangePassword}

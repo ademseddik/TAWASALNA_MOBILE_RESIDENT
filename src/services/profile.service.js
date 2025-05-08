@@ -22,6 +22,24 @@ export const ProfileService = {
     }
   },
  
+  Updateprivacy: async (credentials) => {
+  
+    try {
+      const response = await Axios.put(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/updatePrivacy/${credentials.userId}/${credentials.privacy}`,
+        credentials,
+        {
+          headers: {
+            Authorization: `Bearer ${credentials.token}`, // Include token in headers
+          },
+        });
+    
+  
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 
   //////////////////////////////////CHANGE PASSWORD////////////////////////////////////////////////////////
 

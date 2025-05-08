@@ -119,9 +119,7 @@ export const AuthService = {
  ///////////////////////////////////////////CHANGE PASSWORD////////////////////////////////////////////
 
  ChangePassword: async (credentials) => {
-  console.log(credentials)
-  console.log(`token from the service ${credentials.token}`)
-
+  
   try {
     const response = await Axios.patch(
       `${APP_ENV.AUTH_PORT}/tawasalna-user/residentmanagement/updatepassword/${credentials.userId}`,

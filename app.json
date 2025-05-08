@@ -25,6 +25,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": ["INTERNET"],
+
       "splash": {
         "resizeMode": "contain",
         "image": "./assets/Icons/TawasalnaLogoW1.png",

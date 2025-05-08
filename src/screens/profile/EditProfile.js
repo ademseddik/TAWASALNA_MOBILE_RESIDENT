@@ -33,7 +33,7 @@ import { Picker } from '@react-native-picker/picker';
 const EditProfile = () => {
   //////////////////////////////////////////////////////////////////////
   const [selectedImage, setSelectedImage] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
-  const [coverImage, setCoverImage] = useState("https://i.ibb.co/fzzgjg27/profile-photo.jpg");
+  const [coverImage, setCoverImage] = useState("https://i.ibb.co/Zqy4r4F/profile-photo.jpg");
 
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
@@ -43,6 +43,7 @@ const EditProfile = () => {
   const [data, setData] = useState([]);
   const [errorFullName, setErrorFullName] = useState(false);
   const [errorBio, setErrorBio] = useState(false);
+  const [lengthBio, setlengthBio] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [date, setDate] = useState(new Date());
@@ -229,6 +230,14 @@ const EditProfile = () => {
 
   ////////////////////////////////////////////////////////////////
   const OnchangeBio = (event) => {
+    if(event.length>300){
+      setErrorBio("Bio cannot exceed 300 characters.")
+      setlengthBio("")
+
+    }else {
+      setlengthBio(`${event.length} Characters`)
+      setErrorBio("")
+    }
     setBio(event);
   };
   const OnchangeFullName = (event) => {
@@ -243,7 +252,7 @@ const EditProfile = () => {
   };
   const OnchangeResidentId = (text) => {
     const parsedValue = text.trim() !== "" ? parseFloat(text) : "";
-    setResidentId(parsedValue);
+    setResidentId(text);
   };
 
   ///////////////////////////////////////////////////////////////////////////
@@ -374,6 +383,7 @@ const EditProfile = () => {
           dateOfBirth: new Date(dateOfBirth),
           bio,
           interests,
+          selectedCommunity
         },
         {
           headers: {
@@ -632,6 +642,7 @@ const EditProfile = () => {
               multiline
             />
             {errorBio ? <Text style={styles.errorText}>{errorBio}</Text> : null}
+            {lengthBio ? <Text style={styles.lengthBio}>{lengthBio}</Text> : null}
             <Text
               style={styles.label2}
             >
@@ -920,6 +931,13 @@ const styles = StyleSheet.create({
   errorText: {
     color: "red",
     marginBottom: 10,
+  },
+  lengthBio: {
+    color: Colors.GRAY,
+    marginBottom: 3,
+   alignSelf:"flex-end",
+    alignContent:"flex-end",
+    end:20,
   },
   containerNested: {
     flexDirection: "column",

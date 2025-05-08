@@ -7,29 +7,29 @@ import { APP_ENV } from "../../../src/utils/BaseUrl";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const InfoRoute = ({ userId }) => { // Accept userId as a prop
+const GroupInfo = ({ id }) => { // Accept group as a prop
 
   const { t } = useTranslation();
-  const [profileData, setProfileData] = useState(null);
+  const [GroupData, setGroupData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfileData = async () => {
+  const fetchGroupeData = async () => {
 
     try {
       const token = await AsyncStorage.getItem("token");
       const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`,
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/getGroupById${id}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
       const userinformations = await Axios.get(
-        `${APP_ENV.AUTH_PORT}/tawasalna-user/user/${userId}`
+         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/getGroupById${id}`
       );
     
-      const residentData = response.data;
+      const groupData = response.data;
       const userCommunity = userinformations.data?.community?.name || null;
-      console.log(residentData)
-      setProfileData({ ...residentData, community: userCommunity });
+      console.log(groupData)
+      setGroupData({ ...groupData, community: userCommunity });
     } catch (error) {
       console.error("Error fetching profile data:", error);
     } finally {
@@ -38,7 +38,7 @@ const InfoRoute = ({ userId }) => { // Accept userId as a prop
   };
 
   useEffect(() => {
-    fetchProfileData();
+    fetchGroupeData();
   }, [userId]);
 
   if (loading) {
@@ -56,28 +56,28 @@ const InfoRoute = ({ userId }) => { // Accept userId as a prop
           <Text style={styles.sectionTitle}>{t("Personal Information")}</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t("Age")}:</Text>
-            <Text style={styles.infoValue}>{profileData?.age || "-"}</Text>
+            <Text style={styles.infoValue}>{GroupData?.age || "-"}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t("Gender")}:</Text>
-            <Text style={styles.infoValue}>{profileData?.gender ? t(profileData.gender) : "-"}</Text>
+            <Text style={styles.infoValue}>{GroupData?.gender ? t(GroupData.gender) : "-"}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t("Date of Birth")}:</Text>
             <Text style={styles.infoValue}>
-              {profileData?.dateOfBirth ? new Date(profileData.dateOfBirth).toLocaleDateString() : "-"}
+              {GroupData?.dateOfBirth ? new Date(GroupData.dateOfBirth).toLocaleDateString() : "-"}
             </Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t("Address")}:</Text>
-            <Text style={styles.infoValue}>{profileData?.address || t("No address provided")}</Text>
+            <Text style={styles.infoValue}>{GroupData?.address || t("No address provided")}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("Interests")}</Text>
           <View style={styles.interestsContainer}>
-            {profileData?.interests?.map((interest, index) => (
+            {GroupData?.interests?.map((interest, index) => (
               <View key={index} style={styles.interestTag}>
                 <Text style={styles.interestText}>{t(interest)}</Text>
               </View>
@@ -89,7 +89,7 @@ const InfoRoute = ({ userId }) => { // Accept userId as a prop
           <Text style={styles.sectionTitle}>{t("Community")}</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>{t("Community name")}:</Text>
-            <Text style={styles.infoValue}>{profileData?.community || "-"}</Text>
+            <Text style={styles.infoValue}>{GroupData?.community || "-"}</Text>
           </View>
         </View>
       </View>
@@ -112,4 +112,4 @@ const styles = StyleSheet.create({
   interestText: { color: "white", fontSize: 14 },
 });
 
-export default InfoRoute;
+export default GroupInfo;

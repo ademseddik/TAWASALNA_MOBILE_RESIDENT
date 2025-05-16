@@ -15,6 +15,7 @@ import AddPost from './tabs/AddPost';
 import Notifications from './tabs/ReelScreen';
 import Profile from './profile/UserProfile';
 import HelpScreen from './screenstotest/HelpScreen';
+import UserGroups from './screenstotest/UserGroups';
 import SettingsScreen from './screenstotest/SettingsScreen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { createDrawerNavigator } from '@react-navigation/drawer';
@@ -73,6 +74,7 @@ const HomeScreen = ({ route }) => {
     { name: 'Profile', component: Profile },
     { name: 'Help', component: HelpScreen },
     { name: 'Settings', component: SettingsScreen },
+    { name: 'Groups', component: UserGroups },
   ];
   
   const ProfileDrawer = () => {

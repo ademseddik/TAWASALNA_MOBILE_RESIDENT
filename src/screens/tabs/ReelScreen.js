@@ -10,6 +10,7 @@ const Notifications = ({ navigation }) => {
   const [followRequests, setFollowRequests] = useState([]);
   const [usersData, setUsersData] = useState({});
   const [loading, setLoading] = useState(true);
+  const [groupInvitations, setGroupInvitations] = useState([]);
 
   useEffect(() => {
     const fetchFollowRequests = async () => {
@@ -26,6 +27,58 @@ const Notifications = ({ navigation }) => {
 
     fetchFollowRequests();
   }, []);
+
+  useEffect(() => {
+  const fetchGroupInvitation = async () => {
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+      const response = await fetch(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/group`);
+      const data = await response.json();
+
+      // Filter groups where user is in invitedUsers
+      const filteredGroups = data.filter(group => 
+        group.invitedUsers?.some(user => user.id === userId)
+      );
+
+      const formatted = filteredGroups.map(group => ({
+        id: group.id,
+        name: group.name,
+        description: group.description || 'No description available',
+        image: group.groupphoto || 'https://placeholder.com/avatar',
+        type: 'group'
+      }));
+
+      setGroupInvitations(formatted);
+    } catch (error) {
+      console.error('Failed to fetch groups:', error);
+      setGroupInvitations([]);
+    }
+  };
+
+  fetchGroupInvitation();
+}, []);
+const acceptGroupInvitation = async (groupId) => {
+  try {
+    const userId = await AsyncStorage.getItem("userId");
+    await Axios.post(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/acceptgroupinvitation/${groupId}/${userId}`);
+    
+    setGroupInvitations((prev) => prev.filter(group => group.id !== groupId)); // Remove accepted group from UI
+  } catch (error) {
+    console.error('Error accepting group invitation:', error);
+  }
+};
+
+const rejectGroupInvitation = async (groupId) => {
+  try {
+    const userId = await AsyncStorage.getItem("userId");
+    await Axios.post(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/regetGroupInvitation/${groupId}/${userId}`);
+    
+    setGroupInvitations((prev) => prev.filter(group => group.id !== groupId)); // Remove rejected group from UI
+  } catch (error) {
+    console.error('Error rejecting group invitation:', error);
+  }
+};
+
 
   useEffect(() => {
     const fetchUserDetails = async () => {
@@ -89,8 +142,36 @@ const Notifications = ({ navigation }) => {
           );
         })
       )}
+   <Text style={styles.title}>Group Invitations</Text>
+{groupInvitations.map(group => (
+  <TouchableOpacity 
+    key={group.id}
+    style={styles.userCard}
+    onPress={() => navigation.navigate("GroupDetails", { 
+  groupData: group,  
+  groupPics: group.image 
+})}
+
+  >
+    <Image source={{ uri: group.image }} style={styles.avatar} />
+    <View style={styles.userInfo}>
+      <Text style={styles.username}>{group.name}</Text>
+      <Text style={styles.bio}>{group.description}</Text>
+      <View style={styles.row}>
+        <TouchableOpacity style={styles.acceptButton} onPress={() => acceptGroupInvitation(group.id)}>
+          <Text style={styles.buttonText}>Accept</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.rejectButton} onPress={() => rejectGroupInvitation(group.id)}>
+          <Text style={styles.buttonText}>Reject</Text>
+        </TouchableOpacity>
+      </View>
     </View>
-  );
+    <Icon name="chevron-right" size={24} color="#6200EE" style={styles.nextIcon} />
+  </TouchableOpacity>
+))}
+
+  </View>
+);
 };
 
 export default Notifications;
@@ -107,4 +188,11 @@ const styles = StyleSheet.create({
   acceptButton: { backgroundColor: '#007AFF', padding: 8, borderRadius: 5 },
   buttonText: { color: 'white', fontWeight: 'bold', textAlign: 'center' },
   nextIcon: { alignSelf: "center", marginLeft: "auto" },
+  rejectButton: {
+  backgroundColor: '#FF3B30',
+  padding: 8,
+  borderRadius: 5,
+  marginLeft: 10,
+},
+
 });

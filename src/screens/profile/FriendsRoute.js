@@ -79,14 +79,17 @@ function FriendsRoute({ userId, navigation }) {
   }, [users]); // Logs every time `users` state updates
 
   const filteredUsers = users.filter(user => {
-    if (filter === 'followers') return relationships.followers.includes(user.id);
-    if (filter === 'following') return relationships.following.includes(user.id);
+    if (filter === 'followers') {
+
+      return relationships.followers.includes(user.id);}
+    
+    else if (filter === 'following') return relationships.following.includes(user.id);
     return true;
   });
 
   return (
     <View style={styles.container}>
-      {/* Filter Buttons */}
+     
       <View style={styles.filterContainer}>
         <TouchableOpacity style={[styles.filterButton, filter === 'all' && styles.activeFilter]} onPress={() => setFilter('all')}>
           <Text style={styles.filterText}>All</Text>
@@ -107,23 +110,29 @@ function FriendsRoute({ userId, navigation }) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>
-          {filteredUsers.map(item => (
-            <TouchableOpacity
-              style={styles.userCard}
-              onPress={() => navigation.navigate("UsersProfile", { userId: item.id })}
-            >
-              <Image source={{ uri: item.residentProfile?.profilephoto || 'https://placeholder.com/avatar' }} style={styles.avatar} />
-              <View style={styles.userInfo}>
-                <Text style={styles.username}>{item.residentProfile?.fullName || 'Unknown'}</Text>
-                <Text style={styles.bio}>
-                  {item.residentProfile?.bio?.length > 30 ? `${item.residentProfile.bio.slice(0, 30)}...` : item.residentProfile?.bio || 'No bio available'}
-                </Text>
-              </View>
-              <TouchableOpacity style={styles.viewProfileButton}>
-                <Text style={styles.buttonText}>View Profile</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
+         {filteredUsers.map((item) => (
+  <TouchableOpacity
+    key={item.id} // Ensure each item has a unique key
+    style={styles.userCard}
+    onPress={() => navigation.navigate("UsersProfile", { userId: item.id })}
+  >
+    <Image
+      source={{ uri: item.residentProfile?.profilephoto || 'https://placeholder.com/avatar' }}
+      style={styles.avatar}
+    />
+    <View style={styles.userInfo}>
+      <Text style={styles.username}>{item.residentProfile?.fullName || 'Unknown'}</Text>
+      <Text style={styles.bio}>
+        {item.residentProfile?.bio?.length > 30
+          ? `${item.residentProfile.bio.slice(0, 30)}...`
+          : item.residentProfile?.bio || 'No bio available'}
+      </Text>
+    </View>
+    <TouchableOpacity style={styles.viewProfileButton}>
+      <Text style={styles.buttonText}>View Profile</Text>
+    </TouchableOpacity>
+  </TouchableOpacity>
+))}
         </ScrollView>
       )}
     </View>

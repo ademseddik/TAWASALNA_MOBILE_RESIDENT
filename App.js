@@ -20,6 +20,7 @@ import UsersProfile from './src/screens/profile/UsersProfile';
 import ChangePassword from './src/screens/profile/ChangePassword';
 import SearchScreen from './src/screens/tabs/SearchScreen';
 import ShowGroup from './src/screens/groups/ShowGroup';
+import GroupDetails from './src/screens/groups/GroupDetails';
 //////////////////////////////////////////////////////////////////
 import { I18nextProvider } from 'react-i18next';
 import { ClerkProvider } from '@clerk/clerk-expo';
@@ -91,11 +92,7 @@ const App = () => {
               component={EditProfile}
               options={{ headerShown: false }}
             />
-            <Stack.Screen
-              name="ProfileScreen"
-              component={ProfileScreen}
-              options={{ headerShown: false }}
-            />
+          
                        <Stack.Screen
               name="UsersProfile"
               component={UsersProfile}
@@ -104,6 +101,13 @@ const App = () => {
                                    <Stack.Screen
               name="Showgroup"
               component={ShowGroup}
+              options={{ headerShown: false }}
+            />
+            
+            
+                                   <Stack.Screen
+              name="GroupDetails"
+              component={GroupDetails}
               options={{ headerShown: false }}
             />
                                   <Stack.Screen

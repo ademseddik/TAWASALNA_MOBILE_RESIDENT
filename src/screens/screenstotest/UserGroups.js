@@ -68,7 +68,7 @@ const handleToggle = () => {
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/getGroupByUserId/${userId}`
       );
       const data = await response.json();
-
+console.log(data)
         const formattedGroups = data.map(group => ({
       id: group.id,
       name: group.name,
@@ -78,7 +78,11 @@ const handleToggle = () => {
         'https://via.placeholder.com/150',
       type: group.type,
       creator: group.creator,
-      members: group.members
+      members: group.members,
+      joiningRequest:group.joiningRequest,
+      followrequests:group.followrequests
+
+
     }));
 
     setFetchedGroups(formattedGroups);
@@ -201,7 +205,9 @@ const handleToggle = () => {
           <View style={styles.sectionContent}>
             <Ionicons name="people" size={24} color="#333" />
             <View style={styles.textContainer}>
-              <Text style={styles.sectionTitle}>Private Account</Text>
+              <Text style={styles.sectionTitle}>
+                {isPublic ? 'Public Group' : 'Private Group'}
+              </Text>
               <Text style={styles.description}>
                 {isPublic ? 'Your group and posts are visible to everyone' : 'Only approved followers can see your posts'}
               </Text>

@@ -109,10 +109,21 @@ const SearchScreen = ({ navigation }) => {
   }, [searchQuery, filter, fetchedResults]); 
 
   const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.userCard}
-      onPress={() => navigation.navigate("UsersProfile", { userId: item.id })}
-    >
+<TouchableOpacity
+  style={styles.userCard}
+  onPress={() => {
+    if (item.type === 'group') {
+      navigation.navigate('GroupDetails', {
+        groupData: item,
+        groupPics: item.groupphoto,
+      });
+    } else {
+      navigation.navigate('UsersProfile', {
+        userId: item.id,
+      });
+    }
+  }}
+>
       <Image source={{ uri: item.image || 'https://placeholder.com/avatar' }} style={styles.avatar} />
       
       <View style={styles.userInfo}>

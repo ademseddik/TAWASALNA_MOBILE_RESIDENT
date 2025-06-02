@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { APP_ENV } from '../../utils/BaseUrl';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { FollowService } from '../../services/follow.service';
+import Colors from '../../../assets/Colors';
 
 const SearchScreen = ({ navigation }) => {
 
@@ -136,7 +137,7 @@ const SearchScreen = ({ navigation }) => {
         <View style={styles.row}>
           <Text style={styles.typeIndicator}>{item.type === 'group' ? 'Group' : 'Person'}</Text>
           {item.privacy === 'PUBLIC' ? (
-            <Icon name="unlock" size={15} color="black" style={styles.icon} />
+            <Icon name="unlock" size={15} color={Colors.LIGHT_PURPLE} style={styles.icon} />
           ) : (
             <Icon name="lock" size={15} color="black" style={styles.icon} />
           )}
@@ -147,7 +148,7 @@ const SearchScreen = ({ navigation }) => {
       <Icon 
         name="chevron-right" 
         size={24} 
-        color="#6200EE" 
+        color={Colors.LIGHT_PURPLE}
         style={styles.nextIcon} 
       />
     </TouchableOpacity>
@@ -169,7 +170,7 @@ const SearchScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => setFilter('all')}><Text>All</Text></TouchableOpacity>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#6200EE" />
+        <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} />
       ) : (
         <FlatList data={results} renderItem={renderItem} keyExtractor={(item) => item.id.toString()} />
       )}

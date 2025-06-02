@@ -7,20 +7,20 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { ProfileService } from '../services/profile.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Colors from '../../assets/Colors';
 // Screens
 import Home from './tabs/HomeScreen';
 import Search from './tabs/SearchScreen';
 import AddPost from './tabs/AddPost';
 
 import Notifications from './tabs/ReelScreen';
-import Profile from './profile/UserProfile';
-import HelpScreen from './screenstotest/HelpScreen';
-import UserGroups from './screenstotest/UserGroups';
-import SettingsScreen from './screenstotest/SettingsScreen';
+
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { createDrawerNavigator } from '@react-navigation/drawer';
+
+import ProfileDrawerWrapper from './tabs/profileDrawerNavigation/ProfileDrawerWrapper'; 
+
 const Tab = createBottomTabNavigator();
-const Drawer = createDrawerNavigator();
+
 
 
 const HomeScreen = ({ route }) => {
@@ -70,37 +70,11 @@ const HomeScreen = ({ route }) => {
 
 
   
-  const screens = [
-    { name: 'Profile', component: Profile },
-    { name: 'Help', component: HelpScreen },
-    { name: 'Settings', component: SettingsScreen },
-    { name: 'Groups', component: UserGroups },
-  ];
-  
-  const ProfileDrawer = () => {
-    return (
-      <Drawer.Navigator
-        screenOptions={{
-          headerShown: false,
-          drawerActiveTintColor: Colors.PURPLE,
-          drawerInactiveTintColor: Colors.GRAY,
-          drawerLabelStyle: { fontWeight: 'bold' },
-        }}
-      >
-        {screens.map((screen, index) => (
-          <Drawer.Screen key={index} name={screen.name} component={screen.component} />
-        ))}
-      </Drawer.Navigator>
-    );
-  };
 
-  const renderCustomHeader = () => {
-    return (
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>{currentTab}</Text>
-      </View>
-    );
-  };
+  
+
+
+
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -136,7 +110,7 @@ const HomeScreen = ({ route }) => {
                       height: focused ? 30 : 26,
                       borderRadius: 15,
                       borderWidth: focused ? 2 : 1,
-                      borderColor: focused ? 'black' : 'gray',
+                      borderColor: focused ? Colors.LIGHT_PURPLE : 'gray',
                     }}
                   />
                 );
@@ -144,7 +118,7 @@ const HomeScreen = ({ route }) => {
                 return null;
             }
           },
-          tabBarActiveTintColor: 'black',
+          tabBarActiveTintColor:  Colors.LIGHT_PURPLE,
           tabBarInactiveTintColor: 'gray',
         })}
         screenListeners={{
@@ -159,7 +133,7 @@ const HomeScreen = ({ route }) => {
         <Tab.Screen name="Search" component={Search} />
         <Tab.Screen name="Add" component={AddPost} />
         <Tab.Screen name="Notifications" component={Notifications} />
-        <Tab.Screen name="Profile" component={ProfileDrawer} />
+       <Tab.Screen name="Profile" component={ProfileDrawerWrapper} />
       </Tab.Navigator>
     </View>
     </GestureHandlerRootView>

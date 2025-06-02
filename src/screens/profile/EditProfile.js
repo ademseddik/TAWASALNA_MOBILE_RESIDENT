@@ -235,7 +235,7 @@ const EditProfile = () => {
       setlengthBio("")
 
     }else {
-      setlengthBio(`${event.length} Characters`)
+      setlengthBio(`${event.length} /300`)
       setErrorBio("")
     }
     setBio(event);
@@ -635,7 +635,7 @@ const EditProfile = () => {
               {t("Bio")}
             </Text>
             <TextInput
-              style={[styles.input, { height: 120, textAlignVertical: 'top', maxWidth: 300 }]} // make it taller and text start from top
+              style={[styles.input, { maxHeight: 120, textAlignVertical: 'top', maxWidth: 300 }]} // make it taller and text start from top
               value={bio}
               onChangeText={OnchangeBio}
               placeholder="Bio"

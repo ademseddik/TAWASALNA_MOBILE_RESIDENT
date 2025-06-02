@@ -7,6 +7,7 @@ import { APP_ENV } from "../../../src/utils/BaseUrl";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+
 const InfoRoute = ({ userId }) => { // Accept userId as a prop
 
   const { t } = useTranslation();

@@ -10,17 +10,20 @@ import {
   ScrollView,
   BackHandler,
   Image,
+  Modal,
+  Pressable,
+  FlatList
 } from "react-native";
 import Colors from "../../../assets/Colors";
+import i18n from '../../../i18n'
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Termsofservices from "../../components/pupUps/Termsofservices";
 import PrivacyPolicy from "../../components/pupUps/PrivacyPolicy";
-import DateTimePicker from "@react-native-community/datetimepicker";
+
 import { APP_ENV } from "../../../src/utils/BaseUrl";
-import { I18nextProvider, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 import Axios from "axios";
 import { Picker } from '@react-native-picker/picker';
-import { AuthService } from '../../services/auth.service';
 
 const SignUp = () => {
   const navigation = useNavigation();
@@ -50,12 +53,29 @@ const SignUp = () => {
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
   const [communityError, setCommunityError] = useState('');
   const [authToken, setAuthToken] = useState('eyJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3NDU1MjM3NDMsImV4cCI6MTc1MDcwNzc0M30.lYAhJCya5jUvhMTigBRVpXwCrzHZ34e8cC1WgudKIkn80Bph0fiTl0ttpeHVwvWVOpT1udpLHwU-itVbz34zEQ'); // Your hardcoded token
-
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
-  //////////////////////////////////////////////communioty//////////////////////////////////////
-
-
+  //////////////////////////////////////////////Language//////////////////////////////////////
+ const inputStyles = {
+    height: 50, // Set your desired height here
+    borderColor: "gray",
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 10,
+    width: "92%",
+    marginLeft: "4%",
+    marginTop: 5,
+  };
+const languages = [
+  { code: 'en', name: 'English', flag: require('../../../assets/flags/enFlag.png') },
+  { code: 'fr', name: 'Français', flag: require('../../../assets/flags/FranceFlag.png') },
+  { code: 'es', name: 'Español', flag: require('../../../assets/flags/SpainFlag.png') },
+  { code: 'ar', name: 'العربية', flag: require('../../../assets/flags/ArFlag.png') },
+  { code: 'pr', name: 'Portuguese', flag: require('../../../assets/flags/portugalFlag.png') },
+  { code: 'al', name: 'German', flag: require('../../../assets/flags/GermanyFlag.png') },
+];
   /////////////////////////////////////////////////////////////////
   useEffect(() => {
     const backAction = () => {
@@ -238,28 +258,99 @@ if (error.response.data.error==="User already exists"){
   };
 
 
-
+  const changeLanguage = async (lng) => {
+    await i18n.changeLanguage(lng);
+    setShowLanguagePicker(false);
+  };
 
 
 
 
   return (
     <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
-      <ScrollView style={{ marginTop: "10%" }}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
+      <ScrollView style={{ marginTop: "0%" }}>
+          <View style={{ marginTop: '0.6%' }}>
+                <TouchableOpacity
+                  style={styles.languageSelector}
+                  onPress={() => setShowLanguagePicker(!showLanguagePicker)}
+                >
+                  <Image source={require('../../../assets/Icons/earth2.png')} style={styles.earthIcon} />
+                </TouchableOpacity>
+        
+                {showLanguagePicker && (
+          <Modal
+            transparent={true}
+            visible={showLanguagePicker}
+            onRequestClose={() => setShowLanguagePicker(false)}
+          >
+            <Pressable 
+              style={styles.modalOverlay} 
+              onPress={() => setShowLanguagePicker(false)}
+            >
+              <View style={styles.languageListContainer}>
+                <FlatList
+                  data={languages}
+                  keyExtractor={(item) => item.code}
+                  renderItem={({ item }) => (
+                    <Pressable
+                      style={styles.languageItem}
+                      onPress={() => {
+                        changeLanguage(item.code);
+                        setShowLanguagePicker(false);
+                      }}
+                    >
+                      <Image source={item.flag} style={styles.flagIcon} />
+                      <Text style={styles.languageText}>{item.name}</Text>
+                    </Pressable>
+                  )}
+                />
+              </View>
+            </Pressable>
+          </Modal>
+        )}
+              <View style={{
+          flexDirection: 'column',
+          alignItems: 'flex-start',
           marginLeft: '5%',
-          marginBottom: 90
+          marginBottom: 20,
+          marginTop:10
+        }}>
+              <View style={{
+        width: 384, height: 50,
+        marginLeft:-19,
+        backgroundColor:Colors.PURPLE,
+        paddingLeft:10,
+        borderBottomStartRadius:10,
+        borderBottomEndRadius:10
         }}>
           <Image
-            source={require('../../../assets/Icons/logo.png')}
-            style={{ width: 50, height: 50, marginRight: 10 }} // adjust size as needed
+            source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
+            style={{ width: 150, height: 50, marginRight: 15 }} // adjust size as needed
             resizeMode="contain"
           />
-          <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Register')}</Text>
+          </View>
+          <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Register here')}</Text>
         </View>
-        <View style={{ marginTop: 20 }}>
+              
+        
+                {isLoading && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      bottom: 0,
+                      right: 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    }}
+                  >
+                    <ActivityIndicator size="large" color={Colors.PURPLE} />
+                  </View>
+                )}
+              </View>
+        <View style={{ marginTop: 0 }}>
           <Text style={{ marginLeft: "4%" }}>
             {t("FullName")}
             <Text style={{ color: fullname.trim() ? "black" : "red" }}>*</Text>
@@ -550,7 +641,7 @@ if (error.response.data.error==="User already exists"){
             style={{
               color: Colors.PURPLE,
               textDecorationLine: "underline",
-              marginLeft: "22%",
+              marginLeft: "15%",
             }}
           >
             {t("Privacy Policy.")}
@@ -624,5 +715,70 @@ if (error.response.data.error==="User already exists"){
     </SafeAreaView>
   );
 };
+const styles = {
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  languageListContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    maxHeight: '60%',
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  flagIcon: {
+    width: 30,
+    height: 20,
+    marginRight: 15,
+    borderRadius: 3,
+  },
+  languageText: {
+    fontSize: 16,
+  },
+  languageSelector: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  earthIcon: {
+    width: 30,
+    height: 30,
+  },
+  languagePicker: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: Colors.WHITE,
+    borderRadius: 5,
+    elevation: 3,
+    zIndex: 1000,
+    width: 150,
+  },
+};
 
+const socialStyles = {
+  container: {
+    backgroundColor: Colors.WHITE,
+    borderRadius: 50,
+    width: 50,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: '5%',
+  },
+  icon: {
+    width: 45,
+    height: 45,
+  },
+};
 export default SignUp;

@@ -2,6 +2,7 @@ export default Colors = {
   BLACK: "#000000",
   LIGHT_BLACK: "#5E5E5E",
   LIGHT_GRAY: "#5a5959",
+  DARK_GRAY:"#4a4a4a",
   WHITE: "#FFFFFF",
   BLUE: "#0077B5",
   LIGHT_BLUE: "#ADD8E6",
@@ -19,4 +20,5 @@ export default Colors = {
   BABYBLUE: "#89CFF0",
   Periwinkle: "#CCCCFF",
   Azure: "#F0FFFF",
+
 };

@@ -36,6 +36,19 @@ export const FollowService = {
       throw error;
     }
   },
+  RejectFollowRequest: async (userIdToAccept) => {
+    try {
+
+        const userId = await AsyncStorage.getItem("userId");
+      const response = await Axios.post(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/rejectFollowUser/${userIdToAccept}/${userId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error following user:', error.response?.data || error.message);
+      throw error;
+    }
+  },
   unfollowUser: async (userIdToFollow) => {
     try {
 

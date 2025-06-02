@@ -139,5 +139,8 @@ export const AuthService = {
 ///////////////////////////////////get user id by email 
 getUserByEmail: async (email) => {
   return Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
+},
+getUserbyId: async (id) => {
+  return Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/user/${id}`);
 }
 };

@@ -37,7 +37,7 @@ export const useChangePassword = () => {
     if (!errors.minLength) errorMessage += t("password_min_length");
     if (!errors.uppercase) errorMessage += t("password_uppercase");
     if (!errors.lowercase) errorMessage += t("password_lowercase");
-    if (!errors.symbol) errorMessage += t("password_symbol");
+    if (!errors.symbol) errorMessage += t("Ajoutez un symbole (@...!)");
     if (!errors.number) errorMessage += t("password_number");
 
     return { isValid: Object.values(errors).every(v => v), errorMessage };

@@ -177,12 +177,13 @@ const InviteToGroupModal = ({ isVisible, onClose, groupId }) => {
             }}
           />
           <View
-            style={{
-              flexDirection: "row",
-              backgroundColor: Colors.PLATINUM,
-              marginBottom: "7%",
-              borderRadius: 13,
-              padding: 10,
+   style={{
+    flexDirection: "row",
+    backgroundColor: Colors.PLATINUM,
+    borderRadius: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: "center", // <== This ensures vertical centering
             }}
           >
             <AntDesign

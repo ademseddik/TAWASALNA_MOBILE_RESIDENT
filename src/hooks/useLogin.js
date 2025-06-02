@@ -36,6 +36,7 @@ export const useLogin = () => {
         ]);
 
         if (userId && token && timestamp) {
+         // console.log("user id "+userId)
           const sevenDays = 7 * 24 * 60 * 60 * 1000;
           if (Date.now() - parseInt(timestamp) < sevenDays) {
             navigation.navigate("TABBAR");

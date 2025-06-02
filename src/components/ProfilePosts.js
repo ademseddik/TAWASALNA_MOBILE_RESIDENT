@@ -439,6 +439,7 @@ fetchImage(data);
                       color={
                         post.likedBy.includes(userId) ? Colors.LIGHT_PURPLE : Colors.BLACK
                       }
+                      
                       style={{ marginRight: -2 }}
                     />
                    
@@ -451,7 +452,7 @@ fetchImage(data);
                     }}
                     onPressIn={() => toggleCommentModal(post.id)}
                   >
-                    <EvilIcons name="comment" size={30} color={Colors.BLACK} />
+                    <EvilIcons name="comment" size={30} color={Colors.LIGHT_PURPLE} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
@@ -480,7 +481,7 @@ fetchImage(data);
                     <Entypo
                       name="share"
                       size={22}
-                      color={Colors.BLACK}
+                      color={Colors.LIGHT_PURPLE}
                       style={{ marginRight: 5 }}
                     />
                   </TouchableOpacity>

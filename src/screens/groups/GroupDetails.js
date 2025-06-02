@@ -992,36 +992,43 @@ const GroupDetails = ({ route }) => {
             </View>
           )}
 
-          <View style={{ flexDirection: "row", marginTop: 25 }}>
+          <View style={{ flexDirection: "row", marginTop: 25 , justifyContent: "center", }}>
             <TouchableOpacity
               onPress={handleAcceptInvitation}
               style={{
                 height: 30,
                 width: "40%",
+                backgroundColor:Colors.LIGHT_PURPLE,
                 borderColor: "gray",
                 borderWidth: 0.3,
                 borderRadius: 10,
-                marginLeft: 10,
+            
                 alignItems: "center",
+                
                 flexDirection: "row",
+                      justifyContent: "center", // Centers content vertically
+   
               }}
             >
-              <Text style={{ fontSize: 17, marginLeft: 5 }}>Accept</Text>
+              <Text style={{ fontSize: 17, marginLeft: 5 ,color:Colors.WHITE,fontWeight:"bold"}}>Accept</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleRejectInvitation}
               style={{
                 height: 30,
                 width: "40%",
-                borderColor: "gray",
-                borderWidth: 0.3,
+                borderColor: Colors.LIGHT_PURPLE,
+                borderWidth: 1,
                 borderRadius: 10,
+             
                 marginLeft: 10,
                 alignItems: "center",
                 flexDirection: "row",
+                      justifyContent: "center", // Centers content vertically
+
               }}
             >
-              <Text style={{ fontSize: 17, marginLeft: 5 }}>Reject</Text>
+              <Text style={{ fontSize: 17, marginLeft: 5 ,fontWeight:"bold"}}>Reject</Text>
             </TouchableOpacity>
 
           </View>
@@ -1043,8 +1050,8 @@ const GroupDetails = ({ route }) => {
                 autoPlay
                 loop
                 style={{
-                  width: 150,
-                  height: 150,
+                  width: 500,
+                height:500
                 }}
               />
             </View>

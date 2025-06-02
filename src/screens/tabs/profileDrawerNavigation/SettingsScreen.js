@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { ProfileService } from '../../services/profile.service';  // Import the Updateprivacy function
+import { ProfileService } from '../../../services/profile.service';  // Import the Updateprivacy function
 
 const SettingsScreen = ({ navigation }) => {
     const [isPublic, setIsPublic] = useState(true);

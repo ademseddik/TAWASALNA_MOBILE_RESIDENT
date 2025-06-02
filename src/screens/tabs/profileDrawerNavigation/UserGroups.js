@@ -13,9 +13,10 @@ import {
 TouchableWithoutFeedback 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { APP_ENV } from '../../utils/BaseUrl';
+import { APP_ENV } from '../../../utils/BaseUrl';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Ionicons } from '@expo/vector-icons';
+import Colors from '../../../../assets/Colors';
 
 const UserGroups = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -73,9 +74,7 @@ console.log(data)
       id: group.id,
       name: group.name,
       description: group.description || 'No description available',
-      image: group.groupphoto ? 
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/images?fileUrl=${group.groupphoto}` : 
-        'https://via.placeholder.com/150',
+      image: group.groupphoto,
       type: group.type,
       creator: group.creator,
       members: group.members,
@@ -130,12 +129,8 @@ console.log(data)
       groupPics: item.groupphoto
     })}
     >
-      <Image
-        source={{
-          uri: item.image || 'https://i.ibb.co/GLMJBr3/Group-Photo-Place-Holder.jpg',
-        }}
-        style={styles.avatar}
-      />
+   <Image source={{ uri: item.image || 'https://i.ibb.co/GLMJBr3/Group-Photo-Place-Holder.jpg' }} style={styles.avatar} />
+  
       <View style={styles.userInfo}>
         <Text style={styles.username}>{item.name}</Text>
         <Text style={styles.bio}>
@@ -147,7 +142,7 @@ console.log(data)
           <Text style={styles.typeIndicator}>{item.type}</Text>
         </View>
       </View>
-      <Icon name="chevron-right" size={24} color="#6200EE" style={styles.nextIcon} />
+      <Icon name="chevron-right" size={24} color={Colors.LIGHT_PURPLE} style={styles.nextIcon} />
     </TouchableOpacity>
   );
 
@@ -171,7 +166,7 @@ console.log(data)
         </TouchableOpacity>
       </View>
       {loading ? (
-        <ActivityIndicator size="large" color="#6200EE" />
+        <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} />
       ) : (
         <FlatList
           data={filteredGroups}
@@ -188,7 +183,7 @@ console.log(data)
   <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
     <View style={styles.modalContainer}>
       <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>Create Group</Text>
+        <Text style={styles.modalTitle}>                    Create Group</Text>
         <TextInput
           style={styles.input}
           placeholder="Group Name"
@@ -203,6 +198,12 @@ console.log(data)
         />
         <View>
           <View style={styles.sectionContent}>
+              <Switch
+            trackColor={{ false: Colors.GRAY, true: Colors.LIGHT_PURPLE }}
+            thumbColor={isPublic ? Colors.GRAY : Colors.LIGHT_PURPLE}
+            onValueChange={handleToggle}
+            value={isPublic}
+          />
             <Ionicons name="people" size={24} color="#333" />
             <View style={styles.textContainer}>
               <Text style={styles.sectionTitle}>
@@ -213,19 +214,12 @@ console.log(data)
               </Text>
             </View>
           </View>
-          <Switch
-            trackColor={{ false: "#767577", true: "#81b0ff" }}
-            thumbColor={isPublic ? "#f5dd4b" : "#f4f3f4"}
-            onValueChange={handleToggle}
-            value={isPublic}
-          />
+        
         </View>
         <TouchableOpacity style={styles.createButton} onPress={handleCreateGroup}>
           <Text style={styles.buttonText}>Create</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.cancelButton} onPress={() => setModalVisible(false)}>
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
+
       </View>
     </View>
   </TouchableWithoutFeedback>
@@ -259,12 +253,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 15,
-  },
+  avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
+
   userInfo: {
     flex: 1,
   },
@@ -294,7 +284,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#6200EE',
+    backgroundColor:Colors.LIGHT_PURPLE,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -305,6 +295,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
@@ -316,6 +307,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+  
     marginBottom: 10,
   },
   input: {
@@ -325,13 +317,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   createButton: {
-    backgroundColor: '#6200EE',
+    backgroundColor: Colors.LIGHT_PURPLE,
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 30,
     alignItems: 'center',
   },
   cancelButton: {
-    marginTop: 10,
+
     padding: 10,
     borderRadius: 8,
     alignItems: 'center',
@@ -351,7 +343,8 @@ const styles = StyleSheet.create({
     description: {
         fontSize: 14,
         color: '#666',
-        maxWidth: 250,
+        maxWidth: 200,
+        marginBottom:10
     },sectionContent: {
         flexDirection: 'row',
         alignItems: 'center',

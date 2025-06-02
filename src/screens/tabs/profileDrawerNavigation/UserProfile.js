@@ -11,16 +11,16 @@ import {
 import { EvilIcons } from "@expo/vector-icons";
 import { CommonActions } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Colors from "../../../assets/Colors";
+import Colors from "../../../../assets/Colors";
 import Axios from "axios";
 import { useTranslation } from "react-i18next";
-import { APP_ENV } from "../../../src/utils/BaseUrl";
+import { APP_ENV } from "../../../utils/BaseUrl";
 import { useAuth, useUser } from '@clerk/clerk-expo';
-import CompleteInformations from "../../components/pupUps/CompleteInformations";
+import CompleteInformations from "../../../components/pupUps/CompleteInformations";
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
-import InfoRoute from './InfoRoute';
-import FriendsRoute from './FriendsRoute';
-import PostsRoute from './PostsRoute';
+import InfoRoute from '../../profile/InfoRoute';
+import FriendsRoute from '../../profile/FriendsRoute';
+import PostsRoute from '../../profile/PostsRoute';
 import { ScrollView } from 'react-native-virtualized-view';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -163,7 +163,7 @@ const ProfileScreen = ({ navigation }) => {
       onPress={handleSignOut}
     >
       <Image
-              source={require("../../../assets/Icons/logout.png")} 
+              source={require("../../../../assets/Icons/logout.png")} 
               style={styles.signOutIcon}
             />
     </TouchableOpacity>

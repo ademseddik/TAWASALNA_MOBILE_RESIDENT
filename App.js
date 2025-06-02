@@ -15,7 +15,6 @@ import SignUp from './src/screens/auth/SignUp';
 import signup_with_social_media from './src/screens/auth/SignUpSocial';
 import VerifyAccount from './src/screens/auth/VerifyAccount';
 import EditProfile from './src/screens/profile/EditProfile';
-import ProfileScreen from "./src/screens/profile/UserProfile";
 import UsersProfile from './src/screens/profile/UsersProfile';
 import ChangePassword from './src/screens/profile/ChangePassword';
 import SearchScreen from './src/screens/tabs/SearchScreen';

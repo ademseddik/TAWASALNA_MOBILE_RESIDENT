@@ -20,7 +20,6 @@ import Colors from "../../../assets/Colors";
 
 
 const CompleteInformations = ({ isVisible, onClose }) => {
-  const [residentId, setResidentId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [date, setDate] = useState(new Date());
@@ -65,7 +64,6 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
      const responce= await Axios.put(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/updateresidenprofile/${userId}`,
         {
-          residentId,
           provider:provider,
           dateOfBirth: new Date(dateOfBirth),
         },
@@ -126,18 +124,7 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
               {t("Complete your informations")}
             </Text>
 
-            <Text style={{ marginBottom: 4 }}>{t("Your ID")}</Text>
-            <TextInput
-              style={{
-                borderWidth: 1,
-                borderRadius: 8,
-                padding: 12,
-                marginBottom: 16,
-              }}
-              placeholder="Enter your ID number..."
-              value={residentId}
-              onChangeText={setResidentId}
-            />
+
 
             <Text style={{ marginBottom: 4 }}>
               {t("Date Of Birth")}
@@ -155,6 +142,7 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
                   display="spinner"
                   value={date}
                   onChange={onchangeDatePicker}
+                    maximumDate={new Date(new Date().setDate(new Date().getDate() - 1))}
                 />
               )}
               <TouchableOpacity

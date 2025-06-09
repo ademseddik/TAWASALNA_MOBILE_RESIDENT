@@ -50,8 +50,8 @@ const ProfileScreen = ({ navigation }) => {
 
   const { t } = useTranslation();
   const [profileData, setProfileData] = useState(null);
-  const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
-  const [coverImage, setCoverImage] = useState("https://i.ibb.co/Zqy4r4F/profile-photo.jpg");
+  const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/3LTQjg6/20250604-1540-White-Background-Change-remix-01jwxp43eefkss1zrbgf7gqqyb.png");
+  const [coverImage, setCoverImage] = useState("https://i.ibb.co/3LTQjg6/20250604-1540-White-Background-Change-remix-01jwxp43eefkss1zrbgf7gqqyb.png");
 
   const [loading, setLoading] = useState(true);
   const [isCompleteInformationsModalVisible, setCompleteInformationsModalVisible] = useState(false);
@@ -158,15 +158,7 @@ const ProfileScreen = ({ navigation }) => {
 
    <View style={styles.profileHeaderWrapper}>
   <View style={styles.coverImageWrapper}>
-    <TouchableOpacity
-      style={styles.signOutButton}
-      onPress={handleSignOut}
-    >
-      <Image
-              source={require("../../../../assets/Icons/logout.png")} 
-              style={styles.signOutIcon}
-            />
-    </TouchableOpacity>
+  
     <Image source={{ uri: coverImage }} style={styles.coverImage} />
   </View>
   
@@ -233,7 +225,7 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: "white",
-    padding: 10 
+ 
    
   },
   menuButton: {
@@ -266,7 +258,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  coverImage: { width: "100%", height: 180, borderRadius: 30 },
+  coverImage: { width: "100%", height: 180},
 
   loadingContainer: {
     flex: 1,

@@ -4,11 +4,11 @@
     "slug": "TAWASALNA",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Icons/logoc.png",
+    
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/Icons/logoc.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -16,20 +16,23 @@
       "supportsTablet": true,
       "splash": {
         "resizeMode": "contain",
-        "image": "./assets/Icons/TawasalnaLogoW1.png",
+        "image": "./assets/Icons/logoc.png",
         "backgroundColor": "#2A003A"
       }
     },
     "android": {
+      "icon": "./assets/Icons/logoc.png",
+
       "adaptiveIcon": {
         "foregroundImage": "./assets/Icons/logoc.png",
-        "backgroundColor": "#2A003A"
+        "backgroundColor": "#FFFFFF"
       },
-      "permissions": ["INTERNET"],
-
+      "permissions": [
+        "INTERNET"
+      ],
       "splash": {
         "resizeMode": "contain",
-        "image": "./assets/Icons/TawasalnaLogoW1.png",
+        "image": "./assets/Icons/logoc.png",
         "backgroundColor": "#2A003A"
       },
       "package": "com.adem1.TAWASALNA"

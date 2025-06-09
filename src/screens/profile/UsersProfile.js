@@ -128,7 +128,8 @@ const UsersProfile = () => {
         setFollowStatus("pending");
       } else if (data.following?.includes(currentuserId)) {
         setFollowStatus("follow-back");
-      } else {
+      } 
+    else {
         setFollowStatus("follow");
       }
     } catch (error) {

@@ -6,10 +6,13 @@ import { ProfileService } from '../../../services/profile.service';  // Import t
 
 const SettingsScreen = ({ navigation }) => {
     const [isPublic, setIsPublic] = useState(true);
+  const [isSocialAuth, setIsSocialAuth] = useState(false);
 
     // Load privacy setting from AsyncStorage
     useEffect(() => {
         const loadPrivacySetting = async () => {
+             const socialAuth = await AsyncStorage.getItem("SOCIAL_AUTH");
+    setIsSocialAuth(socialAuth === 'true'); // Add this line
             try {
                 const privacyValue = await AsyncStorage.getItem('PRIVACY');
                 if (privacyValue !== null) {
@@ -57,7 +60,7 @@ const SettingsScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
-            {/* Change Password Section */}
+               {!isSocialAuth && (
             <TouchableOpacity
                 style={styles.section}
                 onPress={() => navigation.navigate('change password')}
@@ -68,6 +71,7 @@ const SettingsScreen = ({ navigation }) => {
                 </View>
                 <Ionicons name="chevron-forward" size={24} color="#666" />
             </TouchableOpacity>
+               )}
 
             {/* Account Privacy Section */}
             <View style={styles.section}>

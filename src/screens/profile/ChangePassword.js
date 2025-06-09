@@ -180,7 +180,7 @@ const styles = {
   },
   label: {
     marginBottom: 5,
-    marginLeft: 15
+    marginLeft: 5
   },
   passwordInput: {
     flexDirection: "row",

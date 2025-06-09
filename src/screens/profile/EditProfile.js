@@ -4,7 +4,7 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
+  
   Image,
   StyleSheet,
   Dimensions,
@@ -26,7 +26,7 @@ import Axios from "axios";
 import { useNavigation } from "@react-navigation/native";
 import { useUser } from '@clerk/clerk-expo';
 import { Picker } from '@react-native-picker/picker';
-
+import { ScrollView } from 'react-native-gesture-handler';
 
 
 
@@ -230,11 +230,11 @@ const EditProfile = () => {
 
   ////////////////////////////////////////////////////////////////
   const OnchangeBio = (event) => {
-    if(event.length>300){
+    if (event.length > 300) {
       setErrorBio("Bio cannot exceed 300 characters.")
       setlengthBio("")
 
-    }else {
+    } else {
       setlengthBio(`${event.length} /300`)
       setErrorBio("")
     }
@@ -366,7 +366,7 @@ const EditProfile = () => {
     }
 
     if (hasError) return;
-    setIsSubmitting(true); 
+    setIsSubmitting(true);
     try {
       const userId = await AsyncStorage.getItem("userId");
       const token = await AsyncStorage.getItem("token");
@@ -401,7 +401,7 @@ const EditProfile = () => {
       );
       fetchProfile();
       showToastSuccess();
-     
+
       navigation.navigate("TABBAR", { screen: "Profile" });
     } catch (error) {
       navigation.navigate("TABBAR", { screen: "Profile" });
@@ -525,7 +525,6 @@ const EditProfile = () => {
 
   return (
     <View style={styles.lastCont}>
-      <ScrollView contentContainerStyle={{ backgroundColor: "white", flex: 1, }}>
         <View style={styles.bigContainer}>
           <View style={styles.profileHeaderWrapper}>
             <View style={{ marginBottom: 20 }}>
@@ -543,12 +542,14 @@ const EditProfile = () => {
                   position: "absolute",
                   bottom: 10,
                   right: 10,
-                  backgroundColor: "rgba(0,0,0,0.5)",
-                  padding: 8,
-                  borderRadius: 10,
+                  backgroundColor: Colors.WHITE,
+                  padding: 5,
+                  paddingTop: 2, // Reduced padding
+                  borderRadius: 20,
+                  elevation: 3,
                 }}
               >
-                <Text style={{ color: "#fff" }}>Change Cover</Text>
+                <EvilIcons name="camera" size={25} color={Colors.LIGHT_PURPLE} />
               </TouchableOpacity>
             </View>
 
@@ -558,7 +559,7 @@ const EditProfile = () => {
                 style={styles.editButton}
                 onPress={() => handleImageSelection()}
               >
-                <EvilIcons name="camera" size={20} color="white" />
+                <EvilIcons name="camera" size={25} color={Colors.LIGHT_PURPLE} />
               </TouchableOpacity>
             </View>
           </View>
@@ -707,10 +708,10 @@ const EditProfile = () => {
                 </View>
               </View>
             </View>
-            <View style={{  marginTop: 15 }}>
+            <View style={{ marginTop: 15 }}>
               <Text style={styles.label3}>
                 {t("Community")}
-        
+
               </Text>
               <View
                 style={{
@@ -718,7 +719,7 @@ const EditProfile = () => {
                   borderRadius: 8,
                   borderColor: communityError ? 'red' : 'gray',
                   width: 310,
-                  
+
                   marginBottom: 1,
                 }}
               >
@@ -772,17 +773,12 @@ const EditProfile = () => {
 
 
           </ScrollView>
-          {!isSocialAuth && (
-            <TouchableOpacity
-              onPress={handlechangepassword}
-              style={[styles.button, { backgroundColor: 'transparent',borderColor:Colors.LIGHT_PURPLE,borderWidth:2 }]}
-            >
-              <Text style={styles.textBtnchangepassword}>{t("Change Password")}</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleOpenSubmit} style={[styles.button,{height:53}]}>
+        <View style={{ height: '20%',marginBottom:10 ,alignContent:"center" ,width:'100%'}}>
+ <TouchableOpacity onPress={handleOpenSubmit} style={[styles.button, { height: 50,marginBottom:10,alignItems:"center",alignSelf:'center' }]}>
             <Text style={styles.textBtn}>{t("Save")}</Text>
           </TouchableOpacity>
+        </View>
+         
         </View>
         <SuccessUpdatingProfile
           handleCloseSubmit={handleCloseSubmit}
@@ -791,7 +787,7 @@ const EditProfile = () => {
           onConfirm={UpdateProfile}
           isSubmitting={isSubmitting}
         />
-      </ScrollView>
+
     </View>
   );
 };
@@ -843,7 +839,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     elevation: 3,
   },
- 
+
 
   containerPhoto: {
     marginTop: 20,
@@ -867,10 +863,11 @@ const styles = StyleSheet.create({
   },
   editButton: {
     position: "absolute",
-    bottom: -2,
+    bottom: -3,
     right: 4,
-    backgroundColor: Colors.LIGHT_PURPLE,
-    padding: 8, // Reduced padding
+    backgroundColor: Colors.WHITE,
+    padding: 5,
+    paddingTop: 2, // Reduced padding
     borderRadius: 20,
     elevation: 3,
   },
@@ -935,9 +932,9 @@ const styles = StyleSheet.create({
   lengthBio: {
     color: Colors.GRAY,
     marginBottom: 3,
-   alignSelf:"flex-end",
-    alignContent:"flex-end",
-    end:20,
+    alignSelf: "flex-end",
+    alignContent: "flex-end",
+    end: 20,
   },
   containerNested: {
     flexDirection: "column",
@@ -957,7 +954,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
-   paddingEnd:12,
+    paddingEnd: 12,
     marginTop: 5,
   },
   gender: {
@@ -972,7 +969,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
- 
+
   textBtnchangepassword: {
     color: Colors.LIGHT_PURPLE,
     fontWeight: "bold",
@@ -1010,7 +1007,7 @@ const styles = StyleSheet.create({
   },
   label3: {
     fontWeight: "bold",
-    color: "black", 
+    color: "black",
     marginBottom: 5,
     marginLeft: 3,
     alignSelf: "flex-start"
@@ -1040,7 +1037,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 10,
-    marginLeft:20,
+    marginLeft: 20,
   },
   interestButton: {
     backgroundColor: "#f0f0f0",

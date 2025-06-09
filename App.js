@@ -89,7 +89,7 @@ const App = () => {
             <Stack.Screen
               name="Edit profile"
               component={EditProfile}
-              options={{ headerShown: false }}
+              options={{ headerShown: true  }}
             />
           
                        <Stack.Screen

@@ -64,11 +64,11 @@ const CommentModel = ({
     setIsTyping(false);
   };
   const handleModalClose = () => {
-     onClose();
-     setData([]); 
-     postId = null;
+    onClose();
+    setData([]);
+    postId = null;
   };
-  
+
   const showEmptyFieldsToast = () => {
     Toast.show({
       type: "info",
@@ -138,7 +138,7 @@ const CommentModel = ({
       } catch (error) {
         console.error("Error getting resident profile:", error);
         throw new Error(error);
-      } 
+      }
     };
 
     fetchProfile();
@@ -154,17 +154,23 @@ const CommentModel = ({
 
     try {
       const userId = await AsyncStorage.getItem("userId");
+      const Token = await AsyncStorage.getItem("USER_ACCESS");
       if (isReplying && replyingToCommentId) {
         // Add reply to comment
         await Axios.post(
           `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${replyingToCommentId}`,
-          { replyText: commentText } 
+          { replyText: commentText }
         );
       } else {
         // Add new comment
         await Axios.post(
           `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addcomment/${postId}/${userId}`,
-          { commentText }
+          { commentText },
+          {
+            headers: {
+              Authorization: `Bearer ${Token}`
+            }
+          }
         );
         showaddedcommentToast();
       }
@@ -181,12 +187,12 @@ const CommentModel = ({
     }
   };
   ///////////////////////////////////////////////////////////////////////////////////////////
-const handleReplyButtonPress = (commentId, userName) => {
-  setReplyingToCommentId(commentId);
-  setReplyingToUserName(userName);
-  setIsReplying(true);
-  setCommentText(`@${userName} `); 
-};
+  const handleReplyButtonPress = (commentId, userName) => {
+    setReplyingToCommentId(commentId);
+    setReplyingToUserName(userName);
+    setIsReplying(true);
+    setCommentText(`@${userName} `);
+  };
   ///////////////////////////////////////////////////////////////////////////////////////////
   const fetchRepliesForComment = async (commentId) => {
     try {
@@ -202,7 +208,7 @@ const handleReplyButtonPress = (commentId, userName) => {
           [commentId]: response.data,
         }));
 
-        console.log('replies for :',commentId,':',response.data)
+        console.log('replies for :', commentId, ':', response.data)
 
         const profilePicPromises = response.data.map(async (reply) => {
           const response = await Axios.get(
@@ -360,10 +366,14 @@ const handleReplyButtonPress = (commentId, userName) => {
       transparent={true}
       visible={isVisible}
       onRequestClose={handleModalClose}
+       onSwipeComplete={handleModalClose}
+  swipeDirection="down"
+  onBackdropPress={handleModalClose}
     >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Comments</Text>
             <View style={styles.separator} />
@@ -435,7 +445,7 @@ const handleReplyButtonPress = (commentId, userName) => {
                                 >
                                   <View style={styles.replyLine} />
                                   {replyprofilePic[reply.residentId] !==
-                                  "data:image/jpeg;base64," ? (
+                                    "data:image/jpeg;base64," ? (
                                     <Image
                                       source={{
                                         uri: replyprofilePic[reply.residentId],
@@ -498,7 +508,7 @@ const handleReplyButtonPress = (commentId, userName) => {
                                   >
                                     <View style={styles.replyLine} />
                                     {replyprofilePic[reply.residentId] !==
-                                    "data:image/jpeg;base64," ? (
+                                      "data:image/jpeg;base64," ? (
                                       <Image
                                         source={{
                                           uri: replyprofilePic[
@@ -604,27 +614,37 @@ const handleReplyButtonPress = (commentId, userName) => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </View>
+
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
   modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  flex: 1,
+  backgroundColor: "transparent",
+  borderCurve:30
+
   },
   modalContent: {
-    backgroundColor: "white",
-    borderRadius: 15,
-    padding: 20,
-    width: "100%",
-    height: 350,
-    marginTop: "20%",
+    flex: 1,
+  padding: 15,
+
+  borderTopEndRadius:20,
+  borderTopStartRadius:20,
+
+  overflow: "hidden",
+  backgroundColor: 'white',
+  // iOS shadow
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 3.84,
+  // Android shadow
+  elevation: 5,
   },
   modalHandle: {
     borderTopColor: Colors.GunmetalGray,
@@ -696,6 +716,7 @@ const styles = StyleSheet.create({
   addCommentContainer: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal:20
   },
   userProfileImage: {
     height: 40,
@@ -726,15 +747,15 @@ const styles = StyleSheet.create({
     width: "50%",
     maxHeight: 150,
     zIndex: 1,
-    marginLeft:90,
-    alignItems:'center',
-    borderRadius:20
+    marginLeft: 90,
+    alignItems: 'center',
+    borderRadius: 20
   },
   suggestionText: {
     padding: 10,
     borderBottomColor: "#ccc",
     borderBottomWidth: 1,
-    
+
   },
 });
 

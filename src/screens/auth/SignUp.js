@@ -269,7 +269,7 @@ if (error.response.data.error==="User already exists"){
   return (
     <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
       <ScrollView style={{ marginTop: "0%" }}>
-          <View style={{ marginTop: '0.6%' }}>
+          <View style={{ marginTop: '0%' }}>
                 <TouchableOpacity
                   style={styles.languageSelector}
                   onPress={() => setShowLanguagePicker(!showLanguagePicker)}
@@ -316,16 +316,16 @@ if (error.response.data.error==="User already exists"){
           marginTop:10
         }}>
               <View style={{
-        width: 384, height: 50,
+        width: 384, height: 70,
         marginLeft:-19,
         backgroundColor:Colors.PURPLE,
         paddingLeft:10,
-        borderBottomStartRadius:10,
-        borderBottomEndRadius:10
+        top:-10
+   
         }}>
           <Image
             source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
-            style={{ width: 150, height: 50, marginRight: 15 }} // adjust size as needed
+            style={{ width: 150, height: 50, marginRight: 15 ,top:10}} // adjust size as needed
             resizeMode="contain"
           />
           </View>
@@ -538,7 +538,7 @@ if (error.response.data.error==="User already exists"){
               {confirmpasswordError}
             </Text>
           ) : null}
-          <View style={{ marginLeft: "4%", marginTop: 15 }}>
+          <View style={{ marginLeft: "4%" }}>
             <Text style={{ marginBottom: 5 }}>
               {t("Community")}
               <Text style={{ color: "red" }}>*</Text>
@@ -578,7 +578,7 @@ if (error.response.data.error==="User already exists"){
               <Text style={{ color: 'red', marginLeft: '3%' }}>{communityError}</Text>
             )}
           </View>
-          <Text style={{ marginLeft: "4%" }}>{t("Your ID")} </Text>
+          <Text style={{ marginLeft: "4%" ,marginTop:10}}>{t("Your ID")} </Text>
 
           <View
             style={{

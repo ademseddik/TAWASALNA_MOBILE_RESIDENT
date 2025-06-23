@@ -6,6 +6,7 @@ export const APP_ENV = {
     SOCIAL_PORT: "http://192.168.1.13:8093",
     EXPO_PUBLIC_ADMIN_SOCKET :"ws://192.168.1.13:8093/tawasalna-community/ws",
       WS_URL: "http://192.168.1.13:8093/tawasalna-community/ws",
+        NOTIFICATION_WS_URL: "ws://192.168.1.13:8093/tawasalna-community/ws-notif",
     HOST: process.env.EXPO_PUBLIC_HOST,
   };
   

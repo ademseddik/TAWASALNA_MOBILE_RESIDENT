@@ -32,6 +32,8 @@ const initialLayout = { width: Dimensions.get('window').width };
 const ProfileScreen = ({ navigation }) => {
   const [userId, setuserId] = useState(null);
   const [index, setIndex] = useState(0);
+  const [isBioExpanded, setIsBioExpanded] = useState(false);
+
   const [routes] = useState([
 
     { key: 'posts', title: 'Posts' },
@@ -45,8 +47,7 @@ const ProfileScreen = ({ navigation }) => {
     friends: () => <FriendsRoute userId={userId} navigation={navigation}  />,
     info: () => <InfoRoute userId={userId} />,
   });
-  const { user } = useUser(); // User data from Clerk
-  const { signOut } = useAuth();
+
 
   const { t } = useTranslation();
   const [profileData, setProfileData] = useState(null);
@@ -60,6 +61,10 @@ const ProfileScreen = ({ navigation }) => {
   const toggleCompleteInformationsModal = () => {
     setCompleteInformationsModalVisible(!isCompleteInformationsModalVisible);
   };
+
+  const toggleBio = () => setIsBioExpanded(prev => !prev);
+
+
   const fetchProfileData = async () => {
 
     try {
@@ -111,29 +116,7 @@ const ProfileScreen = ({ navigation }) => {
   };
 
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      console.log('User signed out successfully');
-    } catch (error) {
-      console.error('Sign out eror:', error);
-    }
 
-    try {
-
-      await AsyncStorage.multiRemove(["userId", "token", "SOCIAL_AUTH"]);
-
-
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        })
-      );
-    } catch (error) {
-      console.error("Error signing out:", error);
-    }
-  };
   useEffect(() => {
     const loadData = async () => {
       await fetchProfileData();
@@ -174,10 +157,22 @@ const ProfileScreen = ({ navigation }) => {
 
   <View style={styles.profileInfo}>
     <Text style={styles.name}>{profileData?.fullName || ""}</Text>
-    {profileData?.residentId && (
-      <Text style={styles.residentId}>ID: {profileData.residentId}</Text>
-    )}
-    <Text style={styles.bio}> {profileData.bio}</Text>
+   
+    {profileData?.bio && (
+  <TouchableOpacity onPress={toggleBio}>
+    <Text style={styles.bio}>
+      {profileData.bio.length > 50 && !isBioExpanded
+        ? `${profileData.bio.slice(0, 50)}...`
+        : profileData.bio}
+      {profileData.bio.length > 50 && (
+        <Text style={{ color: Colors.LIGHT_PURPLE }}>
+          {isBioExpanded ? " Show less" : " Read more"}
+        </Text>
+      )}
+    </Text>
+  </TouchableOpacity>
+)}
+
   </View>
 </View>
       <CompleteInformations
@@ -323,6 +318,8 @@ const styles = StyleSheet.create({
   },
   bio: {
     fontSize: 16,
+    fontWeight:300,
+    marginLeft:10,
     color: Colors.LIGHT_BLACK,
     maxWidth: 300,
   },

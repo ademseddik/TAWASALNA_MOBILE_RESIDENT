@@ -212,6 +212,7 @@ const CommentModel = ({
 
   // Toggle comment expansion
   const toggleCommentExpansion = (commentId) => {
+    fetchRepliesForComment(commentId);
     setExpandedComments(prev => ({
       ...prev,
       [commentId]: !prev[commentId]
@@ -250,6 +251,7 @@ const CommentModel = ({
 
   // Fetch comments for post
   const fetchCommentsPost = useCallback(async () => {
+
     if (!postId) return;
 
     setIsLoading(true);
@@ -350,6 +352,7 @@ const CommentModel = ({
 
   // Fetch replies for a comment
   const fetchRepliesForComment = async (commentId) => {
+    console.log("1")
     try {
       const response = await Axios.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getreplies/${commentId}`
@@ -359,7 +362,7 @@ const CommentModel = ({
           ...prevReplies,
           [commentId]: response.data,
         }));
-
+  console.log("2")
         const profilePicPromises = response.data.map(async (reply) => {
 
 
@@ -368,7 +371,7 @@ const CommentModel = ({
             profilePic: reply.userProfileImage,
           };
         });
-
+  console.log("3")
         const profilePics = await Promise.all(profilePicPromises);
         const profilePicMap = profilePics.reduce((acc, pic) => {
           if (pic) acc[pic.residentId] = pic.profilePic;

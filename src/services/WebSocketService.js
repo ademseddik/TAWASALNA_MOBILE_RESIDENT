@@ -1,19 +1,16 @@
-import SockJS from 'sockjs-client';
-import { Client } from '@stomp/stompjs';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_ENV } from '../utils/BaseUrl';
 
-// Store active clients by userId
-const activeClients = new Map();
+const activeSockets = new Map();
 
-function createWrapper(client, callbacks) {
+function createWrapper(socket, callbacks) {
   return {
     on: (event, callback) => {
       callbacks[event] = callback;
     },
     disconnect: () => {
-      if (client.active) {
-        client.deactivate();
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.close();
       }
     }
   };
@@ -22,59 +19,52 @@ function createWrapper(client, callbacks) {
 export const initializeSocket = async () => {
   const userId = await AsyncStorage.getItem("userId");
   
-  if (activeClients.has(userId)) {
-    const { client, callbacks } = activeClients.get(userId);
-    return createWrapper(client, callbacks);
+  if (activeSockets.has(userId)) {
+    const { socket, callbacks } = activeSockets.get(userId);
+    return createWrapper(socket, callbacks);
   }
 
-  const socket = new SockJS(`${APP_ENV.WS_URL}`);
-  
-  const stompClient = new Client({
-    webSocketFactory: () => socket,
-    reconnectDelay: 5000,
-    heartbeatIncoming: 1000,
-    heartbeatOutgoing: 1000,
-    debug: (str) => console.log(str),
-    connectHeaders: { userId },
-    onConnect: () => {
-      console.log('STOMP Connected');
-      
-      stompClient.subscribe(`/user/${userId}/queue/notifications`, (message) => {
-        const notification = JSON.parse(message.body);
-        const callbacks = activeClients.get(userId)?.callbacks || {};
-        
-        if (notification.type && callbacks[notification.type]) {
-          callbacks[notification.type](notification);
-        }
-      });
-    },
-    onStompError: (frame) => {
-      console.error('STOMP error:', frame.headers.message);
-    },
-    onDisconnect: () => {
-      console.log('STOMP Disconnected');
-      const callbacks = activeClients.get(userId)?.callbacks || {};
-      if (callbacks.disconnect) {
-        callbacks.disconnect();
-      }
-      activeClients.delete(userId);
-    }
-  });
-
-  stompClient.activate();
+  // Use the new notification endpoint
+  const socket = new WebSocket(`${APP_ENV.NOTIFICATION_WS_URL}?userId=${userId}`);
   
   const callbacks = {};
-  activeClients.set(userId, { client: stompClient, callbacks });
   
-  return createWrapper(stompClient, callbacks);
+  socket.onopen = () => {
+    console.log('WebSocket connected');
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const notification = JSON.parse(event.data);
+      // Call the appropriate callback based on notification type
+      if (notification.type && callbacks[notification.type]) {
+        callbacks[notification.type](notification);
+      }
+    } catch (error) {
+      console.error('Error parsing notification:', error);
+    }
+  };
+
+  socket.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+
+  socket.onclose = () => {
+    console.log('WebSocket disconnected');
+    if (callbacks.disconnect) {
+      callbacks.disconnect();
+    }
+    activeSockets.delete(userId);
+  };
+
+  activeSockets.set(userId, { socket, callbacks });
+  return createWrapper(socket, callbacks);
 };
 
 export const disconnectSocket = (userId) => {
-  if (activeClients.has(userId)) {
-    const { client } = activeClients.get(userId);
-    if (client.active) {
-      client.deactivate();
-    }
-    activeClients.delete(userId);
+  if (activeSockets.has(userId)) {
+    const { socket } = activeSockets.get(userId);
+    socket.close();
+    activeSockets.delete(userId);
   }
 };

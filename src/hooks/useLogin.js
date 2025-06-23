@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
+
 import { AuthService } from '../services/auth.service';
 import { useTranslation } from 'react-i18next';
 import { useNetworkMonitor } from './useNetworkMonitor';
@@ -10,7 +10,7 @@ export const useLogin = () => {
   const navigation = useNavigation();
   const { t } = useTranslation();
   const isConnected = useNetworkMonitor();
-  const [state, setState] = useState({
+  const [state, setState] = useState({ 
     email: '',
     password: '',
     showPassword: false,
@@ -28,7 +28,8 @@ export const useLogin = () => {
   useEffect(() => {
     const checkRememberMe = async () => {
       const rememberMe = await AsyncStorage.getItem("RememberMe");
-      if (rememberMe === "true") {
+      
+      if (rememberMe === "false") {
         const [userId, token, timestamp] = await Promise.all([
           AsyncStorage.getItem("userId"),
           AsyncStorage.getItem("USER_ACCESS"),

@@ -6,10 +6,13 @@ import {
   Image,
   ActivityIndicator,
   StyleSheet,
+  TouchableWithoutFeedback,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Modal } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
+import Ionicons from 'react-native-vector-icons/Ionicons';
+
 import Colors from "../../../assets/Colors";
 import { TextInput } from "react-native";
 import {
@@ -22,40 +25,183 @@ import {
   MessageText,
   TextSection,
   CommentContainer,
+  Replytext,
+  ActionDialog,
+  ActionContainer,
+  ActionButton,
+  CancelButton,
+  ReactionSummary,
+  ActionButtonText,
+  ReactionPickerContainer,
 } from "../../utils/Styles/MessageStyles";
-import { encode } from "base64-arraybuffer";
+import { encode } from "base64-arraybuffer"; // Added missing import
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
-
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import Axios from "axios";
 import { APP_ENV } from "../../../src/utils/BaseUrl";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming
+} from 'react-native-reanimated';
 
 const CommentModel = ({
   isVisible,
   onClose,
   postId,
-  fullName,
   refreshPosts,
 }) => {
+  // State variables
   const [commentText, setCommentText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [isTyping, setIsTyping] = useState(false); // Added back missing state
   const [data, setData] = useState([]);
-  const [userId, setUserId] = useState([]);
-  const [profilePic, setProfilePic] = useState(null);
-  const [replyprofilePic, setReplyProfilePic] = useState({});
-  const [userprofilePic, setUserProfilePic] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingComment, setIsAddingComment] = useState(false);
-  const [replies, setReplies] = useState([]);
   const [replyText, setReplyText] = useState("");
   const [replyingToCommentId, setReplyingToCommentId] = useState(null);
   const [replyingToUserName, setReplyingToUserName] = useState("");
-  const [isReplying, setIsReplying] = useState(false);
-  const [userFullname, setFullName] = useState(false);
-  const [showAllReplies, setShowAllReplies] = useState(false);
-  const [followers, setFollowers] = useState([]);
-  const [showFollowers, setShowFollowers] = useState(false);
-  ///////////////////////////////////////////////////////////
+  const [showReplyOverlay, setShowReplyOverlay] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [editingComment, setEditingComment] = useState(null);
+  const [editCommentText, setEditCommentText] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [expandedComments, setExpandedComments] = useState({});
+  const [showActionDialog, setShowActionDialog] = useState(false);
+  const [selectedComment, setSelectedComment] = useState(null);
+  const [userFullname, setFullName] = useState("");
+  const [userimage, setimage] = useState("");
+  const [userprofilePic, setUserProfilePic] = useState(null);
+  const [showReplyInput, setShowReplyInput] = useState(null); // Added back missing state
+  const [replies, setReplies] = useState({}); // Added back for replies
+  const [replyprofilePic, setReplyProfilePic] = useState({}); // Added back for reply profile pics
+  const [showReactionPicker, setShowReactionPicker] = useState(null);
+  const [addingReply, setAddingReply] = useState(null);
+  // Animation values
+  const editInputHeight = useSharedValue(0);
+  const editInputOpacity = useSharedValue(0);
+  const actionDialogHeight = useSharedValue(0);
+  const actionDialogOpacity = useSharedValue(1);
+
+  const animatedEditInputStyle = useAnimatedStyle(() => ({
+    height: withSpring(editInputHeight.value, { damping: 15 }),
+    opacity: withTiming(editInputOpacity.value, { duration: 300 }),
+  }));
+
+  const animatedActionDialogStyle = useAnimatedStyle(() => ({
+    height: withSpring(actionDialogHeight.value, { damping: 15 }),
+    opacity: withTiming(actionDialogOpacity.value, { duration: 300 }),
+  }));
+  const getCurrentUserReaction = useCallback((comment) => {
+    if (!comment.reactions || !currentUserId) return null;
+    return comment.reactions.find(r => r.userId === currentUserId)?.reactionType;
+  }, [currentUserId]);
+
+  // Handle reaction icon press
+  const handleReactionIconPress = (commentId, currentReaction) => {
+    if (currentReaction) {
+      removeReaction(commentId);
+    } else {
+      addReactionToComment(commentId, "heart");
+    }
+  };
+
+  // Handle reaction icon long press
+  const handleReactionIconLongPress = (commentId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowReactionPicker(commentId);
+  };
+
+  // Remove reaction
+  const removeReaction = async (commentId) => {
+    try {
+      // Optimistic UI update
+      setData(prevData =>
+        prevData.map(comment => {
+          if (comment.commentId === commentId) {
+            const newReactions = comment.reactions.filter(r => r.userId !== currentUserId);
+            return { ...comment, reactions: newReactions };
+          }
+          return comment;
+        })
+      );
+
+      const userId = await AsyncStorage.getItem("userId");
+      await Axios.delete(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/removeReaction/${commentId}/${userId}`,
+        { headers: { "Content-Type": "application/json" } }
+      );
+    } catch (error) {
+      console.error("Error removing reaction:", error);
+      fetchCommentsPost(); // Revert on error
+    }
+  };
+
+  // Reaction emojis mapping
+  const reactionEmojis = {
+    heart: '❤️',
+    like: '👍',
+    laugh: '😂',
+    angry: '😡',
+    sad: '😢'
+  };
+
+  // Get current user ID on mount
+  useEffect(() => {
+    const getUserId = async () => {
+      const id = await AsyncStorage.getItem("userId");
+      setCurrentUserId(id);
+    };
+    getUserId();
+  }, []);
+
+  // Fetch current user profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const userId = await AsyncStorage.getItem("userId");
+        const response = await Axios.get(
+          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
+        );
+        setFullName(response.data.fullName);
+        setimage(response.data.profilephoto);
+      } catch (error) {
+        console.error("Error getting resident profile:", error);
+      }
+    };
+    fetchProfile();
+  }, []);
+
+  // Fetch user profile photo
+  useEffect(() => {
+    const fetchProfilePhoto = async () => {
+      try {
+        const userId = await AsyncStorage.getItem("userId");
+        const response = await Axios.get(
+          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
+          { responseType: "arraybuffer" }
+        );
+        const base64Image = encode(response.data);
+        setUserProfilePic(`data:image/jpeg;base64,${base64Image}`);
+      } catch (error) {
+        console.error("Error getting profile photo:", error);
+      }
+    };
+    fetchProfilePhoto();
+  }, []);
+
+  // Modal close handler
+  const handleModalClose = useCallback(() => {
+    onClose();
+    setData([]);
+    setReplyingToCommentId(null);
+    setExpandedComments({});
+    resetEditState();
+    setShowReplyInput(null); // Reset reply inputs
+  }, [onClose]);
+
   const handleTextInputFocus = () => {
     setIsTyping(true);
   };
@@ -63,611 +209,917 @@ const CommentModel = ({
   const handleTextInputBlur = () => {
     setIsTyping(false);
   };
-  const handleModalClose = () => {
-    onClose();
-    setData([]);
-    postId = null;
+
+  // Toggle comment expansion
+  const toggleCommentExpansion = (commentId) => {
+    setExpandedComments(prev => ({
+      ...prev,
+      [commentId]: !prev[commentId]
+    }));
   };
 
-  const showEmptyFieldsToast = () => {
-    Toast.show({
-      type: "info",
-      text1: "Please write a comment.",
-      visibilityTime: 3000,
-      autoHide: true,
-    });
-  };
-  const showaddedcommentToast = () => {
-    Toast.show({
-      type: "info",
-      text1: "comment added successfully .",
-      visibilityTime: 3000,
-      autoHide: true,
-    });
-  };
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  const handleTextInputChange = async (text) => {
-    setCommentText(text);
-    setIsTyping(text.trim().length > 0);
-
-    const lastAtIndex = text.lastIndexOf("@");
-    if (lastAtIndex !== -1) {
-      const query = text.substring(lastAtIndex + 1);
-      if (query.length > 0) {
-        const fetchedFollowers = await fetchFollowers(query);
-        setFollowers(fetchedFollowers);
-        setShowFollowers(true);
-      } else {
-        setShowFollowers(false);
-      }
-    } else {
-      setShowFollowers(false);
-    }
+  // Reset edit state
+  const resetEditState = () => {
+    setEditingComment(null);
+    setEditCommentText("");
+    editInputHeight.value = 0;
+    editInputOpacity.value = 0;
+    actionDialogHeight.value = 160;
+    actionDialogOpacity.value = 1;
   };
 
-  const handleFollowerClick = (followerFullName) => {
-    const lastAtIndex = commentText.lastIndexOf("@");
-    const newText =
-      commentText.substring(0, lastAtIndex + 1) + followerFullName + " ";
-    setCommentText(newText);
-    setShowFollowers(false);
+  const cancelEdit = () => {
+    resetEditState();
+    setShowActionDialog(false);
   };
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  const fetchFollowers = async (query) => {
+  const refetchCommentsPost = useCallback(async () => {
+    if (!postId) return;
+
     try {
-      const userId = await AsyncStorage.getItem("userId");
       const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/followers/search/${userId}?partialName=${query}`
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcomments/${postId}`
       );
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching followers:", error);
-      return [];
-    }
-  };
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  useEffect(() => {
-    const fetchProfile = async () => {
 
-      try {
-        const userId = await AsyncStorage.getItem("userId");
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
-        );
-        setFullName(response.data.fullName);
-      } catch (error) {
-        console.error("Error getting resident profile:", error);
-        throw new Error(error);
+      if (response.data && Array.isArray(response.data)) {
+        setData(response.data);
       }
-    };
+    } catch (error) {
+      console.error("Error getting comments:", error);
+    }
+  }, [postId]);
 
-    fetchProfile();
-  }, []);
-  ///////////////////////////////////////////////////////////////////////////////////////////
+  // Fetch comments for post
+  const fetchCommentsPost = useCallback(async () => {
+    if (!postId) return;
+
+    setIsLoading(true);
+    try {
+      const response = await Axios.get(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcomments/${postId}`
+      );
+
+      if (response.data && Array.isArray(response.data)) {
+        setData(response.data);
+      }
+    } catch (error) {
+      console.error("Error getting comments:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [postId]);
+
+  // Fetch comments when postId changes
+  useEffect(() => {
+    if (postId) fetchCommentsPost();
+  }, [postId, fetchCommentsPost]);
+
+  // Add comment to post
   const addCommentToPost = async () => {
     if (!commentText.trim()) {
-      showEmptyFieldsToast();
+      Toast.show({ type: "info", text1: "Please write a comment", visibilityTime: 3000 });
       return;
     }
 
     setIsAddingComment(true);
-
     try {
       const userId = await AsyncStorage.getItem("userId");
       const Token = await AsyncStorage.getItem("USER_ACCESS");
-      if (isReplying && replyingToCommentId) {
-        // Add reply to comment
-        await Axios.post(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${replyingToCommentId}`,
-          { replyText: commentText }
-        );
-      } else {
-        // Add new comment
-        await Axios.post(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addcomment/${postId}/${userId}`,
-          { commentText },
-          {
-            headers: {
-              Authorization: `Bearer ${Token}`
-            }
-          }
-        );
-        showaddedcommentToast();
-      }
-
+      await Axios.post(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addcomment/${postId}/${userId}`,
+        { commentText },
+        { headers: { Authorization: `Bearer ${Token}` } }
+      );
+      Toast.show({ type: "success", text1: "Comment added successfully", visibilityTime: 3000 });
       setCommentText("");
-      setIsReplying(false);
-      setReplyingToCommentId(null);
-      setReplyingToUserName("");
-      fetchCommentsPost();
+      refetchCommentsPost();
     } catch (error) {
-      console.error("Error while adding comment or reply:", error);
+      console.error("Error adding comment:", error);
     } finally {
       setIsAddingComment(false);
     }
   };
-  ///////////////////////////////////////////////////////////////////////////////////////////
+
+  // Add reply to comment
+ const addReplyToComment = async (commentId, text) => {
+  if (!text.trim()) {
+    Toast.show({ type: "info", text1: "Please write a reply", visibilityTime: 3000 });
+    return;
+  }
+
+  setAddingReply(commentId); // Set the comment we're replying to
+  
+  try {
+    const Token = await AsyncStorage.getItem("USER_ACCESS");
+    const userId = await AsyncStorage.getItem("userId");
+    await Axios.post(
+      `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${commentId}`,
+      {
+        image: userprofilePic,
+        Name: userFullname,
+        replyText: text
+      },
+      { headers: { Authorization: `Bearer ${Token}` } }
+    );
+    refetchCommentsPost();
+    setShowReplyInput(null);
+    setReplyText("");
+  } catch (error) {
+    console.error("Error adding reply:", error);
+  } finally {
+    setAddingReply(null); // Reset regardless of success or failure
+  }
+};
+
   const handleReplyButtonPress = (commentId, userName) => {
-    setReplyingToCommentId(commentId);
-    setReplyingToUserName(userName);
-    setIsReplying(true);
-    setCommentText(`@${userName} `);
+    if (showReplyInput === commentId) {
+      setShowReplyInput(null);
+      setShowReplyOverlay(false);
+    } else {
+      setShowReplyInput(commentId);
+      setReplyingToCommentId(commentId);
+      setReplyingToUserName(userName);
+      setReplyText("");
+      setShowReplyOverlay(true);
+    }
   };
-  ///////////////////////////////////////////////////////////////////////////////////////////
+
+  const handleCloseReply = () => {
+    setShowReplyInput(null);
+    setShowReplyOverlay(false);
+  };
+
+  // Fetch replies for a comment
   const fetchRepliesForComment = async (commentId) => {
     try {
       const response = await Axios.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getreplies/${commentId}`
       );
-      if (
-        response.data &&
-        response.data !== "No replies found for the specified comment"
-      ) {
-        setReplies((prevReplies) => ({
+      if (response.data && response.data !== "No replies found for the specified comment") {
+        setReplies(prevReplies => ({
           ...prevReplies,
           [commentId]: response.data,
         }));
 
-        console.log('replies for :', commentId, ':', response.data)
-
         const profilePicPromises = response.data.map(async (reply) => {
-          const response = await Axios.get(
-            `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${reply.residentId}`,
-            { responseType: "arraybuffer" }
-          );
-          const base64Image = encode(response.data);
+
+
           return {
             residentId: reply.residentId,
-            profilePic: `data:image/jpeg;base64,${base64Image}`,
+            profilePic: reply.userProfileImage,
           };
         });
 
         const profilePics = await Promise.all(profilePicPromises);
         const profilePicMap = profilePics.reduce((acc, pic) => {
-          acc[pic.residentId] = pic.profilePic;
+          if (pic) acc[pic.residentId] = pic.profilePic;
           return acc;
         }, {});
 
-        setReplyProfilePic((prev) => ({
+        setReplyProfilePic(prev => ({
           ...prev,
           ...profilePicMap,
         }));
       } else {
-        setReplies((prevReplies) => ({
+        setReplies(prevReplies => ({
           ...prevReplies,
           [commentId]: [],
         }));
       }
     } catch (error) {
-      console.error(
-        "Error while fetching replies to the comment: ",
-        error.response ? error.response.data : error.message
-      );
+      console.error("Error while fetching replies:", error);
     }
   };
-  useEffect(() => {
-    data.forEach((comment) => {
-      if (comment.replies && comment.replies.length > 0) {
-        fetchRepliesForComment(comment.id);
-      }
-    });
-  }, [data]);
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  const fetchCommentsPost = async () => {
-    if (!postId) {
-      console.log(postId)
-      console.error("postId is null or undefined.");
+
+  // Format date/time
+  const formatDateTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+
+    const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 60) return `${seconds}s`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+
+    const weeks = Math.floor(days / 7);
+    if (weeks < 4) return `${weeks}w`;
+
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months}mo`;
+
+    return `${Math.floor(months / 12)}y`;
+  };
+
+  // Add reaction to comment
+  const addReactionToComment = async (commentId, reactionType = "heart") => {
+    try {
+      // Optimistic UI update
+      setData(prevData =>
+        prevData.map(comment => {
+          if (comment.commentId === commentId) {
+            const existingIndex = comment.reactions.findIndex(r => r.userId === currentUserId);
+            const newReactions = [...comment.reactions];
+
+            if (existingIndex !== -1) {
+              newReactions[existingIndex] = { ...newReactions[existingIndex], reactionType };
+            } else {
+              newReactions.push({ userId: currentUserId, reactionType });
+            }
+
+            return { ...comment, reactions: newReactions };
+          }
+          return comment;
+        })
+      );
+
+      const userId = await AsyncStorage.getItem("userId");
+      await Axios.post(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addReactionToComment/${commentId}/${userId}/${reactionType}`,
+        {},
+        { headers: { "Content-Type": "application/json" } }
+      );
+      setShowActionDialog(false);
+    } catch (error) {
+      console.error("Error handling reaction:", error);
+      fetchCommentsPost(); // Revert on error
+    }
+  };
+
+  // Handle comment actions
+  const handleCommentAction = (actionType, comment) => {
+    Haptics.selectionAsync();
+    setShowActionDialog(false);
+
+    switch (actionType) {
+      case 'delete':
+        deleteComment(comment.commentId);
+        break;
+      case 'edit':
+        startEditingComment(comment);
+        break;
+      case 'report':
+        // Implement report functionality
+        break;
+      case 'block':
+        // Implement block functionality
+        break;
+      default:
+        break;
+    }
+  };
+
+  const startEditingComment = (comment) => {
+    setEditingComment(comment);
+    setEditCommentText(comment.text);
+    actionDialogHeight.value = 0;
+    actionDialogOpacity.value = 0;
+
+    setTimeout(() => {
+      editInputHeight.value = 150;
+      editInputOpacity.value = 1;
+    }, 300);
+  };
+
+  const updateComment = async () => {
+    if (!editCommentText.trim()) {
+      Toast.show({ type: "info", text1: "Comment cannot be empty", visibilityTime: 3000 });
       return;
     }
-    setIsLoading(true);
-    setData([]);
+
+    setIsUpdating(true);
     try {
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getcomments/${postId}`
+      const Token = await AsyncStorage.getItem("USER_ACCESS");
+      const userId = await AsyncStorage.getItem("userId");
+      await Axios.put(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/edit/${editingComment.commentId}/${userId}`,
+        { newText: editCommentText },
+        { headers: { Authorization: `Bearer ${Token}` } }
       );
-
-      if (
-        response.data &&
-        response.data !== "No comments found for the specified post"
-      ) {
-        const residentComments = response.data;
-        //console.log("resident comments Response : ", residentComments);
-        setData(residentComments);
-        //console.log("PostId from Comment Model : ", postId);
-        const userIds = residentComments.map((comment) => comment.user.id);
-        setUserId(userIds);
-      } else if (response.data === "No comments found for the specified post") {
-
-        console.log("No resident comments found on this post !.", data.length);
-      }
+      Toast.show({ type: "success", text1: "Comment updated successfully", visibilityTime: 3000 });
+      refetchCommentsPost();
+      resetEditState();
     } catch (error) {
-      console.error("Error getting resident comments:", error);
+      console.error('Error updating comment:', error);
+      Toast.show({ type: "error", text1: "Failed to update comment", visibilityTime: 3000 });
     } finally {
-      setIsLoading(false);
+      setIsUpdating(false);
     }
   };
 
-  useEffect(() => {
-    if (postId) {
-      fetchCommentsPost();
-    }
-  }, [postId]);
-
-  ///////////////////////////////////////////////////////////////////////////////////////////
-  useEffect(() => {
-    const fetchProfilePhotos = async () => {
-      try {
-        const promises = userId.map(async (userId) => {
-          const response = await Axios.get(
-            `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
-            { responseType: "arraybuffer" }
-          );
-          const base64Image = encode(response.data);
-          return `data:image/jpeg;base64,${base64Image}`;
-        });
-        const profilePics = await Promise.all(promises);
-        setProfilePic(profilePics);
-      } catch (error) {
-        console.error("Error getting profile photos:", error);
-        throw new Error(error);
-      }
-    };
-
-    fetchProfilePhotos();
-  }, [userId]);
-  ////////////////////////////////////////////////////////////////////////////////////////////
-  useEffect(() => {
-    const fetchProfilePhoto = async () => {
-      try {
-        const userId = await AsyncStorage.getItem("userId");
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
-          {
-            responseType: "arraybuffer",
-          }
-        );
-        const base64Image = encode(response.data);
-
-        const imageUrl = `data:image/jpeg;base64,${base64Image}`;
-
-        setUserProfilePic(imageUrl);
-      } catch (error) {
-        console.error("Error getting profile photo:", error);
-        throw new Error(error);
-      }
-    };
-
-    fetchProfilePhoto();
-  }, []);
-  ////////////////////////////////////////////////////////////////////////////////////////////
-  const formatDateTime = (dateTimeString) => {
-    const date = new Date(dateTimeString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now - date) / 1000);
-
-    if (diffInSeconds < 60) {
-      return `${diffInSeconds} second${diffInSeconds === 1 ? "" : "s"} ago`;
-    } else if (diffInSeconds < 3600) {
-      const diffInMinutes = Math.floor(diffInSeconds / 60);
-      return `${diffInMinutes} mn${diffInMinutes === 1 ? "" : "s"} `;
-    } else if (diffInSeconds < 86400) {
-      const diffInHours = Math.floor(diffInSeconds / 3600);
-      return `${diffInHours} hr${diffInHours === 1 ? "" : "s"} `;
-    } else {
-      const diffInDays = Math.floor(diffInSeconds / 86400);
-      return `${diffInDays} day${diffInDays === 1 ? "" : "s"} `;
+  const deleteComment = async (commentId) => {
+    try {
+      const Token = await AsyncStorage.getItem("USER_ACCESS");
+      const userId = await AsyncStorage.getItem("userId");
+      await Axios.delete(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/delete/${commentId}/${userId}`,
+        { headers: { Authorization: `Bearer ${Token}` } }
+      );
+      refetchCommentsPost();
+      Toast.show({ type: 'success', text1: 'Comment deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting comment:', error);
     }
   };
-  ///////////////////////////////////////////////////////////////////////////////////////////
+
+  // Render reaction summary
+  const renderReactionSummary = (reactions) => {
+    if (!reactions || reactions.length === 0) return null;
+
+    // Count reaction types
+    const reactionCounts = {};
+    reactions.forEach(r => {
+      reactionCounts[r.reactionType] = (reactionCounts[r.reactionType] || 0) + 1;
+    });
+
+    // Find most popular reaction
+    const mostPopular = Object.keys(reactionCounts).reduce((a, b) =>
+      reactionCounts[a] > reactionCounts[b] ? a : b
+    );
+
+    return (
+      <ReactionSummary>
+        <Text style={styles.reactionEmoji}>{reactionEmojis[mostPopular]}</Text>
+        <Text style={styles.reactionCount}>{reactions.length}</Text>
+      </ReactionSummary>
+    );
+  };
+
   return (
     <Modal
       animationType="slide"
       transparent={true}
       visible={isVisible}
       onRequestClose={handleModalClose}
-       onSwipeComplete={handleModalClose}
-  swipeDirection="down"
-  onBackdropPress={handleModalClose}
+      onSwipeComplete={handleModalClose}
+      swipeDirection="down"
     >
-
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Comments</Text>
             <View style={styles.separator} />
+
+            {/* Comments List */}
             <ScrollView>
               {isLoading && (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={Colors.PURPLE} />
                 </View>
               )}
+
               {!isLoading && data.length === 0 && (
                 <View style={styles.noCommentsContainer}>
                   <Text>No comments yet</Text>
                 </View>
               )}
-              {!isLoading &&
-                data.length > 0 &&
-                data.map((item, index) => (
-                  <View key={item.id}>
-                    <UserInfo key={item.id}>
-                      <UserImgWrapper>
-                        <UserImg source={item.userImg} />
-                      </UserImgWrapper>
-                      <TextSection>
-                        <View style={styles.commentHeader}>
-                          <View style={{ flex: 1 }}>
-                            {profilePic[index] !== "data:image/jpeg;base64," ? (
-                              <Image
-                                key={profilePic[index]}
-                                source={{ uri: profilePic[index] }}
-                                style={styles.profileImage}
-                              />
+
+              {!isLoading && data.map((comment) => {
+                const currentUserReaction = getCurrentUserReaction(comment);
+                const isExpanded = expandedComments[comment.commentId];
+                const isSelected = selectedComment?.commentId === comment.commentId;
+                const isEditing = editingComment?.commentId === comment.commentId;
+                const hasReplies = parseInt(comment.numberOfReplies) > 0;
+                const showReplies = isExpanded && hasReplies;
+
+                return (
+                  <React.Fragment key={comment.commentId}>
+                    {showActionDialog && isSelected && (
+                      <BlurView
+                        intensity={100}
+                        tint="light"
+                        style={[styles.blurOverlay, StyleSheet.absoluteFill]}
+                      />
+                    )}
+
+                    <TouchableOpacity
+                      onLongPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        setSelectedComment(comment);
+                        setShowActionDialog(true);
+                      }}
+                      activeOpacity={1}
+                      style={{ zIndex: isSelected ? 2 : 0 }}
+                    >
+                      <UserInfo style={{ borderBottomWidth: 0 }}>
+                        <UserImgWrapper>
+                          <UserImg
+                            source={{ uri: comment.userProfileImage }}
+                            defaultSource={require("../../../assets/default-avatar.jpg")}
+                          />
+                        </UserImgWrapper>
+
+                        <TextSection>
+                          <View style={styles.commentHeader}>
+                            {isEditing ? (
+                              <Animated.View style={[styles.editCommentContainer, animatedEditInputStyle]}>
+                                <TextInput
+                                  value={editCommentText}
+                                  onChangeText={setEditCommentText}
+                                  multiline
+                                  style={styles.editInput}
+                                  autoFocus
+                                  placeholder="Edit your comment..."
+                                />
+                                <View style={styles.editButtons}>
+                                  <TouchableOpacity onPress={cancelEdit} disabled={isUpdating}>
+                                    <Text style={styles.cancelEditButton}>Cancel</Text>
+                                  </TouchableOpacity>
+                                  <TouchableOpacity onPress={updateComment} disabled={isUpdating}>
+                                    {isUpdating ? (
+                                      <ActivityIndicator size="small" color={Colors.PURPLE} />
+                                    ) : (
+                                      <Text style={styles.saveEditButton}>Save</Text>
+                                    )}
+                                  </TouchableOpacity>
+                                </View>
+                              </Animated.View>
                             ) : (
-                              <Image
-                                source={require("../../../assets/default-avatar.jpg")}
-                                style={styles.profileImage}
-                              />
+                              <CommentContainer>
+                                <UserInfoText>
+                                  <UserName>{comment.userName}</UserName>
+                                  <PostTime>{formatDateTime(comment.createdAt)}</PostTime>
+
+                                </UserInfoText>
+                                <MessageText>{comment.text}</MessageText>
+
+                                {showReactionPicker === comment.commentId && (
+                                  <ReactionPickerContainer>
+                                    {Object.entries(reactionEmojis).map(([type, emoji]) => (
+                                      <TouchableOpacity
+                                        key={type}
+                                        onPress={() => {
+                                          addReactionToComment(comment.commentId, type);
+                                          setShowReactionPicker(null);
+                                        }}
+                                        style={styles.reactionOption}
+                                      >
+                                        <Text style={styles.reactionOptionEmoji}>{emoji}</Text>
+                                      </TouchableOpacity>
+                                    ))}
+                                  </ReactionPickerContainer>
+                                )}
+                               
+                              </CommentContainer>
                             )}
                           </View>
-                          <CommentContainer>
-                            <UserName>
-                              {item.user.residentProfile.fullName}
-                            </UserName>
-                            <MessageText>{item.text}</MessageText>
-                          </CommentContainer>
-                        </View>
-                        <View style={styles.commentFooter}>
-                          <PostTime>{formatDateTime(item.createdAt)}</PostTime>
-                          <TouchableOpacity
-                            style={{ marginLeft: 7 }}
-                            onPress={() =>
-                              handleReplyButtonPress(
-                                item.id,
-                                item.user.residentProfile.fullName
-                              )
-                            }
-                          >
-                            <Text style={{ color: "grey" }}>Reply</Text>
-                          </TouchableOpacity>
-                        </View>
-                        {replies[item.id] && (
-                          <>
-                            {replies[item.id]
-                              .slice(0, 1)
-                              .map((reply, replyIndex) => (
-                                // Render the first reply
-                                <View
-                                  key={replyIndex}
-                                  style={styles.replyContainer}
-                                >
-                                  <View style={styles.replyLine} />
-                                  {replyprofilePic[reply.residentId] !==
-                                    "data:image/jpeg;base64," ? (
-                                    <Image
-                                      source={{
-                                        uri: replyprofilePic[reply.residentId],
-                                      }}
-                                      style={{
-                                        width: 35,
-                                        height: 35,
-                                        borderRadius: 25,
-                                      }}
-                                    />
-                                  ) : (
-                                    <Image
-                                      source={require("../../../assets/default-avatar.jpg")}
-                                      style={{
-                                        width: 35,
-                                        height: 35,
-                                        borderRadius: 25,
-                                      }}
-                                    />
-                                  )}
-                                  <View style={{ marginLeft: 8 }}>
-                                    <CommentContainer>
-                                      <UserName>{reply.userName}</UserName>
-                                      <MessageText>{reply.text}</MessageText>
-                                    </CommentContainer>
-                                  </View>
-                                  <Text
-                                    style={{
-                                      color: "grey",
-                                      fontSize: 12,
-                                      left: 8,
-                                      top: -4,
-                                    }}
-                                  >
-                                    {formatDateTime(reply.createdAt)}
-                                  </Text>
-                                </View>
-                              ))}
-                            {replies[item.id].length > 1 && (
+
+                          {/* Comment footer */}
+                          {!isEditing && (
+                            <View style={styles.commentFooter}>
                               <TouchableOpacity
-                                onPress={() =>
-                                  setShowAllReplies(!showAllReplies)
-                                }
-                                style={{ marginLeft: 60 }}
+                                onPress={() => handleReactionIconPress(comment.commentId, currentUserReaction)}
+                                onLongPress={() => handleReactionIconLongPress(comment.commentId)}
+                                style={styles.reactionIcon}
                               >
-                                <Text style={{ color: Colors.LIGHT_PURPLE }}>
-                                  {showAllReplies
-                                    ? "Hide Replies"
-                                    : "Show Other  Replies"}
+                                <Text style={styles.reactionIconText}>
+                                  {currentUserReaction
+                                    ? reactionEmojis[currentUserReaction]
+                                    : <Ionicons name="heart-outline" size={20} color={Colors.LIGHT_PURPLE} />
+                                  }
                                 </Text>
                               </TouchableOpacity>
-                            )}
-                            {showAllReplies &&
-                              replies[item.id]
-                                .slice(1)
-                                .map((reply, replyIndex) => (
-                                  <View
-                                    key={replyIndex}
-                                    style={styles.replyContainer}
-                                  >
-                                    <View style={styles.replyLine} />
-                                    {replyprofilePic[reply.residentId] !==
-                                      "data:image/jpeg;base64," ? (
-                                      <Image
-                                        source={{
-                                          uri: replyprofilePic[
-                                            reply.residentId
-                                          ],
-                                        }}
-                                        style={{
-                                          width: 35,
-                                          height: 35,
-                                          borderRadius: 25,
-                                        }}
-                                      />
-                                    ) : (
-                                      <Image
-                                        source={require("../../../assets/default-avatar.jpg")}
-                                        style={{
-                                          width: 35,
-                                          height: 35,
-                                          borderRadius: 25,
-                                        }}
-                                      />
-                                    )}
-                                    <View style={{ marginLeft: 8 }}>
-                                      <CommentContainer>
-                                        <UserName>{reply.userName}</UserName>
-                                        <MessageText>{reply.text}</MessageText>
-                                      </CommentContainer>
-                                    </View>
-                                    <Text
-                                      style={{
-                                        color: "grey",
-                                        fontSize: 12,
-                                        left: 8,
-                                        top: -4,
-                                      }}
-                                    >
+                              <TouchableOpacity onPress={() =>
+                                handleReplyButtonPress(comment.commentId, comment.userName)
+                              }>
+                                <Replytext>Reply</Replytext>
+                              </TouchableOpacity>
+
+                              
+                              {hasReplies && (
+                                <TouchableOpacity
+                                  style={styles.repliesCounter}
+                                  onPress={() => {
+                                    toggleCommentExpansion(comment.commentId);
+                                    if (!replies[comment.commentId]) {
+                                      fetchRepliesForComment(comment.commentId);
+                                    }
+                                  }}
+                                >
+                                  <Text style={styles.repliesText}>
+                                    {parseInt(comment.numberOfReplies)} replies
+                                  </Text>
+                                  <FontAwesome
+                                    name={isExpanded ? "chevron-up" : "chevron-down"}
+                                    size={12}
+                                    color={Colors.PURPLE}
+                                  />
+                                </TouchableOpacity>
+                              )}
+                               {renderReactionSummary(comment.reactions)}
+                            </View>
+                          )}
+                          {showReplies && replies[comment.commentId] && (
+                            <View style={styles.repliesContainer}>
+                              {replies[comment.commentId].map((reply, index) => (
+                                <View key={`${comment.commentId}-${index}`} style={styles.replyItem}>
+                                  <View style={styles.replyLine} />
+                                  <Image
+                                    source={{ uri: replyprofilePic[reply.residentId] || require("../../../assets/default-avatar.jpg") }}
+                                    style={styles.replyAvatar}
+                                  />
+                                  <View style={styles.replyContent}>
+                                    <UserName>{reply.userName}</UserName>
+                                    <MessageText>{reply.text}</MessageText>
+                                    <Text style={styles.replyTime}>
                                       {formatDateTime(reply.createdAt)}
                                     </Text>
                                   </View>
-                                ))}
-                          </>
-                        )}
-                      </TextSection>
-                    </UserInfo>
-                  </View>
-                ))}
-            </ScrollView>
-            <View style={styles.separator} />
-            <View style={styles.addCommentContainer}>
-              {userprofilePic !== "data:image/jpeg;base64," ? (
-                <Image
-                  source={{ uri: userprofilePic }}
-                  style={styles.userProfileImage}
-                />
-              ) : (
-                <Image
-                  source={require("../../../assets/default-avatar.jpg")}
-                  style={styles.userProfileImage}
-                />
-              )}
-              {showFollowers && (
-                <View style={styles.suggestionsContainer}>
-                  {followers.map((follower) => (
-                    <TouchableOpacity
-                      key={follower.id}
-                      onPress={() =>
-                        handleFollowerClick(follower.residentProfile.fullName)
-                      }
-                    >
-                      <Text style={styles.suggestionText}>
-                        {follower.residentProfile.fullName}
-                      </Text>
+                                </View>
+                              ))}
+                            </View>
+                          )}
+                          {/* Reply overlay */}
+                          {showReplyOverlay && showReplyInput === comment.commentId && (
+                            <TouchableWithoutFeedback onPress={handleCloseReply}>
+                              <View style={styles.replyOverlay} />
+                            </TouchableWithoutFeedback>
+                          )}
+
+                          {/* Reply input */}
+                        {showReplyInput === comment.commentId && (
+  <View style={styles.replyInputContainer}>
+    <Image
+      source={{ uri: userprofilePic }}
+      defaultSource={require("../../../assets/default-avatar.jpg")}
+      style={styles.smallProfileImage}
+    />
+    <TextInput
+      style={styles.replyInput}
+      placeholder={`Reply to ${comment.userName}...`}
+      value={replyText}
+      onChangeText={setReplyText}
+      autoFocus
+      multiline
+      editable={addingReply !== comment.commentId}
+    />
+    <TouchableOpacity
+      onPress={() => addReplyToComment(comment.commentId, replyText)}
+      style={styles.sendReplyButton}
+      disabled={!replyText.trim() || addingReply === comment.commentId}
+    >
+      {addingReply === comment.commentId ? (
+        <ActivityIndicator size="small" color={Colors.PURPLE} />
+      ) : (
+        <FontAwesome
+          name="send"
+          size={18}
+          color={replyText.trim() ? Colors.PURPLE : Colors.GRAY}
+        />
+      )}
+    </TouchableOpacity>
+  </View>
+)}
+
+                          {/* Replies section */}
+
+                        </TextSection>
+                      </UserInfo>
                     </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              <View style={{ flex: 1 }}>
-                <TextInput
-                  placeholder={`add a comment as ${userFullname}`}
-                  multiline={true}
-                  value={commentText}
-                  onChangeText={handleTextInputChange}
-                  onFocus={handleTextInputFocus}
-                  onBlur={handleTextInputBlur}
-                  style={styles.commentInput}
-                />
-              </View>
-              <TouchableOpacity
-                onPress={addCommentToPost}
-                disabled={isAddingComment}
-              >
+
+                    {/* Action dialog */}
+                    {showActionDialog && isSelected && !isEditing && (
+                      <ActionDialog
+                        style={[
+                          animatedActionDialogStyle,
+                          { zIndex: 3 }
+                        ]}
+                      >
+                        {/* ACTION BUTTONS ONLY */}
+                        <ActionContainer>
+                          {selectedComment.residentId === currentUserId ? (
+                            <>
+                              <ActionButton
+
+                                onPress={() => handleCommentAction("edit", selectedComment)}
+                              >
+
+                                <ActionButtonText>Edit</ActionButtonText>
+
+                              </ActionButton>
+                              <ActionButton
+
+                                onPress={() => handleCommentAction("delete", selectedComment)}
+                              >
+
+                                 <ActionButtonText>Delete </ActionButtonText>
+                              </ActionButton>
+                            </>
+                          ) : (
+                            <>
+                              <ActionButton
+                                onPress={() => handleCommentAction("report", selectedComment)}
+                              >
+
+                                <ActionButtonText>Report</ActionButtonText>
+                              </ActionButton>
+                              <ActionButton
+                                onPress={() => handleCommentAction("block", selectedComment)}
+                              >
+
+                                <ActionButtonText>Block</ActionButtonText>
+                              </ActionButton>
+                            </>
+                          )}
+                          <CancelButton
+                            onPress={() => setShowActionDialog(false)}
+                          >
+
+                            <ActionButtonText>Cancel</ActionButtonText>
+                          </CancelButton>
+                        </ActionContainer>
+                      </ActionDialog>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </ScrollView>
+
+            {/* Add comment section */}
+          
+          </ScrollView>
+            <View style={styles.addCommentContainer}>
+              <Image
+                source={{ uri: userprofilePic }}
+                defaultSource={require("../../../assets/default-avatar.jpg")}
+                style={styles.userProfileImage}
+              />
+              <TextInput
+                placeholder={`Add a comment as ${userFullname}`}
+                multiline
+                value={commentText}
+                onChangeText={setCommentText}
+                onFocus={handleTextInputFocus}
+                onBlur={handleTextInputBlur}
+                style={styles.commentInput}
+              />
+              <TouchableOpacity onPress={addCommentToPost} disabled={isAddingComment}>
                 {isAddingComment ? (
                   <ActivityIndicator size="small" color={Colors.PURPLE} />
                 ) : (
                   <FontAwesome
                     name="send"
                     size={24}
-                    style={[
-                      styles.sendIcon,
-                      { color: isTyping ? Colors.PURPLE : Colors.PLATINUM },
-                    ]}
+                    color={isTyping ? Colors.PURPLE : Colors.PLATINUM}
                   />
                 )}
               </TouchableOpacity>
             </View>
-          </ScrollView>
         </View>
       </View>
-
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
-  flex: 1,
-  backgroundColor: "transparent",
-  borderCurve:30
+  reactionIcon: {
+    marginLeft: 10,
+    marginRight: 4,
+  },
+  reactionIconText: {
+    fontSize: 16,
+  },
+  reactionPickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: Colors.WHITE,
+    borderRadius: 25,
+    padding: 10,
+    marginTop: 5,
+    marginLeft: 50, // Align with comment text
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    position: 'relative', // Changed from absolute to relative
+    zIndex: 10,
+  },
+  reactionOption: {
+    padding: 5,
+  },
+  reactionOptionEmoji: {
+    fontSize: 20,
+  },
 
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: 400,
+
+    color: Colors.WHITE,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "transparent",
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    flex: 1,
-  padding: 15,
-
-  borderTopEndRadius:20,
-  borderTopStartRadius:20,
-
-  overflow: "hidden",
-  backgroundColor: 'white',
-  // iOS shadow
-  shadowColor: "#000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.25,
-  shadowRadius: 3.84,
-  // Android shadow
-  elevation: 5,
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    padding: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   modalHandle: {
-    borderTopColor: Colors.GunmetalGray,
-    borderRadius: 13,
-    borderTopWidth: 4,
-    marginTop: -10,
     width: 40,
-    marginLeft: "auto",
-    marginRight: "auto",
+    height: 5,
+    backgroundColor: Colors.GRAY,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 10,
   },
   modalTitle: {
     fontSize: 19,
-    marginBottom: 20,
     fontWeight: "bold",
     textAlign: "center",
-    top: "1%",
+    marginBottom: 20,
   },
   separator: {
     borderTopColor: Colors.GRAY,
     borderTopWidth: 0.5,
-    marginTop: -7,
-    width: 400,
-    marginLeft: -20,
+    marginVertical: 10,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    marginBottom: 5,
+  },
+  commentFooter: {
+    flexDirection: "row",
+    marginLeft: 1,
+    marginTop: -5,
+    verticalAlign:'middle'
+  },
+  repliesCounter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 15,
+  },
+  repliesText: {
+    color: Colors.PURPLE,
+    marginRight: 4,
+    fontSize: 12,
+  },
+  replyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 20,
+    marginTop: 10,
+    marginBottom: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 25,
+    padding: 8,
+    paddingRight: 15,
+    zIndex: 10,
+  },
+  smallProfileImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginRight: 10,
+  },
+  replyInput: {
+    flex: 1,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    maxHeight: 100,
+  },
+  sendReplyButton: {
+    marginLeft: 10,
+    padding: 5,
+  },
+  repliesContainer: {
+    marginLeft: -50,
+    marginTop: 10,
+  },
+  replyItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 50,
+    marginTop: 10,
+  },
+  replyLine: {
+    width: 1,
+    backgroundColor: Colors.GRAY,
+    height: "100%",
+    marginRight: 10,
+    position: 'absolute',
+    left: 25,
+    top: 0,
+    bottom: 0,
+  },
+  replyAvatar: {
+    width: 35,
+    height: 35,
+    borderRadius: 25,
+    marginRight: 10,
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyTime: {
+    color: "grey",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  reactionSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LIGHT_PURPLE_OPACITY,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 5,
+    alignSelf: 'flex-start',
+  },
+  reactionEmoji: {
+    fontSize: 14,
+    marginRight: 2,
+  },
+  reactionCount: {
+    fontSize: 12,
+    color: Colors.DARK_GRAY,
+  },
+  actionDialog: {
+    marginLeft: 10,
+    backgroundColor: Colors.WHITE,
+    width: 220,
+    borderRadius: 20,
+    height: 100,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_PURPLE,
+    zIndex: 10,
+  },
+  reactionContainer: {
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    paddingVertical: 5,
+    backgroundColor: "#fff",
+    borderRadius: 10,
+  },
+  reactionButton: {
+    padding: 5,
+    borderRadius: 50,
+    backgroundColor: Colors.WHITE,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 5,
+  },
+  actionContainer: {
+    flexDirection: "column",
+    justifyContent: "space-evenly",
+    alignItems: "center",
+
+  },
+  actionButton: {
+    backgroundColor: Colors.LIGHT_PURPLE,
+    justifyContent: "center",
+    borderBottomWidth: 5,
+    borderColor: Colors.WHITE,
+    alignItems: "center",
+    width: '100%'
+  },
+  cancelButton: {
+
+    borderTopWidth: 5,
+    borderColor: Colors.WHITE,
+    backgroundColor: Colors.RED,
+    justifyContent: "center",
+    alignItems: "center",
+    width: '100%'
+  },
+  addCommentContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.LIGHT_GRAY,
+  },
+  userProfileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: "#cccdcf",
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    minHeight: 40,
   },
   loadingContainer: {
     flex: 1,
@@ -681,81 +1133,55 @@ const styles = StyleSheet.create({
     marginTop: "10%",
     marginBottom: "10%",
   },
-  commentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginLeft: "-17%",
-  },
-  profileImage: {
-    height: 40,
-    width: 40,
-    borderWidth: 2,
-    borderColor: "black",
-    borderRadius: 20,
-  },
-  commentFooter: {
-    flexDirection: "row",
-    marginLeft: 15,
-    marginTop: -5,
-  },
-  replyContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 50,
-    marginTop: 10,
-  },
-  replyLine: {
-    width: 1,
-    backgroundColor: Colors.GRAY,
-    height: "100%",
-    marginRight: 10,
-  },
-  replyContent: {
-    flex: 1,
-  },
-  addCommentContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal:20
-  },
-  userProfileImage: {
-    height: 40,
-    width: 40,
-    borderRadius: 20,
-    marginTop: 7,
-    left: -16,
-  },
-  commentInput: {
-    borderRadius: 20,
-    padding: 7,
-    marginTop: 10,
-    paddingLeft: 10,
-    width: 250,
-  },
-  sendIcon: {
-    marginLeft: "5%",
-  },
-  replyContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  suggestionsContainer: {
-    position: "absolute",
-    backgroundColor: "white",
-    borderColor: "#ccc",
-    borderWidth: 1,
-    width: "50%",
-    maxHeight: 150,
+  blurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex: 1,
-    marginLeft: 90,
-    alignItems: 'center',
-    borderRadius: 20
   },
-  suggestionText: {
+  replyOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 5,
+  },
+  editCommentContainer: {
+    backgroundColor: "#ccc",
+    borderRadius: 30,
+    paddingVertical: 5,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_PURPLE,
+    width: 280,
+    overflow: 'hidden',
+  },
+  editInput: {
+    minHeight: 80,
+    fontSize: 16,
     padding: 10,
-    borderBottomColor: "#ccc",
-    borderBottomWidth: 1,
-
+    backgroundColor: "#ccc",
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  editButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  cancelEditButton: {
+    color: Colors.RED,
+    fontWeight: 'bold',
+    marginRight: 15,
+    padding: 5,
+  },
+  saveEditButton: {
+    color: Colors.PURPLE,
+    fontWeight: 'bold',
+    padding: 5,
   },
 });
 

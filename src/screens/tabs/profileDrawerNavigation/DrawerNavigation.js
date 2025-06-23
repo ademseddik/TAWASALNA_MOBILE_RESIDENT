@@ -13,7 +13,8 @@ const Drawer = createDrawerNavigator();
 
 const handleSignOut = async (navigation) => {
   try {
-    await AsyncStorage.multiRemove(["userId", "token", "SOCIAL_AUTH"]);
+   await AsyncStorage.clear();
+
     
     navigation.dispatch(
       CommonActions.reset({

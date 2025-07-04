@@ -29,7 +29,7 @@ export const useLogin = () => {
     const checkRememberMe = async () => {
       const rememberMe = await AsyncStorage.getItem("RememberMe");
       
-      if (rememberMe === "false") {
+      if (rememberMe === "true") {
         const [userId, token, timestamp] = await Promise.all([
           AsyncStorage.getItem("userId"),
           AsyncStorage.getItem("USER_ACCESS"),

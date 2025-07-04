@@ -11,7 +11,6 @@ import Colors from "../../../assets/Colors";
 import {
   MaterialIcons,
   Entypo,
-  Octicons,
   AntDesign,
   Ionicons,
 } from "@expo/vector-icons";
@@ -85,7 +84,30 @@ const UsersProfile = () => {
       autoHide: true,
     });
   };
+const handleSendMessagePress = async () => {
+    try {
+      const currentUserId = await AsyncStorage.getItem("userId");
+      if (!currentUserId) {
+    
+        return;
+      }
+      
+      const otherUserId = userId;
 
+   
+      const ids = [currentUserId, otherUserId].sort();
+      const chatId = ids.join('_');
+
+      navigation.navigate('Conversation', {
+        chatId: chatId,
+        userName: fullName,
+        userImage: profilePic,
+      });
+    } catch (error) {
+      console.error("Failed to navigate to conversation:", error);
+     
+    }
+  };
   const handleFollowAction = async () => {
     setLoadingFollow(true);
   console.log(`the follow statues ${followStatus}`)
@@ -614,7 +636,9 @@ const UsersProfile = () => {
             }}
           >
             {renderFollowButton()}
-            <TouchableOpacity>
+            <TouchableOpacity 
+            onPress={handleSendMessagePress}
+            >
               <View
                 style={{
                   backgroundColor: Colors.LIGHT_PURPLE,

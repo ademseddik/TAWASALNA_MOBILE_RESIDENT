@@ -33,11 +33,15 @@ export const initializeSocket = async () => {
     console.log('WebSocket connected');
   };
 
-  socket.onmessage = (event) => {
+  
+   socket.onmessage = (event) => {
     try {
       const notification = JSON.parse(event.data);
       // Call the appropriate callback based on notification type
       if (notification.type && callbacks[notification.type]) {
+        callbacks[notification.type](notification);
+      } else if (callbacks[notification.type]) {
+       
         callbacks[notification.type](notification);
       }
     } catch (error) {

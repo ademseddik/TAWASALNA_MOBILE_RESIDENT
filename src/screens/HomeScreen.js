@@ -7,11 +7,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { ProfileService } from '../services/profile.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeSocket } from '../services/WebSocketService'; 
+import { initializeChatSocket } from '../utils/initializeChatSocket';
 import Colors from '../../assets/Colors';
-// Screens
+// Screenss
 import Home from './tabs/HomeScreen';
 import Search from './tabs/SearchScreen';
-import AddPost from './tabs/AddPost';
+import Conversations from './tabs/Conversations';
 
 import Notifications from './tabs/ReelScreen';
 
@@ -28,7 +30,74 @@ const HomeScreen = ({ route }) => {
   const [profilePhoto, setProfilePhoto] = useState("https://i.ibb.co/73SntSb/profileimage.jpg");
   const [initialTab] = useState(route.params?.initialTab || "Home");
   const [currentTab, setCurrentTab] = useState(initialTab); // <<< NEW
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
+  // --- NEW: useEffect to manage WebSocket connections ---
+  useEffect(() => {
+    let generalSocketWrapper = null;
+    let chatSocketWrapper = null;
+
+    const setupAndListen = async () => {
+      try {
+        const userId = await AsyncStorage.getItem("userId");
+        if (!userId) {
+          console.log("No user ID found, aborting socket setup.");
+          return;
+        }
+
+        // --- 1. Connect to the General Notification Socket ---
+        generalSocketWrapper = await initializeSocket();
+        
+        const handleNewGeneralNotification = (notification) => {
+          console.log('Received general notification:', notification.type);
+          setUnreadNotificationCount(prevCount => prevCount + 1);
+        };
+        
+        // Listen to all relevant general notification types
+        generalSocketWrapper.on('followRequest', handleNewGeneralNotification);
+        generalSocketWrapper.on('followNotification', handleNewGeneralNotification);
+        generalSocketWrapper.on('likePostNotification', handleNewGeneralNotification);
+        generalSocketWrapper.on('commentNotification', handleNewGeneralNotification);
+        generalSocketWrapper.on('replyToCommentNotification', handleNewGeneralNotification);
+        generalSocketWrapper.on('reactionOnCommentNotification', handleNewGeneralNotification);
+        generalSocketWrapper.on('groupInvitation', handleNewGeneralNotification);
+
+
+        // --- 2. Connect to the Chat Message Socket ---
+        chatSocketWrapper = await initializeChatSocket();
+
+        // Subscribe to the user's personal notification queue for new messages
+        // This is where your backend sends a signal for a new message
+        chatSocketWrapper.subscribe(`/user/${userId}/queue/notifications`, (messageNotification) => {
+          console.log('Received new message notification.');
+          // You can add a check here if this queue sends other types of notifications
+          if (messageNotification.typeNotif === 'MESSAGE') {
+            setUnreadNotificationCount(prevCount => prevCount + 1);
+          }
+        });
+
+      } catch (error) {
+        console.error("Failed to setup WebSocket listeners:", error);
+      }
+    };
+
+    setupAndListen();
+
+    // --- 3. Cleanup Function ---
+    // This is crucial to prevent memory leaks and duplicate connections
+    return () => {
+      console.log("Cleaning up Home screen sockets...");
+      if (generalSocketWrapper) {
+        generalSocketWrapper.disconnect();
+      }
+      if (chatSocketWrapper) {
+        // Since your chat socket is shared, you might not want to fully disconnect
+        // unless the user is logging out. For now, we'll assume disconnecting on screen unload is okay.
+        // A more advanced pattern would use a global context to manage the socket lifecycle.
+        // chatSocketWrapper.disconnect(); // Comment out if you want it to persist across screens
+      }
+    };
+  }, []); 
   const fetchProfileData = async () => {
     try {
       const userId = await AsyncStorage.getItem("userId");
@@ -97,8 +166,8 @@ const HomeScreen = ({ route }) => {
                 return <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />;
               case 'Search':
                 return <Feather name="search" size={24} color={color} />;
-              case 'Add':
-                return <Ionicons name="add-circle-outline" size={28} color={color} />;
+         case 'Chat':
+  return <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={24} color={color} />;
                 case 'Notifications':
                   return <MaterialCommunityIcons name="bell-outline" size={24} color={color} />;
               case 'Profile':
@@ -131,7 +200,7 @@ const HomeScreen = ({ route }) => {
       >
         <Tab.Screen name="Home" component={Home} />
         <Tab.Screen name="Search" component={Search} />
-        <Tab.Screen name="Add" component={AddPost} />
+        <Tab.Screen name="Chat" component={Conversations} />
         <Tab.Screen name="Notifications" component={Notifications} />
        <Tab.Screen name="Profile" component={ProfileDrawerWrapper} />
       </Tab.Navigator>

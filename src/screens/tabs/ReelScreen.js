@@ -22,7 +22,66 @@ const Notifications = ({ navigation }) => {
         setSocket(socketWrapper);
 
   
+     socketWrapper.on('likePostNotification', (notification) => {
+                    setNotifications(prev => [
+                        {
+                            id: `like_${notification.senderUser.id}_${Date.now()}`,
+                            type: 'like',
+                            userId: notification.senderUser.id,
+                            fullName: notification.senderUser.residentProfile?.fullName || 'Unknown',
+                            bio: 'Liked your post',
+                            image: notification.senderProfile?.profilephoto || 'https://placeholder.com/avatar',
+                            postId: notification.postId
+                        },
+                        ...prev
+                    ]);
+                });
+                socketWrapper.on('commentNotification', (notification) => {
+                    setNotifications(prev => [
+                        {
+                            id: `comment_${notification.senderUser.id}_${Date.now()}`,
+                            type: 'comment',
+                            userId: notification.senderUser.id,
+                            fullName: notification.senderUser.residentProfile?.fullName || 'Unknown',
+                            bio: 'Commented on your post',
+                            image: notification.senderProfile?.profilephoto || 'https://placeholder.com/avatar',
+                            postId: notification.postId,
+                            commentId: notification.commentId // Make sure backend sends this
+                        },
+                        ...prev
+                    ]);
+                });
 
+                socketWrapper.on('replyToCommentNotification', (notification) => {
+                    setNotifications(prev => [
+                        {
+                            id: `reply_${notification.senderUser.id}_${Date.now()}`,
+                            type: 'reply',
+                            userId: notification.senderUser.id,
+                            fullName: notification.senderUser.residentProfile?.fullName || 'Unknown',
+                            bio: 'Replied to your comment',
+                            image: notification.senderProfile?.profilephoto || 'https://placeholder.com/avatar',
+                            postId: notification.postId,
+                            commentId: notification.commentId // And this
+                        },
+                        ...prev
+                    ]);
+                });
+                 socketWrapper.on('reactionOnCommentNotification', (notification) => {
+                    setNotifications(prev => [
+                        {
+                            id: `reaction_on_comment_${notification.senderUser.id}_${Date.now()}`,
+                            type: 'reaction_on_comment',
+                            userId: notification.senderUser.id,
+                            fullName: notification.senderUser.residentProfile?.fullName || 'Unknown',
+                            bio: 'Reacted to your comment',
+                            image: notification.senderProfile?.profilephoto || 'https://placeholder.com/avatar',
+                            postId: notification.postId,
+                            commentId: notification.commentId
+                        },
+                        ...prev
+                    ]);
+                });
         socketWrapper.on('followRequest', (notification) => {
           setNotifications(prev => [
             {
@@ -208,16 +267,21 @@ const Notifications = ({ navigation }) => {
     }
   };
 
-  const handleNotificationPress = (item) => {
-    switch(item.type) {
-      case 'follow':
-        navigation.navigate("UsersProfile", { userId: item.userId });
-        break;
-      case 'like':
-      case 'comment':
-        navigation.navigate("PostDetail", { postId: item.postId });
-        break;
-      case 'group':
+   const handleNotificationPress = (item) => {
+        switch (item.type) {
+            case 'follow':
+                navigation.navigate("UsersProfile", { userId: item.userId });
+                break;
+            case 'like':
+            case 'comment':
+            case 'reply':
+            case 'reaction_on_comment':
+                navigation.navigate("PostDetail", {
+                    postId: item.postId,
+                    highlightCommentId: item.commentId, // Pass commentId for highlighting
+                });
+                break;
+            case 'group':
         navigation.navigate("GroupDetails", {
           groupData: item,
           groupPics: item.image

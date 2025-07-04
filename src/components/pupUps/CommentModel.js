@@ -8,7 +8,7 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
 } from "react-native";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback,useRef } from "react";
 import { Modal } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import Ionicons from 'react-native-vector-icons/Ionicons';
@@ -79,6 +79,14 @@ const CommentModel = ({
   const [replyprofilePic, setReplyProfilePic] = useState({}); // Added back for reply profile pics
   const [showReactionPicker, setShowReactionPicker] = useState(null);
   const [addingReply, setAddingReply] = useState(null);
+
+    const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionSuggestions, setMentionSuggestions] = useState([]);
+  const [isFetchingMentions, setIsFetchingMentions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [mentionedUsers, setMentionedUsers] = useState([]); // <-- Tracks selected users {id, name}
+
+  const commentInputRef = useRef(null);
   // Animation values
   const editInputHeight = useSharedValue(0);
   const editInputOpacity = useSharedValue(0);
@@ -108,6 +116,78 @@ const CommentModel = ({
     }
   };
 
+  useEffect(() => {
+    if (mentionQuery) {
+      const handler = setTimeout(() => {
+        fetchMentionUsers(mentionQuery);
+      }, 500); // Wait 500ms after user stops typing
+
+      return () => {
+        clearTimeout(handler);
+      };
+    } else {
+      setShowSuggestions(false);
+      setMentionSuggestions([]);
+    }
+  }, [mentionQuery]);
+
+  const fetchMentionUsers = async (query) => {
+    setIsFetchingMentions(true);
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+      const response = await Axios.get(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/users/${userId}/mention-list?query=${query}`
+      );
+      const suggestions = response.data.map(user => ({
+        id: user.id,
+        name: user.fullName,
+        avatar: user.profilePhotoUrl
+      }));
+      setMentionSuggestions(suggestions);
+      setShowSuggestions(true);
+    } catch (error) {
+      console.error("Error fetching mention users:", error);
+      setMentionSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setIsFetchingMentions(false);
+    }
+  };
+
+   const handleCommentChange = (text) => {
+    setCommentText(text);
+
+    // --- Logic to remove mention ID if name is deleted/edited ---
+    const currentlyMentioned = mentionedUsers.filter(user =>
+      text.includes(`@${user.name}`)
+    );
+    if (currentlyMentioned.length !== mentionedUsers.length) {
+      setMentionedUsers(currentlyMentioned);
+    }
+    // --- End of deletion logic ---
+
+    const words = text.split(' ');
+    const lastWord = words[words.length - 1];
+    if (lastWord.startsWith('@')) {
+      setMentionQuery(lastWord.substring(1));
+    } else {
+      setMentionQuery('');
+    }
+  };
+
+  const onSuggestionPress = (user) => {
+    // Add the selected user to our tracking state
+    setMentionedUsers(prev => [...prev, { id: user.id, name: user.name }]);
+
+    const words = commentText.split(' ');
+    words.pop();
+    const newText = [...words, `@${user.name}`].join(' ') + ' ';
+
+    setCommentText(newText);
+    setMentionQuery('');
+    setShowSuggestions(false);
+    commentInputRef.current?.focus();
+  };
   // Handle reaction icon long press
   const handleReactionIconLongPress = (commentId) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -259,7 +339,7 @@ const CommentModel = ({
       const response = await Axios.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcomments/${postId}`
       );
-
+console.log(response)
       if (response.data && Array.isArray(response.data)) {
         setData(response.data);
       }
@@ -276,26 +356,32 @@ const CommentModel = ({
   }, [postId, fetchCommentsPost]);
 
   // Add comment to post
-  const addCommentToPost = async () => {
+ const addCommentToPost = async () => {
     if (!commentText.trim()) {
-      Toast.show({ type: "info", text1: "Please write a comment", visibilityTime: 3000 });
+      Toast.show({ type: "info", text1: "Please write a comment" });
       return;
     }
-
     setIsAddingComment(true);
     try {
       const userId = await AsyncStorage.getItem("userId");
       const Token = await AsyncStorage.getItem("USER_ACCESS");
+
+      // Extract just the IDs to send to the backend
+      const mentionedUserIds = mentionedUsers.map(u => u.id);
+
       await Axios.post(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addcomment/${postId}/${userId}`,
-        { commentText },
+        { commentText, mentionedUserIds }, // Send the new request body
         { headers: { Authorization: `Bearer ${Token}` } }
       );
-      Toast.show({ type: "success", text1: "Comment added successfully", visibilityTime: 3000 });
+
+      Toast.show({ type: "success", text1: "Comment added" });
       setCommentText("");
-      refetchCommentsPost();
+      setMentionedUsers([]); // Clear mentions after posting
+      // refreshPosts(); // Optional: if you want the parent to refresh
     } catch (error) {
       console.error("Error adding comment:", error);
+      Toast.show({ type: "error", text1: "Failed to add comment" });
     } finally {
       setIsAddingComment(false);
     }
@@ -314,7 +400,7 @@ const CommentModel = ({
     const Token = await AsyncStorage.getItem("USER_ACCESS");
     const userId = await AsyncStorage.getItem("userId");
     await Axios.post(
-      `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${commentId}`,
+      `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${commentId}/${postId}`,
       {
         image: userprofilePic,
         Name: userFullname,
@@ -371,7 +457,7 @@ const CommentModel = ({
             profilePic: reply.userProfileImage,
           };
         });
-  console.log("3")
+
         const profilePics = await Promise.all(profilePicPromises);
         const profilePicMap = profilePics.reduce((acc, pic) => {
           if (pic) acc[pic.residentId] = pic.profilePic;
@@ -553,6 +639,28 @@ const CommentModel = ({
       </ReactionSummary>
     );
   };
+const renderSuggestions = () => (
+    <View style={styles.suggestionsContainer}>
+      {isFetchingMentions ? (
+        <ActivityIndicator style={{ padding: 10 }} color={Colors.PURPLE} />
+      ) : (
+        <ScrollView keyboardShouldPersistTaps="handled">
+          {mentionSuggestions.map(user => (
+            <TouchableOpacity
+              key={user.id}
+              style={styles.suggestionItem}
+              onPress={() => onSuggestionPress(user)}
+            >
+              <Image source={{ uri: user.avatar }} style={styles.suggestionAvatar} />
+              <Text>{user.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+
+
 
   return (
     <Modal
@@ -848,33 +956,37 @@ const CommentModel = ({
             {/* Add comment section */}
           
           </ScrollView>
-            <View style={styles.addCommentContainer}>
-              <Image
-                source={{ uri: userprofilePic }}
-                defaultSource={require("../../../assets/default-avatar.jpg")}
-                style={styles.userProfileImage}
-              />
-              <TextInput
-                placeholder={`Add a comment as ${userFullname}`}
-                multiline
-                value={commentText}
-                onChangeText={setCommentText}
-                onFocus={handleTextInputFocus}
-                onBlur={handleTextInputBlur}
-                style={styles.commentInput}
-              />
-              <TouchableOpacity onPress={addCommentToPost} disabled={isAddingComment}>
-                {isAddingComment ? (
-                  <ActivityIndicator size="small" color={Colors.PURPLE} />
-                ) : (
-                  <FontAwesome
-                    name="send"
-                    size={24}
-                    color={isTyping ? Colors.PURPLE : Colors.PLATINUM}
-                  />
-                )}
-              </TouchableOpacity>
-            </View>
+               {/* --- Mention Suggestions List --- */}
+        {showSuggestions && mentionSuggestions.length > 0 && renderSuggestions()}
+
+          <View style={styles.addCommentContainer}>
+            <Image
+              source={{ uri: userprofilePic }}
+              defaultSource={require("../../../assets/default-avatar.jpg")}
+              style={styles.userProfileImage}
+            />
+            <TextInput
+              ref={commentInputRef}
+              style={styles.commentInput}
+              placeholder={`Add a comment as ${userFullname}`}
+              multiline
+              value={commentText}
+              onChangeText={handleCommentChange}
+              onFocus={() => setIsTyping(true)}
+              onBlur={() => setIsTyping(false)}
+            />
+            <TouchableOpacity onPress={addCommentToPost} disabled={isAddingComment}>
+              {isAddingComment ? (
+                <ActivityIndicator size="small" color={Colors.PURPLE} />
+              ) : (
+                <FontAwesome
+                  name="send"
+                  size={24}
+                  color={isTyping || commentText ? Colors.PURPLE : Colors.PLATINUM}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -882,6 +994,33 @@ const CommentModel = ({
 };
 
 const styles = StyleSheet.create({
+   suggestionsContainer: {
+    maxHeight: 150,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 20,
+    width:200,
+    left:50,
+    marginBottom: 5,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  suggestionAvatar: {
+    width: 35,
+    height: 35,
+    borderRadius: 17.5,
+    marginRight: 12,
+  },
+  suggestionName: {
+      fontSize: 15,
+      fontWeight: '500',
+  },
   reactionIcon: {
     marginLeft: 10,
     marginRight: 4,

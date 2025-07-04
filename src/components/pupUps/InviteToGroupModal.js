@@ -12,7 +12,6 @@ import { AntDesign } from "@expo/vector-icons";
 import Colors from "../../../assets/Colors";
 import Axios from 'axios';
 import { APP_ENV } from '../../utils/BaseUrl';
-import { encode } from "base64-arraybuffer";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 
@@ -20,7 +19,7 @@ const InviteToGroupModal = ({ isVisible, onClose, groupId }) => {
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [data, setData] = useState([]);
-  const [userIds, setUserIds] = useState([]);
+  const [ setUserIds] = useState([]);
 
   const [currentUserId, setCurrentUserId] = useState(null);
 
@@ -37,14 +36,7 @@ const InviteToGroupModal = ({ isVisible, onClose, groupId }) => {
     fetchCurrentUserId();
   }, []);
 
-  const showUserAlreadyInGroup = () => {
-    Toast.show({
-      type: "error",
-      text1: `Invitee is already a member of the group.`,
-      visibilityTime: 3000,
-      autoHide: true,
-    });
-  };
+
 
   // useEffect(() => {
   //   const fetchProfilePhotos = async () => {
@@ -146,6 +138,7 @@ const InviteToGroupModal = ({ isVisible, onClose, groupId }) => {
       transparent={true}
       visible={isVisible}
       onRequestClose={onClose}
+      
     >
       <View
         style={{

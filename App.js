@@ -20,6 +20,8 @@ import ChangePassword from './src/screens/profile/ChangePassword';
 import SearchScreen from './src/screens/tabs/SearchScreen';
 import ShowGroup from './src/screens/groups/ShowGroup';
 import GroupDetails from './src/screens/groups/GroupDetails';
+import ConversationScreen from './src/screens/messaging/ConversationScreen';
+import PostDetail from './src/components/PostDetail';
 //////////////////////////////////////////////////////////////////
 import { I18nextProvider } from 'react-i18next';
 import { ClerkProvider } from '@clerk/clerk-expo';
@@ -120,6 +122,12 @@ const App = () => {
               component={ChangePassword}
               options={{ headerShown: false }}
             />
+                  <Stack.Screen 
+        name="Conversation" 
+        component={ConversationScreen} 
+        options={{ headerShown: false }}
+      />
+     <Stack.Screen name="PostDetail" component={PostDetail} />
           </Stack.Navigator>
 
         </I18nextProvider>

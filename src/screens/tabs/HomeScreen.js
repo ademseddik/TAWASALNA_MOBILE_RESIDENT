@@ -1,8 +1,7 @@
 import AddPostModal from '../../components/pupUps/AddPostModal';
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, Image, StyleSheet, ActivityIndicator, TouchableOpacity, RefreshControl
-} from 'react-native';
+  View, Text, Image, StyleSheet,  TouchableOpacity, RefreshControl,Animated} from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -10,8 +9,6 @@ import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
 import Colors from '../../../assets/Colors';
 import { MaterialIcons, AntDesign } from "@expo/vector-icons";
-import { differenceInCalendarISOWeek, parseISO } from 'date-fns';
-import { Animated } from 'react-native'; // Add this import
 import { useFocusEffect } from '@react-navigation/native';
 export default function HomeScreen() {
 
@@ -145,122 +142,143 @@ export default function HomeScreen() {
     fetchPosts();
   }, []);
 
-  return (
-    <View style={{ flex: 1, backgroundColor: Colors.WHITE }}>
-      <View style={styles.container}>
-        {loading ? (
-          <LottieView
-            source={loadingAnimation}
-            autoPlay
-            loop
-            style={styles.loadingAnimation}
-          />
-        ) : posts.length === 0 ? (
-          <View style={styles.noPostsContainer}>
-            <Text style={styles.noPostsText}>No posts available</Text>
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={[Colors.LIGHT_PURPLE]}
-                tintColor={Colors.LIGHT_PURPLE}
-              />
-            }>
-            {posts.map((item) => {
-              const user = item.user?.residentProfile;
-              const hasPhoto = item.photos && item.photos.length > 0;
-              const isFromGroup = item.groupId && item.groupImage && item.groupName;
+ // Inside the functional component … ---------------------------------
+const renderBody = () => {
+  if (loading) {
+    return (
+      <LottieView
+        source={loadingAnimation}
+        autoPlay
+        loop
+        style={styles.loadingAnimation}
+      />
+    );
+  }
 
-              return (
-                <View key={item.id.toString()} style={styles.postContainer}>
-                  <View style={styles.postHeader}>
-                    <Image
-                      source={{ uri: isFromGroup ? item.groupImage : user?.profilephoto || 'https://placeholder.com/avatar' }}
-                      style={styles.avatar}
-                    />
-                    <View style={styles.userInfo}>
-                      <Text style={styles.username}>
-                        {isFromGroup ? item.groupName : user?.fullName}
-                      </Text>
-
-                      {isFromGroup && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', top: 5 }}>
-                          <Image
-                            source={{ uri: user?.profilephoto || 'https://placeholder.com/avatar' }}
-                            style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6 }}
-                          />
-                          <Text style={{ fontSize: 13, color: Colors.GRAY }}>{user?.fullName}</Text>
-                        </View>
-                      )}
-
-                      <View style={styles.postMeta}>
- {isFromGroup && (
-                        <Text style={{
-                          left: 26, color: Colors.GRAY,
-                          fontSize: 12,
-                        }}>{formatPostTime(item.postDateTime)}</Text>
-                      )}
-                       {!isFromGroup && (
-                        <Text style={{
-                          color: Colors.GRAY,
-                          fontSize: 12,
-                        }}>{formatPostTime(item.postDateTime)}</Text>
-                      )}
-                      </View>
-                    </View>
-                    <TouchableOpacity style={styles.menuButton}>
-                      <MaterialIcons name="more-horiz" size={24} color={Colors.BLACK} />
-                    </TouchableOpacity>
-                  </View>
-
-                  {hasPhoto && (
-                    <Image
-                      source={{ uri: item.photos[0] }}
-                      style={styles.postImage}
-                      resizeMode="cover"
-                    />
-                  )}
-
-                  <View style={styles.postActions}>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <AntDesign name="hearto" size={24} color={Colors.LIGHT_PURPLE} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <MaterialIcons name="comment" size={24} color={Colors.LIGHT_PURPLE} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.actionButton}>
-                      <MaterialIcons name="send" size={24} color={Colors.LIGHT_PURPLE} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <Text style={styles.caption}>{item.caption}</Text>
-                </View>
-              );
-            })}
-          </ScrollView>
-        )}
+  if (posts.length === 0) {
+    return (
+      <View style={styles.noPostsContainer}>
+        <Text style={styles.noPostsText}>No posts available</Text>
       </View>
+    );
+  }
 
-      <AddPostModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
+  // default branch: we actually have posts
+  return (
+    <ScrollView
+      contentContainerStyle={styles.listContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[Colors.LIGHT_PURPLE]}
+          tintColor={Colors.LIGHT_PURPLE}
+        />
+      }
+    >
+      {posts.map(item => {
+        const user        = item.user?.residentProfile;
+        const hasPhoto    = item.photos?.length > 0;
+        const isFromGroup = item.groupId && item.groupImage && item.groupName;
 
-     <Animated.View // Replace TouchableOpacity with Animated.View
-        style={[
-          styles.addButton,
-          {
-            transform: [{ translateX: buttonAnim }],
-          },
-        ]}
-      >
-        <TouchableOpacity onPress={() => setIsModalVisible(true)}>
-          <Text style={styles.addText}>＋</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
+        return (
+          <View key={item.id} style={styles.postContainer}>
+            {/* ------- header ------- */}
+            <View style={styles.postHeader}>
+              <Image
+                source={{
+                  uri: isFromGroup ? item.groupImage : user?.profilephoto
+                      ?? "https://placeholder.com/avatar",
+                }}
+                style={styles.avatar}
+              />
+              <View style={styles.userInfo}>
+                <Text style={styles.username}>
+                  {isFromGroup ? item.groupName : user?.fullName}
+                </Text>
+
+                {isFromGroup && (
+                  <View style={{ flexDirection: "row", alignItems: "center", top: 5 }}>
+                    <Image
+                      source={{
+                        uri: user?.profilephoto ?? "https://placeholder.com/avatar",
+                      }}
+                      style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6 }}
+                    />
+                    <Text style={{ fontSize: 13, color: Colors.GRAY }}>
+                      {user?.fullName}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.postMeta}>
+                  <Text
+                    style={{
+                      left: isFromGroup ? 26 : 0,
+                      color: Colors.GRAY,
+                      fontSize: 12,
+                    }}
+                  >
+                    {formatPostTime(item.postDateTime)}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.menuButton}>
+                <MaterialIcons name="more-horiz" size={24} color={Colors.BLACK} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ------- photo ------- */}
+            {hasPhoto && (
+              <Image
+                source={{ uri: item.photos[0] }}
+                style={styles.postImage}
+                resizeMode="cover"
+              />
+            )}
+
+            {/* ------- actions ------- */}
+            <View style={styles.postActions}>
+              <TouchableOpacity style={styles.actionButton}>
+                <AntDesign name="hearto" size={24} color={Colors.LIGHT_PURPLE} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialIcons name="comment" size={24} color={Colors.LIGHT_PURPLE} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialIcons name="send" size={24} color={Colors.LIGHT_PURPLE} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.caption}>{item.caption}</Text>
+          </View>
+        );
+      })}
+    </ScrollView>
   );
+};
+// --------------------------------------------------------------------
+
+return (
+  <View style={{ flex: 1, backgroundColor: Colors.WHITE }}>
+    <View style={styles.container}>{renderBody()}</View>
+
+    {/* modal & floating "+" button stay unchanged */}
+    <AddPostModal
+      visible={isModalVisible}
+      onClose={() => setIsModalVisible(false)}
+    />
+
+    <Animated.View
+      style={[styles.addButton, { transform: [{ translateX: buttonAnim }] }]}
+    >
+      <TouchableOpacity onPress={() => setIsModalVisible(true)}>
+        <Text style={styles.addText}>＋</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  </View>
+);
 
 }
 
@@ -283,7 +301,7 @@ const styles = StyleSheet.create({
   postContainer: {
     marginVertical: 8,
     marginBottom: 8,
-    borderBottomWidth: 1,
+  
     borderBottomColor: Colors.LIGHT_PURPLE,
     borderBottomWidth: 3,
     paddingBottom: 16,

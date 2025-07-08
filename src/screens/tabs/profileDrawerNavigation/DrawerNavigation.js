@@ -8,14 +8,21 @@ import HelpScreen from "./HelpScreen";
 import UserGroups from "./UserGroups";
 import SettingsScreen from "./SettingsScreen";
 import Colors from "../../../../assets/Colors";
-
+import { useAuth } from '@clerk/clerk-expo';
 const Drawer = createDrawerNavigator();
 
-const handleSignOut = async (navigation) => {
-  try {
-   await AsyncStorage.clear();
 
-    
+
+
+const handleSignOut = async (navigation, signOut) => {
+  try {
+    const socialAuth = await AsyncStorage.getItem('SOCIAL_AUTH');
+    if (socialAuth === 'true') {
+      await signOut(); // logout from Clerk if social login
+    }
+
+    await AsyncStorage.clear();
+
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
@@ -30,26 +37,28 @@ const handleSignOut = async (navigation) => {
 };
 
 function CustomDrawerContent(props) {
+  const { signOut } = useAuth();
   return (
     <DrawerContentScrollView {...props}>
       {/* Render default drawer items */}
       <DrawerItemList {...props} />
       
       {/* Sign-out button */}
-      <TouchableOpacity 
-        onPress={() => handleSignOut(props.navigation)}
+      <TouchableOpacity
+        onPress={() => handleSignOut(props.navigation, signOut)}
         style={{
           padding: 16,
           backgroundColor: Colors.WHITE,
-          borderWidth:2,
+          borderWidth: 2,
           borderColor: Colors.LIGHT_PURPLE,
           borderRadius: 70,
           alignItems: "center",
-
           margin: 10,
         }}
       >
-        <Text style={{ color: Colors.LIGHT_PURPLE, fontWeight: "bold" }}>Sign Out</Text>
+        <Text style={{ color: Colors.LIGHT_PURPLE, fontWeight: "bold" }}>
+          Sign Out
+        </Text>
       </TouchableOpacity>
     </DrawerContentScrollView>
   );

@@ -1,14 +1,14 @@
 
 export const APP_ENV = {
     // AUTH_PORT: "http://157.173.196.161:30265",
-    // SOCIAL_PORT: "http://157.173.196.161:31499",
-        AUTH_PORT: "http://192.168.1.43:8070",
-    SOCIAL_PORT: "http://192.168.1.43:8093",
-    EXPO_PUBLIC_ADMIN_SOCKET :"ws://192.168.1.43:8093/tawasalna-community/ws",
-      WS_URL: "http://192.168.1.43:8093/tawasalna-community/ws",
-        NOTIFICATION_WS_URL: "ws://192.168.1.43:8093/tawasalna-community/ws-notif",
+    // SOCIAL_PORT: "http://157.173.196.161:31499",s
+        AUTH_PORT: "http://192.168.1.55:8070",
+    SOCIAL_PORT: "http://192.168.1.55:8093",
+    EXPO_PUBLIC_ADMIN_SOCKET :"ws://192.168.1.55:8093/tawasalna-community/ws",
+      WS_URL: "http://192.168.1.55:8093/tawasalna-community/ws",
+        NOTIFICATION_WS_URL: "ws://192.168.1.55:8093/tawasalna-community/ws-notif",
     HOST: process.env.EXPO_PUBLIC_HOST,
-  };
+  };  
   
   console.log("APP_ENV", APP_ENV);
   

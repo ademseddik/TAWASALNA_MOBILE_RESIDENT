@@ -149,27 +149,7 @@ const Conversations = () => {
     );
   };
 
-  const stories = [
-    {
-      id: 2,
-      name: 'Trafalgar D: water Law',
-      avatar: 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg',
-      hasNote: false,
-    },
-    {
-      id: 3,
-      name: 'Amine Arfaoui',
-      avatar: 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg',
-      hasNote: false,
-    },
-    {
-      id: 4,
-      name: 'Siwar',
-      avatar: 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg',
-      hasNote: false,
-      isOnline: true,
-    },
-  ];
+ 
 
   return (
     <SafeAreaView style={styles.container}>
@@ -193,7 +173,7 @@ const Conversations = () => {
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             placeholder="Search"
-            placeholderTextColor="#666"
+            placeholderTextColor="#c4c4c2"
             style={styles.searchInput}
           />
         </View>
@@ -201,23 +181,7 @@ const Conversations = () => {
 
       <ScrollView style={styles.content}>
         {/* Stories Section */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.storiesContainer}>
-          {stories.map((story) => (
-            <TouchableOpacity key={story.id} style={styles.storyItem}>
-              <View style={styles.storyImageContainer}>
-                <Image
-                  source={{ uri: story.avatar }}
-                  style={styles.storyImage}
-                  defaultSource={require('../../../assets/default-avatar.jpg')}
-                />
-                {story.isOnline && <View style={styles.onlineStatus} />}
-              </View>
-              <Text style={styles.storyName} numberOfLines={1}>
-                {story.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+
 
         {/* Messages Header */}
         <View style={styles.messagesHeader}>
@@ -283,24 +247,35 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   searchContainer: {
-    paddingHorizontal: 13,
-    paddingVertical: 12,
+padding:10,
+   
+    borderRadius:20,
+    marginHorizontal:10,
+    marginVertical:10,
+    backgroundColor:Colors.WHITE,
+    elevation:10,
+   height:65,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#333',
-    borderRadius: 12,
+    backgroundColor: Colors.LIGHT_BLACK,
+    borderRadius: 15,
     paddingHorizontal: 16,
     paddingVertical: 5,
+    height:44,
+    
   },
   searchIcon: {
     marginRight: 12,
+    color:Colors.LIGHT_PURPLE,
   },
   searchInput: {
     flex: 1,
     color: 'white',
     fontSize: 16,
+    height:44,
+    
   },
   content: {
     flex: 1,

@@ -22,7 +22,8 @@ const SearchScreen = ({ navigation }) => {
     try {
       const currentUserId = await AsyncStorage.getItem("userId");
       
-      const Community = await AsyncStorage.getItem("USERCOMMUNITY");
+     // const Community = await AsyncStorage.getItem("USERCOMMUNITY");
+      const Community ="66867d06f4c3de5f09170f5b"
       const response = await fetch(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getUsersByCommunity?community=${encodeURIComponent(Community)}`
       );

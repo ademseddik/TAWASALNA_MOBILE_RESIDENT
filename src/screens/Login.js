@@ -160,6 +160,8 @@ const Login = () => {
   
   const handleSigninSocial = async (provider) => {
     await AsyncStorage.setItem('SOCIAL_AUTH', "true");
+    const pushNotificationToken = await registerForPushNotificationsAsync();
+    console.log("Push Token:", pushNotificationToken);
     try {
       const concatenated = `${provider}_${user.primaryEmailAddress?.emailAddress}`;
       console.log(concatenated); // Output: "google_user@example.com"
@@ -175,7 +177,8 @@ const Login = () => {
           provider: provider,
           fullname: fullname,
           role,
-          image:user.imageUrl
+          image:user.imageUrl,
+          pushNotificationToken: pushNotificationToken
         }
       )
       await AsyncStorage.setItem('userId', response.data.id);

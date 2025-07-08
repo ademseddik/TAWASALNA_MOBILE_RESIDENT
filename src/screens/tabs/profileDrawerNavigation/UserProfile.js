@@ -192,7 +192,7 @@ const ProfileScreen = ({ navigation }) => {
             <TabBar
               {...props}
               indicatorStyle={{ backgroundColor: "white" ,height:3}}
-              style={{ backgroundColor: Colors.PUPRLE2,elevation:30}}
+              style={{ backgroundColor: Colors.LIGHT_PURPLE,elevation:30}}
 
               renderLabel={({ route }) => (
                 <Text style={{

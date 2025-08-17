@@ -49,7 +49,25 @@ export const useEnterCode = () => {
 
   const handleCodeChange = async (text, index) => {
     const newCode = [...state.code];
-    newCode[index] = text;
+    
+    // Handle backspace/delete
+    if (text === "") {
+      // If current field is empty and user presses backspace, go to previous field
+      if (newCode[index] === "" && index > 0) {
+        codeInputRefs.current[index - 1]?.focus();
+        return;
+      }
+      // Clear current field
+      newCode[index] = "";
+    } else {
+      // Handle new input
+      newCode[index] = text;
+      
+      // Auto-focus next field if not the last one
+      if (index < 5 && text !== "") {
+        codeInputRefs.current[index + 1]?.focus();
+      }
+    }
     
     setState(prev => ({
       ...prev,
@@ -57,10 +75,9 @@ export const useEnterCode = () => {
       codeError: ""
     }));
 
+    // Auto-verify when all fields are filled
     if (index === 5 && newCode.every(item => item !== "")) {
       await verifyCode(newCode.join(""));
-    } else if (text !== "") {
-      codeInputRefs.current[index + 1]?.focus();
     }
   };
 

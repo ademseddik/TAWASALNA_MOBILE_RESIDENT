@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   TouchableWithoutFeedback,
+  FlatList,
 } from "react-native";
 import React, { useState, useEffect, useCallback,useRef } from "react";
 import { Modal } from "react-native";
@@ -47,6 +48,7 @@ import Animated, {
   withSpring,
   withTiming
 } from 'react-native-reanimated';
+import { PostService } from '../../services/post.service';
 
 const CommentModel = ({
   isVisible,
@@ -57,7 +59,7 @@ const CommentModel = ({
   // State variables
   const [commentText, setCommentText] = useState("");
   const [isTyping, setIsTyping] = useState(false); // Added back missing state
-  const [data, setData] = useState([]);
+  const [pagedData, setPagedData] = useState({ content: [], last: true, number: 0, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -85,6 +87,7 @@ const CommentModel = ({
   const [isFetchingMentions, setIsFetchingMentions] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mentionedUsers, setMentionedUsers] = useState([]); // <-- Tracks selected users {id, name}
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
 
   const commentInputRef = useRef(null);
   // Animation values
@@ -108,10 +111,12 @@ const CommentModel = ({
   }, [currentUserId]);
 
   // Handle reaction icon press
-  const handleReactionIconPress = (commentId, currentReaction) => {
-    if (currentReaction) {
-      removeReaction(commentId);
+  const handleReactionIconPress = (commentId, currentUserReaction) => {
+    if (currentUserReaction) {
+      // User already reacted, remove their reaction
+      addReactionToComment(commentId, currentUserReaction);
     } else {
+      // User has not reacted, add a heart
       addReactionToComment(commentId, "heart");
     }
   };
@@ -194,31 +199,6 @@ const CommentModel = ({
     setShowReactionPicker(commentId);
   };
 
-  // Remove reaction
-  const removeReaction = async (commentId) => {
-    try {
-      // Optimistic UI update
-      setData(prevData =>
-        prevData.map(comment => {
-          if (comment.commentId === commentId) {
-            const newReactions = comment.reactions.filter(r => r.userId !== currentUserId);
-            return { ...comment, reactions: newReactions };
-          }
-          return comment;
-        })
-      );
-
-      const userId = await AsyncStorage.getItem("userId");
-      await Axios.delete(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/removeReaction/${commentId}/${userId}`,
-        { headers: { "Content-Type": "application/json" } }
-      );
-    } catch (error) {
-      console.error("Error removing reaction:", error);
-      fetchCommentsPost(); // Revert on error
-    }
-  };
-
   // Reaction emojis mapping
   const reactionEmojis = {
     heart: '❤️',
@@ -239,43 +219,47 @@ const CommentModel = ({
 
   // Fetch current user profile
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const userId = await AsyncStorage.getItem("userId");
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
-        );
-        setFullName(response.data.fullName);
-        setimage(response.data.profilephoto);
-      } catch (error) {
-        console.error("Error getting resident profile:", error);
-      }
-    };
-    fetchProfile();
-  }, []);
+    if (isVisible) {
+      const fetchProfile = async () => {
+        try {
+          const userId = await AsyncStorage.getItem("userId");
+          const response = await Axios.get(
+            `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
+          );
+          setFullName(response.data.fullName);
+          setimage(response.data.profilephoto);
+        } catch (error) {
+          console.error("Error getting resident profile:", error);
+        }
+      };
+      fetchProfile();
+    }
+  }, [isVisible]);
 
   // Fetch user profile photo
   useEffect(() => {
-    const fetchProfilePhoto = async () => {
-      try {
-        const userId = await AsyncStorage.getItem("userId");
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
-          { responseType: "arraybuffer" }
-        );
-        const base64Image = encode(response.data);
-        setUserProfilePic(`data:image/jpeg;base64,${base64Image}`);
-      } catch (error) {
-        console.error("Error getting profile photo:", error);
-      }
-    };
-    fetchProfilePhoto();
-  }, []);
+    if (isVisible) {
+      const fetchProfilePhoto = async () => {
+        try {
+          const userId = await AsyncStorage.getItem("userId");
+          const response = await Axios.get(
+            `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
+            { responseType: "arraybuffer" }
+          );
+          const base64Image = encode(response.data);
+          setUserProfilePic(`data:image/jpeg;base64,${base64Image}`);
+        } catch (error) {
+          console.error("Error getting profile photo:", error);
+        }
+      };
+      fetchProfilePhoto();
+    }
+  }, [isVisible]);
 
   // Modal close handler
   const handleModalClose = useCallback(() => {
     onClose();
-    setData([]);
+    setPagedData({ content: [], last: true, number: 0, totalPages: 1 });
     setReplyingToCommentId(null);
     setExpandedComments({});
     resetEditState();
@@ -314,46 +298,43 @@ const CommentModel = ({
     setShowActionDialog(false);
   };
   const refetchCommentsPost = useCallback(async () => {
-    if (!postId) return;
-
-    try {
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcomments/${postId}`
-      );
-
-      if (response.data && Array.isArray(response.data)) {
-        setData(response.data);
-      }
-    } catch (error) {
-      console.error("Error getting comments:", error);
-    }
-  }, [postId]);
+    await fetchCommentsPost(0);
+  }, [fetchCommentsPost]);
 
   // Fetch comments for post
-  const fetchCommentsPost = useCallback(async () => {
-
+  const fetchCommentsPost = useCallback(async (page = 0) => {
     if (!postId) return;
-
-    setIsLoading(true);
+    if (page === 0) {
+      setIsLoading(true);
+    } else {
+      setIsFetchingMore(true);
+    }
     try {
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcomments/${postId}`
-      );
-console.log(response)
-      if (response.data && Array.isArray(response.data)) {
-        setData(response.data);
+      const result = await PostService.getAllCommentsPaged(postId, page, 10);
+      if (result && Array.isArray(result.content)) {
+        setPagedData(prev => page === 0
+          ? result
+          : {
+              ...result,
+              content: [...prev.content, ...result.content.filter(c => !prev.content.some(pc => pc.commentId === c.commentId))]
+            }
+        );
       }
     } catch (error) {
-      console.error("Error getting comments:", error);
+      console.error("Error getting paged comments:", error);
     } finally {
-      setIsLoading(false);
+      if (page === 0) {
+        setIsLoading(false);
+      } else {
+        setIsFetchingMore(false);
+      }
     }
   }, [postId]);
 
-  // Fetch comments when postId changes
+  // Fetch comments when postId or modal visibility changes
   useEffect(() => {
-    if (postId) fetchCommentsPost();
-  }, [postId, fetchCommentsPost]);
+    if (isVisible && postId) fetchCommentsPost(0);
+  }, [isVisible, postId, fetchCommentsPost]);
 
   // Add comment to post
  const addCommentToPost = async () => {
@@ -362,26 +343,44 @@ console.log(response)
       return;
     }
     setIsAddingComment(true);
+    // --- Optimistic UI: Add temp comment ---
+    const tempId = `temp-${Date.now()}`;
+    const tempComment = {
+      commentId: tempId,
+      userName: userFullname,
+      userProfileImage: userprofilePic,
+      text: commentText,
+      createdAt: new Date().toISOString(),
+      reactions: [],
+      numberOfReplies: 0,
+      residentId: currentUserId,
+      pending: true,
+    };
+    setPagedData(prev => ({
+      ...prev,
+      content: [tempComment, ...prev.content],
+    }));
+    setCommentText("");
+    setMentionedUsers([]);
+    let success = false;
     try {
       const userId = await AsyncStorage.getItem("userId");
       const Token = await AsyncStorage.getItem("USER_ACCESS");
-
-      // Extract just the IDs to send to the backend
       const mentionedUserIds = mentionedUsers.map(u => u.id);
-
-      await Axios.post(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addcomment/${postId}/${userId}`,
-        { commentText, mentionedUserIds }, // Send the new request body
-        { headers: { Authorization: `Bearer ${Token}` } }
-      );
-
+      await PostService.addComment(postId, userId, tempComment.text, mentionedUserIds, Token);
       Toast.show({ type: "success", text1: "Comment added" });
-      setCommentText("");
-      setMentionedUsers([]); // Clear mentions after posting
-      // refreshPosts(); // Optional: if you want the parent to refresh
+      success = true;
+      // Option 1: Refetch all comments (ensures correct order and data)
+      refetchCommentsPost();
+      // Option 2: If API returns the new comment, replace temp with real one here
     } catch (error) {
       console.error("Error adding comment:", error);
       Toast.show({ type: "error", text1: "Failed to add comment" });
+      // Remove temp comment on failure
+      setPagedData(prev => ({
+        ...prev,
+        content: prev.content.filter(c => c.commentId !== tempId),
+      }));
     } finally {
       setIsAddingComment(false);
     }
@@ -389,34 +388,47 @@ console.log(response)
 
   // Add reply to comment
  const addReplyToComment = async (commentId, text) => {
-  if (!text.trim()) {
-    Toast.show({ type: "info", text1: "Please write a reply", visibilityTime: 3000 });
-    return;
-  }
+    if (!text.trim()) {
+      Toast.show({ type: "info", text1: "Please write a reply", visibilityTime: 3000 });
+      return;
+    }
+    setAddingReply(commentId);
+    try {
+      const Token = await AsyncStorage.getItem("USER_ACCESS");
+      const userId = await AsyncStorage.getItem("userId");
+      await PostService.addReplyToComment(userId, commentId, postId, userprofilePic, userFullname, text, Token);
 
-  setAddingReply(commentId); // Set the comment we're replying to
-  
-  try {
-    const Token = await AsyncStorage.getItem("USER_ACCESS");
-    const userId = await AsyncStorage.getItem("userId");
-    await Axios.post(
-      `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${commentId}/${postId}`,
-      {
-        image: userprofilePic,
-        Name: userFullname,
-        replyText: text
-      },
-      { headers: { Authorization: `Bearer ${Token}` } }
-    );
-    refetchCommentsPost();
-    setShowReplyInput(null);
-    setReplyText("");
-  } catch (error) {
-    console.error("Error adding reply:", error);
-  } finally {
-    setAddingReply(null); // Reset regardless of success or failure
-  }
-};
+      // Optimistically update replies state
+      const newReply = {
+        residentId: userId,
+        userName: userFullname,
+        userProfileImage: userprofilePic,
+        text,
+        createdAt: new Date().toISOString(),
+      };
+      setReplies(prev => ({
+        ...prev,
+        [commentId]: prev[commentId] ? [...prev[commentId], newReply] : [newReply],
+      }));
+
+      // Optimistically increment numberOfReplies in pagedData
+      setPagedData(prev => ({
+        ...prev,
+        content: prev.content.map(comment =>
+          comment.commentId === commentId
+            ? { ...comment, numberOfReplies: (parseInt(comment.numberOfReplies) || 0) + 1 }
+            : comment
+        ),
+      }));
+
+      setShowReplyInput(null);
+      setReplyText("");
+    } catch (error) {
+      console.error("Error adding reply:", error);
+    } finally {
+      setAddingReply(null);
+    }
+  };
 
   const handleReplyButtonPress = (commentId, userName) => {
     if (showReplyInput === commentId) {
@@ -438,32 +450,24 @@ console.log(response)
 
   // Fetch replies for a comment
   const fetchRepliesForComment = async (commentId) => {
-    console.log("1")
     try {
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getreplies/${commentId}`
-      );
-      if (response.data && response.data !== "No replies found for the specified comment") {
+      const repliesData = await PostService.getReplies(commentId);
+      if (repliesData && repliesData !== "No replies found for the specified comment") {
         setReplies(prevReplies => ({
           ...prevReplies,
-          [commentId]: response.data,
+          [commentId]: repliesData,
         }));
-  console.log("2")
-        const profilePicPromises = response.data.map(async (reply) => {
-
-
+        const profilePicPromises = repliesData.map(async (reply) => {
           return {
             residentId: reply.residentId,
             profilePic: reply.userProfileImage,
           };
         });
-
         const profilePics = await Promise.all(profilePicPromises);
         const profilePicMap = profilePics.reduce((acc, pic) => {
           if (pic) acc[pic.residentId] = pic.profilePic;
           return acc;
         }, {});
-
         setReplyProfilePic(prev => ({
           ...prev,
           ...profilePicMap,
@@ -483,9 +487,13 @@ console.log(response)
   const formatDateTime = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now - date;
+    let diffMs = now - date;
+
+    // Clamp negative values to zero
+    if (diffMs < 0) diffMs = 0;
 
     const seconds = Math.floor(diffMs / 1000);
+    if (seconds < 1) return "just now";
     if (seconds < 60) return `${seconds}s`;
 
     const minutes = Math.floor(seconds / 60);
@@ -508,36 +516,40 @@ console.log(response)
 
   // Add reaction to comment
   const addReactionToComment = async (commentId, reactionType = "heart") => {
-    try {
-      // Optimistic UI update
-      setData(prevData =>
-        prevData.map(comment => {
-          if (comment.commentId === commentId) {
-            const existingIndex = comment.reactions.findIndex(r => r.userId === currentUserId);
-            const newReactions = [...comment.reactions];
-
-            if (existingIndex !== -1) {
-              newReactions[existingIndex] = { ...newReactions[existingIndex], reactionType };
+    setPagedData(prevData => ({
+      ...prevData,
+      content: prevData.content.map(comment => {
+        if (comment.commentId === commentId) {
+          // Find if the user already reacted
+          const existingIndex = comment.reactions.findIndex(r => r.userId === currentUserId);
+          let newReactions = [...comment.reactions];
+          if (existingIndex !== -1) {
+            if (newReactions[existingIndex].reactionType === reactionType) {
+              // Remove reaction if same type
+              newReactions.splice(existingIndex, 1);
             } else {
-              newReactions.push({ userId: currentUserId, reactionType });
+              // Update reaction type
+              newReactions[existingIndex] = { ...newReactions[existingIndex], reactionType };
             }
-
-            return { ...comment, reactions: newReactions };
+          } else {
+            // Add new reaction
+            newReactions.push({ userId: currentUserId, reactionType });
           }
-          return comment;
-        })
-      );
+          return { ...comment, reactions: newReactions };
+        }
+        return comment;
+      })
+    }));
 
+    // Call backend (no need to refetch)
+    try {
       const userId = await AsyncStorage.getItem("userId");
-      await Axios.post(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addReactionToComment/${commentId}/${userId}/${reactionType}`,
-        {},
-        { headers: { "Content-Type": "application/json" } }
-      );
+      await PostService.addReactionToComment(commentId, userId, reactionType);
       setShowActionDialog(false);
     } catch (error) {
+      // Optionally: revert optimistic update or show error
       console.error("Error handling reaction:", error);
-      fetchCommentsPost(); // Revert on error
+      // Optionally, you could refetch here if you want to revert on error
     }
   };
 
@@ -581,16 +593,11 @@ console.log(response)
       Toast.show({ type: "info", text1: "Comment cannot be empty", visibilityTime: 3000 });
       return;
     }
-
     setIsUpdating(true);
     try {
       const Token = await AsyncStorage.getItem("USER_ACCESS");
       const userId = await AsyncStorage.getItem("userId");
-      await Axios.put(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/edit/${editingComment.commentId}/${userId}`,
-        { newText: editCommentText },
-        { headers: { Authorization: `Bearer ${Token}` } }
-      );
+      await PostService.editComment(editingComment.commentId, userId, editCommentText, Token);
       Toast.show({ type: "success", text1: "Comment updated successfully", visibilityTime: 3000 });
       refetchCommentsPost();
       resetEditState();
@@ -606,10 +613,7 @@ console.log(response)
     try {
       const Token = await AsyncStorage.getItem("USER_ACCESS");
       const userId = await AsyncStorage.getItem("userId");
-      await Axios.delete(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/delete/${commentId}/${userId}`,
-        { headers: { Authorization: `Bearer ${Token}` } }
-      );
+      await PostService.deleteComment(commentId, userId, postId, Token);
       refetchCommentsPost();
       Toast.show({ type: 'success', text1: 'Comment deleted successfully' });
     } catch (error) {
@@ -627,16 +631,20 @@ console.log(response)
       reactionCounts[r.reactionType] = (reactionCounts[r.reactionType] || 0) + 1;
     });
 
-    // Find most popular reaction
-    const mostPopular = Object.keys(reactionCounts).reduce((a, b) =>
-      reactionCounts[a] > reactionCounts[b] ? a : b
-    );
+    // Sort reaction types by count (descending)
+    const sortedReactions = Object.entries(reactionCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3); // Top 3
 
     return (
-      <ReactionSummary>
-        <Text style={styles.reactionEmoji}>{reactionEmojis[mostPopular]}</Text>
-        <Text style={styles.reactionCount}>{reactions.length}</Text>
-      </ReactionSummary>
+      <View style={styles.reactionSummaryFloating}>
+        {sortedReactions.map(([type, count]) => (
+          <View key={type} style={styles.reactionPill}>
+            <Text style={styles.reactionEmoji}>{reactionEmojis[type]}</Text>
+            <Text style={styles.reactionCount}>{count}</Text>
+          </View>
+        ))}
+      </View>
     );
   };
 const renderSuggestions = () => (
@@ -673,26 +681,17 @@ const renderSuggestions = () => (
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+          {/* Header and separator */}
+          <View>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Comments</Text>
             <View style={styles.separator} />
+          </View>
 
-            {/* Comments List */}
-            <ScrollView>
-              {isLoading && (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={Colors.PURPLE} />
-                </View>
-              )}
-
-              {!isLoading && data.length === 0 && (
-                <View style={styles.noCommentsContainer}>
-                  <Text>No comments yet</Text>
-                </View>
-              )}
-
-              {!isLoading && data.map((comment) => {
+          {/* Comments List - FlatList only, no parent ScrollView */}
+          <FlatList
+            data={Array.from(new Map(pagedData.content.map(c => [c.commentId, c])).values())}
+            renderItem={({ item: comment }) => {
                 const currentUserReaction = getCurrentUserReaction(comment);
                 const isExpanded = expandedComments[comment.commentId];
                 const isSelected = selectedComment?.commentId === comment.commentId;
@@ -709,6 +708,11 @@ const renderSuggestions = () => (
                         style={[styles.blurOverlay, StyleSheet.absoluteFill]}
                       />
                     )}
+
+                    {/* Floating reaction summary (top 3) */}
+                    <View style={{ position: 'relative' }}>
+                      {renderReactionSummary(comment.reactions)}
+                    </View>
 
                     <TouchableOpacity
                       onLongPress={() => {
@@ -760,7 +764,7 @@ const renderSuggestions = () => (
 
                                 </UserInfoText>
                                 <MessageText>{comment.text}</MessageText>
-
+                                {/* Reaction summary is now floating, not inside the container */}
                                 {showReactionPicker === comment.commentId && (
                                   <ReactionPickerContainer>
                                     {Object.entries(reactionEmojis).map(([type, emoji]) => (
@@ -786,7 +790,7 @@ const renderSuggestions = () => (
                           {!isEditing && (
                             <View style={styles.commentFooter}>
                               <TouchableOpacity
-                                onPress={() => handleReactionIconPress(comment.commentId, currentUserReaction)}
+                                onPress={() => handleReactionIconPress(comment.commentId, getCurrentUserReaction(comment))}
                                 onLongPress={() => handleReactionIconLongPress(comment.commentId)}
                                 style={styles.reactionIcon}
                               >
@@ -824,7 +828,7 @@ const renderSuggestions = () => (
                                   />
                                 </TouchableOpacity>
                               )}
-                               {renderReactionSummary(comment.reactions)}
+                              
                             </View>
                           )}
                           {showReplies && replies[comment.commentId] && (
@@ -950,15 +954,32 @@ const renderSuggestions = () => (
                     )}
                   </React.Fragment>
                 );
-              })}
-            </ScrollView>
+              }}
+              keyExtractor={item => item.commentId}
+              onEndReached={() => {
+                if (!pagedData.last && !isFetchingMore) {
+                  fetchCommentsPost(pagedData.number + 1);
+                }
+              }}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                isFetchingMore ? (
+                  <View style={{ paddingVertical: 16, alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator size="small" color={Colors.PURPLE} />
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={!isLoading && (
+                <View style={styles.noCommentsContainer}>
+                  <Text>No comments yet</Text>
+                </View>
+              )}
+            />
 
-            {/* Add comment section */}
-          
-          </ScrollView>
-               {/* --- Mention Suggestions List --- */}
+            {/* --- Mention Suggestions List --- */}
         {showSuggestions && mentionSuggestions.length > 0 && renderSuggestions()}
 
+          {/* Add comment section */}
           <View style={styles.addCommentContainer}>
             <Image
               source={{ uri: userprofilePic }}
@@ -1186,6 +1207,36 @@ const styles = StyleSheet.create({
     marginTop: 5,
     alignSelf: 'flex-start',
   },
+  reactionSummaryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.LIGHT_PURPLE_OPACITY,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    shadowColor: '#B39DDB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  reactionPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 6,
+
+    shadowColor: '#B39DDB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 1,
+    elevation: 1,
+  },
   reactionEmoji: {
     fontSize: 14,
     marginRight: 2,
@@ -1324,6 +1375,23 @@ const styles = StyleSheet.create({
     color: Colors.PURPLE,
     fontWeight: 'bold',
     padding: 5,
+  },
+  reactionSummaryFloating: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    zIndex: 20,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#B39DDB',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.10,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 

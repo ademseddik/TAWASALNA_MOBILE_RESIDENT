@@ -6,7 +6,9 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ActivityIndicator,
-  Image
+  Image,
+  ImageBackground,
+  Dimensions
 } from "react-native";
 import Colors from "../../../assets/Colors";
 import { useEnterCode } from "../../hooks/useEnterCode";
@@ -26,6 +28,8 @@ const EnterCode = () => {
     handleResendCode
   } = useEnterCode();
 
+  const { width, height } = Dimensions.get('window');
+
   if (!isConnected) {
     return (
       <View style={styles.offlineContainer}>
@@ -38,103 +42,181 @@ const EnterCode = () => {
   }
 
   return (
-    <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
-      <View style={styles.container}>
-        <Text style={styles.title}>{t("Enter your code")}</Text>
-
-        <Text style={styles.subtitle}>
-          {t("We've sent you a 6-digit code to")} {email}
-        </Text>
-
-        <View style={styles.codeContainer}>
-          {code.map((digit, index) => (
-            <TextInput
-              key={index}
-              ref={ref => codeInputRefs.current[index] = ref}
-              style={styles.codeInput}
-              keyboardType="numeric"
-              maxLength={1}
-              value={digit}
-              onChangeText={(text) => handleCodeChange(text, index)}
+    <ImageBackground
+      source={require('../../../assets/ImgBackGoung.jpg')}
+      style={{ flex: 1, resizeMode: 'cover' }}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <View style={{
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          marginBottom: height * 0.015,
+          marginTop: 0
+        }}>
+          <View style={{
+            width: width * 1,
+            height: height * 0.08,
+            backgroundColor: Colors.LIGHT_PURPLE,
+            paddingLeft: width * 0.040,
+            justifyContent: 'center',
+            top: 0
+          }}>
+            <Image
+              source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
+              style={{ width: width * 0.4, height: height * 0.06, marginRight: width * 0.02 }}
+              resizeMode="contain"
             />
-          ))}
+          </View>
+          <Text style={{
+            fontSize: width * 0.1,
+            fontWeight: 'bold',
+            color: Colors.WHITE,
+            textShadowColor: Colors.LIGHT_PURPLE,
+            textShadowOffset: { width: 2, height: 2 },
+            textShadowRadius: 20,
+            letterSpacing: 5,
+            marginLeft: width * 0.025,
+            marginTop: height * 0.025,
+            marginBottom: height * 0.070
+          }}>
+            {t("Enter your code")}
+          </Text>
         </View>
 
-        {codeError && <Text style={styles.errorText}>{codeError}</Text>}
+        <View style={{ marginTop: -height * 0.07 }}>
+          <Text style={{
+            marginLeft: width * 0.04,
+            fontSize: width * 0.045,
+            color: Colors.WHITE,
+            textShadowColor: Colors.LIGHT_PURPLE,
+            textShadowOffset: { width: 2, height: 2 },
+            textShadowRadius: 7,
+            marginBottom: height * 0.02
+          }}>
+            {t("We've sent you a 6-digit code to")} {email}
+          </Text>
 
-        <View style={styles.resendContainer}>
-          <Text>{t("Did not receive a code?")}</Text>
-          <TouchableOpacity onPress={handleResendCode}>
-            <Text style={styles.resendText}>{t("Resend")}</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.timerContainer}>
-          {!isExpired ? (
-            <Text style={styles.timerText}>
-              {t('Code will expire in')} {timeLeft}
+          <View style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            marginBottom: 20,
+            marginTop: height * 0.03
+          }}>
+            {code.map((digit, index) => (
+              <TextInput
+                key={index}
+                ref={ref => codeInputRefs.current[index] = ref}
+                style={{
+                  borderBottomWidth: 2,
+                  borderBottomColor: digit ? Colors.LIGHT_PURPLE : Colors.WHITE,
+                  marginHorizontal: 5,
+                  width: 45,
+                  height: 50,
+                  textAlign: "center",
+                  fontSize: 18,
+                  fontWeight: 'bold',
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  borderRadius: 8,
+                  padding: 8,
+                  color: Colors.BLACK,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 3,
+                  elevation: 3,
+                }}
+                keyboardType="numeric"
+                maxLength={1}
+                value={digit}
+                onChangeText={(text) => handleCodeChange(text, index)}
+                onKeyPress={({ nativeEvent }) => {
+                  if (nativeEvent.key === 'Backspace' && digit === '' && index > 0) {
+                    // Handle backspace when field is empty
+                    codeInputRefs.current[index - 1]?.focus();
+                  }
+                }}
+                selectTextOnFocus={true}
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+              />
+            ))}
+          </View>
+
+          {codeError && <Text style={{ color: "red", textAlign: "center", marginTop: 10 }}>{codeError}</Text>}
+
+          <View style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            marginTop: 20
+          }}>
+            <Text style={{ color: Colors.WHITE, fontSize: width * 0.04 }}>{t("Did not receive a code?")}</Text>
+            <TouchableOpacity onPress={handleResendCode}>
+              <Text style={{ 
+                color: Colors.WHITE, 
+                marginLeft: 5, 
+                fontSize: width * 0.04,
+                textShadowColor: Colors.LIGHT_PURPLE,
+                textShadowOffset: { width: 1, height: 1 },
+                textShadowRadius: 3,
+              }}>{t("Resend")}</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={{
+            alignItems: 'center',
+            marginVertical: 20,
+          }}>
+            {!isExpired ? (
+              <Text style={{ 
+                fontSize: 16, 
+                color: Colors.WHITE,
+                textShadowColor: Colors.LIGHT_PURPLE,
+                textShadowOffset: { width: 1, height: 1 },
+                textShadowRadius: 3,
+              }}>
+                {t('Code will expire in')} {timeLeft}
+              </Text>
+            ) : (
+              <Text style={{ 
+                fontSize: 16, 
+                color: 'red',
+                textShadowColor: Colors.LIGHT_PURPLE,
+                textShadowOffset: { width: 1, height: 1 },
+                textShadowRadius: 3,
+              }}>
+                {t('Code has expired!')}
+              </Text>
+            )}
+          </View>
+
+          {/* Copyright Notice */}
+          <View
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'absolute',
+              marginTop: height * 1.1,
+              left: 0,
+              right: 0,
+            }}
+          >
+            <Text style={{ color: 'gray', fontSize: width * 0.035 }}>
+              © {new Date().getUTCFullYear()} - {t('Tawasalna - All Rights Reserved.')}
             </Text>
-          ) : (
-            <Text style={styles.expiredText}>
-              {t('Code has expired!')}
-            </Text>
-          )}
+          </View>
         </View>
-      </View>
 
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={Colors.PURPLE} />
-        </View>
-      )}
-    </SafeAreaView>
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={Colors.PURPLE} />
+          </View>
+        )}
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 
 const styles = {
-  container: {
-    marginTop: "20%",
-    paddingHorizontal: 20
-  },
-  title: {
-    fontSize: 40,
-    fontWeight: "bold",
-    marginBottom: 20,
-    marginLeft: 15
-  },
-  subtitle: {
-    fontSize: 12,
-    color: "gray",
-    fontStyle: "italic",
-    marginBottom: 40,
-    marginLeft: 15
-  },
-  codeContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 20
-  },
-  codeInput: {
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.PURPLE,
-    marginHorizontal: 5,
-    width: 40,
-    textAlign: "center",
-    fontSize: 16
-  },
-  resendContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 20
-  },
-  resendText: {
-    color: Colors.PURPLE,
-    marginLeft: 5
-  },
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    marginTop: 10
-  },
   loadingOverlay: {
     position: "absolute",
     top: 0,
@@ -154,19 +236,7 @@ const styles = {
   offlineIcon: {
     width: 80,
     height: 80
-  },
-  timerContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  timerText: {
-    fontSize: 16,
-    color: Colors.PURPLE,
-  },
-  expiredText: {
-    fontSize: 16,
-    color: 'red',
-  },
+  }
 };
 
 export default EnterCode;

@@ -12,7 +12,9 @@ import {
   Image,
   Modal,
   Pressable,
-  FlatList
+  FlatList,
+  Dimensions,
+  ImageBackground
 } from "react-native";
 import Colors from "../../../assets/Colors";
 import i18n from '../../../i18n'
@@ -56,6 +58,7 @@ const SignUp = () => {
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { t } = useTranslation();
+  const { width, height } = Dimensions.get('window');
   //////////////////////////////////////////////Language//////////////////////////////////////
  const inputStyles = {
     height: 50, // Set your desired height here
@@ -228,7 +231,7 @@ if (!fullname.trim()) {
 //         }
 //       }
 //       );
-// console.log(`responce of the addcommunity ${AddUserToCommunity}`)
+//console.log(`responce of the addcommunity ${AddUserToCommunity}`)
 
 
 
@@ -267,452 +270,548 @@ if (error.response.data.error==="User already exists"){
 
 
   return (
-    <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
-      <ScrollView style={{ marginTop: "0%" }}>
-          <View style={{ marginTop: '0%' }}>
-                <TouchableOpacity
-                  style={styles.languageSelector}
-                  onPress={() => setShowLanguagePicker(!showLanguagePicker)}
-                >
-                  <Image source={require('../../../assets/Icons/earth2.png')} style={styles.earthIcon} />
-                </TouchableOpacity>
-        
-                {showLanguagePicker && (
-          <Modal
-            transparent={true}
-            visible={showLanguagePicker}
-            onRequestClose={() => setShowLanguagePicker(false)}
-          >
-            <Pressable 
-              style={styles.modalOverlay} 
-              onPress={() => setShowLanguagePicker(false)}
+    <ImageBackground
+      source={require('../../../assets/ImgBackGoung.jpg')}
+      style={{ flex: 1, resizeMode: 'cover' }}
+    >
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <ScrollView style={{ marginTop: 0 }}>
+          <View style={{ marginTop: 0 }}>
+            <TouchableOpacity
+              style={styles.languageSelector}
+              onPress={() => setShowLanguagePicker(!showLanguagePicker)}
             >
-              <View style={styles.languageListContainer}>
-                <FlatList
-                  data={languages}
-                  keyExtractor={(item) => item.code}
-                  renderItem={({ item }) => (
-                    <Pressable
-                      style={styles.languageItem}
-                      onPress={() => {
-                        changeLanguage(item.code);
-                        setShowLanguagePicker(false);
-                      }}
-                    >
-                      <Image source={item.flag} style={styles.flagIcon} />
-                      <Text style={styles.languageText}>{item.name}</Text>
-                    </Pressable>
-                  )}
+              <Image source={require('../../../assets/Icons/earth2.png')} style={styles.earthIcon} />
+            </TouchableOpacity>
+            {/* Language Picker Modal unchanged */}
+            <View style={{
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+             width:width*1,
+              marginBottom: height * 0.015,
+              marginTop: 0
+            }}>
+              <View style={{
+               width: width * 1,
+               height: height * 0.08,
+           
+               backgroundColor: Colors.LIGHT_PURPLE,
+               paddingLeft: width * 0.040,
+               justifyContent: 'center',
+               top: 0
+              }}>
+                <Image
+                  source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
+                  style={{ width: width * 0.4, height: height * 0.06, marginRight: width * 0.02 }}
+                  resizeMode="contain"
                 />
               </View>
-            </Pressable>
-          </Modal>
-        )}
-              <View style={{
-          flexDirection: 'column',
-          alignItems: 'flex-start',
-          marginLeft: '5%',
-          marginBottom: 20,
-          marginTop:10
-        }}>
-              <View style={{
-        width: 384, height: 70,
-        marginLeft:-19,
-        backgroundColor:Colors.PURPLE,
-        paddingLeft:10,
-        top:-10
-   
-        }}>
-          <Image
-            source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
-            style={{ width: 150, height: 50, marginRight: 15 ,top:10}} // adjust size as needed
-            resizeMode="contain"
-          />
-          </View>
-          <Text style={{ fontSize: 50, fontWeight: 'bold' }}>{t('Register here')}</Text>
-        </View>
-              
-        
-                {isLoading && (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      bottom: 0,
-                      right: 0,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    }}
-                  >
-                    <ActivityIndicator size="large" color={Colors.PURPLE} />
-                  </View>
-                )}
-              </View>
-        <View style={{ marginTop: 0 }}>
-          <Text style={{ marginLeft: "4%" }}>
-            {t("FullName")}
-            <Text style={{ color: fullname.trim() ? "black" : "red" }}>*</Text>
-          </Text>
-          <View
-            style={{
-              borderColor: fullnameError ? "red" : "gray",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 8,
-              marginBottom: 10,
-              width: "92%",
-              marginLeft: "4%",
-              marginTop: 5,
-            }}
-          >
-            <TextInput
-              placeholder={t("Enter your Full Name")}
-              autoCapitalize="words"
-              autoCompleteType="name"
-              autoCorrect={false}
-              value={fullname}
-              onChangeText={(text) => {
-                setFullName(text);
-                if (text.trim()) {
-                  setFullNameError("");
-                }
-              }}
-            />
-          </View>
-          {fullnameError ? (
-            <Text style={{ color: "red", marginLeft: "7%" }}>
-              {fullnameError}
-            </Text>
-          ) : null}
-
-
-          <Text style={{ marginLeft: "4%" }}>
-            {t("Email")}
-            <Text style={{ color: email.trim() ? "black" : "red" }}>*</Text>
-          </Text>
-
-          <View
-            style={{
-              borderColor: emailError ? "red" : "gray",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 8,
-              marginBottom: 10,
-              width: "92%",
-              marginLeft: "4%",
-              marginTop: 5,
-            }}
-          >
-            <TextInput
-              placeholder={t("Enter your email address...")}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCompleteType="email"
-              autoCorrect={false}
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (text.trim()) {
-                  setEmailError("");
-                }
-              }}
-            />
-          </View>
-          {emailError || (!isValidEmail(email) && email.trim().length > 0) ? (
-            <Text style={{ color: "red", marginLeft: "7%" }}>
-              {emailError || "Invalid email address"}
-            </Text>
-          ) : null}
-
-          <Text style={{ marginLeft: "4%" }}>
-            {t("Password")}
-            <Text style={{ color: password.trim() ? "black" : "red" }}>*</Text>
-          </Text>
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              borderColor: passwordError ? "red" : "gray",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 8,
-              marginBottom: 10,
-              width: "92%",
-              marginLeft: "4%",
-              marginTop: 5,
-            }}
-          >
-            <TextInput
-              placeholder="*********"
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCompleteType="password"
-              autoCorrect={false}
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                const passwordValidation = isValidPassword(text);
-                let errorMessage = "";
-                if (!text.trim()) {
-                  errorMessage = "Password is required";
-                } else if (!passwordValidation.errors.minLength) {
-                  errorMessage =
-                    "Password must be at least 8 characters long.\n";
-                } else if (!passwordValidation.errors.uppercase) {
-                  errorMessage +=
-                    "Password must contain at least one uppercase letter.\n";
-                } else if (!passwordValidation.errors.lowercase) {
-                  errorMessage +=
-                    "Password must contain at least one lowercase letter.\n";
-                } else if (!passwordValidation.errors.symbol) {
-                  errorMessage +=
-                    "Password must contain at least one symbol(?,!,...).\n";
-                } else if (!passwordValidation.errors.number) {
-                  errorMessage +=
-                    "Password must contain at least one number.\n";
-                }
-                setPasswordError(errorMessage);
-              }}
-              style={{ flex: 1 }}
-            />
-            <TouchableOpacity onPress={toggleShowPassword}>
-              <MaterialCommunityIcons
-                name={showPassword ? "eye" : "eye-off"}
-                size={24}
-                color="black"
-              />
-            </TouchableOpacity>
-          </View>
-          {passwordError ? (
-            <Text style={{ color: "red", marginLeft: "7%" }}>
-              {passwordError}
-            </Text>
-          ) : null}
-          <Text style={{ marginLeft: "4%" }}>
-            {t("Confirm your password")}
-            <Text style={{ color: confirmPassword.trim() ? "black" : "red" }}>
-              *
-            </Text>
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              borderColor:
-                confirmpasswordError ||
-                  (confirmPassword.trim() && password !== confirmPassword)
-                  ? "red"
-                  : "gray",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 8,
-              marginBottom: 10,
-              width: "92%",
-              marginLeft: "4%",
-              marginTop: 5,
-            }}
-          >
-            <TextInput
-              placeholder="*********"
-              secureTextEntry={!showConfirmPassword}
-              autoCapitalize="none"
-              autoCompleteType="password"
-              autoCorrect={false}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              style={{ flex: 1 }}
-            />
-            <TouchableOpacity onPress={toggleShowConfirmPassword}>
-              <MaterialCommunityIcons
-                name={showConfirmPassword ? "eye" : "eye-off"}
-                size={24}
-                color="black"
-              />
-            </TouchableOpacity>
-          </View>
-          {confirmpasswordError ? (
-            <Text style={{ color: "red", marginLeft: "7%" }}>
-              {confirmpasswordError}
-            </Text>
-          ) : null}
-          <View style={{ marginLeft: "4%" }}>
-            <Text style={{ marginBottom: 5 }}>
-              {t("Community")}
-              <Text style={{ color: "red" }}>*</Text>
-            </Text>
-            <View
-              style={{
-                borderWidth: 1,
-                borderRadius: 8,
-                borderColor: communityError ? 'red' : 'gray',
-                width: 355,
-                marginBottom: 1,
-              }}
-            >
-              {isLoadingCommunities ? (
-                <ActivityIndicator size="small" color={Colors.PURPLE} />
-              ) : (
-                <Picker
-                  selectedValue={selectedCommunity}
-                  onValueChange={(itemValue) => {
-                    setSelectedCommunity(itemValue);
-                    setCommunityError('');
-                  }}
-                  style={{ color: Colors.BLACK }}
-                >
-                  <Picker.Item label={t("Select a community")} value="" />
-                  {communities.map((community) => (
-                    <Picker.Item
-                      key={community.id}
-                      label={community.name}
-                      value={community.id}
-                    />
-                  ))}
-                </Picker>
-              )}
+              <Text style={{
+                fontSize: width * 0.1,
+                fontWeight: 'bold',
+                color: Colors.WHITE,
+                textShadowColor: Colors.LIGHT_PURPLE,
+                textShadowOffset: { width: 2, height: 2 },
+                textShadowRadius: 20,
+                letterSpacing: 5,
+                marginLeft: width * 0.025,
+                marginTop: height * 0.025,
+                marginBottom: height * 0.070
+              }}>{t('Register here')}</Text>
             </View>
-            {communityError && (
-              <Text style={{ color: 'red', marginLeft: '3%' }}>{communityError}</Text>
+            {isLoading && (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  right: 0,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                }}
+              >
+                <ActivityIndicator size="large" color={Colors.PURPLE} />
+              </View>
             )}
           </View>
-          <Text style={{ marginLeft: "4%" ,marginTop:10}}>{t("Your ID")} </Text>
-
-          <View
-            style={{
-              borderColor: "gray",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 8,
-              marginBottom: 10,
-              width: "92%",
-              marginLeft: "4%",
-              marginTop: 5,
-            }}
-          >
-            <TextInput
-              placeholder="Enter your ID number..."
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={residentId}
-              onChangeText={setResidentId}
-            />
-          </View>
-        </View>
-        <View
-          style={{
-            alignItems: "center",
-            flexDirection: "row",
-            marginLeft: "2%",
-            marginTop: "3%",
-          }}
-        >
-          <TouchableOpacity
-            style={{ marginLeft: "5%" }}
-            onPress={toggleCheckbox}
-          >
-            <MaterialIcons
-              name={isChecked ? "check-box" : "check-box-outline-blank"}
-              size={20}
-              color={isChecked ? "green" : "black"}
-            />
-          </TouchableOpacity>
-          <Text style={{ marginLeft: 10 }}>{t("I accept the")} </Text>
-          <TouchableOpacity onPress={toggleTermsModal}>
-            <Text
+          <View style={{ marginTop: -height * 0.07 }}>
+            {/* FullName Label */}
+            <Text style={{
+              marginLeft: width * 0.04,
+              fontSize: width * 0.045,
+              color: Colors.WHITE,
+              textShadowColor: Colors.LIGHT_PURPLE,
+              textShadowOffset: { width: 2, height: 2 },
+              textShadowRadius: 7,
+            }}>
+              {t("FullName")}
+              <Text style={{ color: fullname.trim() ? "white" : "red" }}>*</Text>
+            </Text>
+            {/* FullName Input */}
+            <View
               style={{
-                color: Colors.PURPLE,
-                textDecorationLine: "underline",
+                borderColor: fullnameError ? "red" : "gray",
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 8,
+                marginBottom: 10,
+                width: width * 0.92,
+                marginLeft: width * 0.04,
+                marginTop: 5,
+                backgroundColor: '#F7F7F7',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 2,
               }}
             >
-              {t("Terms of Services")}
+              <TextInput
+                placeholder={t("Enter your Full Name")}
+                autoCapitalize="words"
+                autoCompleteType="name"
+                autoCorrect={false}
+                value={fullname}
+                onChangeText={(text) => {
+                  setFullName(text);
+                  if (text.trim()) {
+                    setFullNameError("");
+                  }
+                }}
+                style={{ fontSize: width * 0.045 }}
+              />
+            </View>
+            {fullnameError ? (
+              <Text style={{ color: "red", marginLeft: width * 0.07 }}>
+                {fullnameError}
+              </Text>
+            ) : null}
+            {/* Email Label */}
+            <Text style={{
+              marginLeft: width * 0.04,
+              fontSize: width * 0.045,
+              color: Colors.WHITE,
+              textShadowColor: Colors.LIGHT_PURPLE,
+              textShadowOffset: { width: 2, height: 2 },
+              textShadowRadius: 7,
+            }}>
+              {t("Email")}
+              <Text style={{ color: email.trim() ? "white" : "red" }}>*</Text>
+            </Text>
+            {/* Email Input */}
+            <View
+              style={{
+                borderColor: emailError ? "red" : "gray",
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 8,
+                marginBottom: 10,
+                width: width * 0.92,
+                marginLeft: width * 0.04,
+                marginTop: 5,
+                backgroundColor: '#F7F7F7',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 2,
+              }}
+            >
+              <TextInput
+                placeholder={t("Enter your email address...")}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCompleteType="email"
+                autoCorrect={false}
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (text.trim()) {
+                    setEmailError("");
+                  }
+                }}
+                style={{ fontSize: width * 0.045 }}
+              />
+            </View>
+            {emailError || (!isValidEmail(email) && email.trim().length > 0) ? (
+              <Text style={{ color: "red", marginLeft: width * 0.07 }}>
+                {emailError || "Invalid email address"}
+              </Text>
+            ) : null}
+            {/* Password Label */}
+            <Text style={{
+              marginLeft: width * 0.04,
+              fontSize: width * 0.045,
+              color: Colors.WHITE,
+              textShadowColor: Colors.LIGHT_PURPLE,
+              textShadowOffset: { width: 2, height: 2 },
+              textShadowRadius: 7,
+            }}>
+              {t("Password")}
+              <Text style={{ color: password.trim() ? "white" : "red" }}>*</Text>
+            </Text>
+            {/* Password Input */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                borderColor: passwordError ? "red" : "gray",
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 8,
+                marginBottom: 10,
+                width: width * 0.92,
+                marginLeft: width * 0.04,
+                marginTop: 5,
+                backgroundColor: '#F7F7F7',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 2,
+              }}
+            >
+              <TextInput
+                placeholder="*********"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCompleteType="password"
+                autoCorrect={false}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  const passwordValidation = isValidPassword(text);
+                  let errorMessage = "";
+                  if (!text.trim()) {
+                    errorMessage = "Password is required";
+                  } else if (!passwordValidation.errors.minLength) {
+                    errorMessage =
+                      "Password must be at least 8 characters long.\n";
+                  } else if (!passwordValidation.errors.uppercase) {
+                    errorMessage +=
+                      "Password must contain at least one uppercase letter.\n";
+                  } else if (!passwordValidation.errors.lowercase) {
+                    errorMessage +=
+                      "Password must contain at least one lowercase letter.\n";
+                  } else if (!passwordValidation.errors.symbol) {
+                    errorMessage +=
+                      "Password must contain at least one symbol(?,!,...).\n";
+                  } else if (!passwordValidation.errors.number) {
+                    errorMessage +=
+                      "Password must contain at least one number.\n";
+                  }
+                  setPasswordError(errorMessage);
+                }}
+                style={{ flex: 1, fontSize: width * 0.045 }}
+              />
+              <TouchableOpacity onPress={toggleShowPassword}>
+                <MaterialCommunityIcons
+                  name={showPassword ? "eye" : "eye-off"}
+                  size={24}
+                  color="black"
+                />
+              </TouchableOpacity>
+            </View>
+            {passwordError ? (
+              <Text style={{ color: "red", marginLeft: width * 0.07 }}>
+                {passwordError}
+              </Text>
+            ) : null}
+            {/* Confirm Password Label */}
+            <Text style={{
+              marginLeft: width * 0.04,
+              fontSize: width * 0.045,
+              color: Colors.WHITE,
+              textShadowColor: Colors.LIGHT_PURPLE,
+              textShadowOffset: { width: 2, height: 2 },
+              textShadowRadius: 7,
+            }}>
+              {t("Confirm your password")}
+              <Text style={{ color: confirmPassword.trim() ? "white" : "red" }}>*</Text>
+            </Text>
+            {/* Confirm Password Input */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                borderColor:
+                  confirmpasswordError ||
+                  (confirmPassword.trim() && password !== confirmPassword)
+                    ? "red"
+                    : "gray",
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 8,
+                marginBottom: 10,
+                width: width * 0.92,
+                marginLeft: width * 0.04,
+                marginTop: 5,
+                backgroundColor: '#F7F7F7',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 2,
+              }}
+            >
+              <TextInput
+                placeholder="*********"
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                autoCompleteType="password"
+                autoCorrect={false}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                style={{ flex: 1, fontSize: width * 0.045 }}
+              />
+              <TouchableOpacity onPress={toggleShowConfirmPassword}>
+                <MaterialCommunityIcons
+                  name={showConfirmPassword ? "eye" : "eye-off"}
+                  size={24}
+                  color="black"
+                />
+              </TouchableOpacity>
+            </View>
+            {confirmpasswordError ? (
+              <Text style={{ color: "red", marginLeft: width * 0.07 }}>
+                {confirmpasswordError}
+              </Text>
+            ) : null}
+            {/* Community Label */}
+            <View style={{ marginLeft: width * 0.04 }}>
+              <Text style={{
+                marginBottom: 5,
+                fontSize: width * 0.045,
+                color: Colors.WHITE,
+                textShadowColor: Colors.LIGHT_PURPLE,
+                textShadowOffset: { width: 2, height: 2 },
+                textShadowRadius: 7,
+              }}>
+                {t("Community")}
+                <Text style={{ color: "red" }}>*</Text>
+              </Text>
+              <View
+                style={{
+                  borderWidth: 1,
+                  borderRadius: 12,
+                  borderColor: communityError ? 'red' : 'gray',
+                  width: width * 0.92,
+                  marginBottom: 1,
+                  backgroundColor: '#F7F7F7',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 2,
+                  elevation: 2,
+                }}
+              >
+                {isLoadingCommunities ? (
+                  <ActivityIndicator size="small" color={Colors.PURPLE} />
+                ) : (
+                  <Picker
+                    selectedValue={selectedCommunity}
+                    onValueChange={(itemValue) => {
+                      setSelectedCommunity(itemValue);
+                      setCommunityError('');
+                    }}
+                    style={{ color: Colors.BLACK, fontSize: width * 0.045 }}
+                  >
+                    <Picker.Item label={t("Select a community")} value="" />
+                    {communities.map((community) => (
+                      <Picker.Item
+                        key={community.id}
+                        label={community.name}
+                        value={community.id}
+                      />
+                    ))}
+                  </Picker>
+                )}
+              </View>
+              {communityError && (
+                <Text style={{ color: 'red', marginLeft: width * 0.03 }}>{communityError}</Text>
+              )}
+            </View>
+            {/* Resident ID Label */}
+            <Text style={{
+              marginLeft: width * 0.04,
+              marginTop: 10,
+              fontSize: width * 0.045,
+              color: Colors.WHITE,
+              textShadowColor: Colors.LIGHT_PURPLE,
+              textShadowOffset: { width: 2, height: 2 },
+              textShadowRadius: 7,
+            }}>{t("Your ID")}</Text>
+            {/* Resident ID Input */}
+            <View
+              style={{
+                borderColor: "gray",
+                borderWidth: 1,
+                borderRadius: 12,
+                padding: 8,
+                marginBottom: 10,
+                width: width * 0.92,
+                marginLeft: width * 0.04,
+                marginTop: 5,
+                backgroundColor: '#F7F7F7',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+                elevation: 2,
+              }}
+            >
+              <TextInput
+                placeholder="Enter your ID number..."
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={residentId}
+                onChangeText={setResidentId}
+                style={{ fontSize: width * 0.045 }}
+              />
+            </View>
+          </View>
+          {/* Checkbox and Terms */}
+          <View
+            style={{
+              alignItems: "center",
+              flexDirection: "row",
+              marginLeft: width * 0.02,
+              marginTop: height * 0.03,
+            }}
+          >
+            <TouchableOpacity
+              style={{ marginLeft: width * 0.02 }}
+              onPress={toggleCheckbox}
+            >
+              <MaterialIcons
+                name={isChecked ? "check-box" : "check-box-outline-blank"}
+                size={22}
+                color={isChecked ? "green" : "white"}
+              />
+            </TouchableOpacity>
+            <Text style={{ fontSize: width * 0.04, marginLeft: 10, color: Colors.WHITE }}>{t("I accept the")} </Text>
+            <TouchableOpacity onPress={toggleTermsModal}>
+              <Text
+                style={{
+                  fontSize: width * 0.040,
+                  color: Colors.WHITE,
+                  textShadowColor: Colors.LIGHT_PURPLE,
+                  textShadowOffset: { width: 2, height: 2 },
+                  textShadowRadius: 7,
+                }}
+              >
+                {t("Terms of Services")}
+              </Text>
+            </TouchableOpacity>
+            <Termsofservices
+              isVisible={isTermsModalVisible}
+              onClose={toggleTermsModal}
+            />
+            <Text style={{ fontSize: width * 0.04, color: Colors.WHITE }}> {t("and")} </Text>
+          </View>
+          <TouchableOpacity onPress={togglePrivacyPolicyModal}>
+            <Text
+              style={{
+                fontSize: width * 0.040,
+                color: Colors.WHITE,
+                textShadowColor: Colors.LIGHT_PURPLE,
+                textShadowOffset: { width: 2, height: 2 },
+                textShadowRadius: 7,
+                marginLeft:width*0.125
+              }}
+            >
+              {t("Privacy Policy.")}
             </Text>
           </TouchableOpacity>
-          <Termsofservices
-            isVisible={isTermsModalVisible}
-            onClose={toggleTermsModal}
+          <PrivacyPolicy
+            isVisible={isPrivacyPolicyModalVisible}
+            onClose={togglePrivacyPolicyModal}
           />
-          <Text> {t("and")} </Text>
-        </View>
-        <TouchableOpacity onPress={togglePrivacyPolicyModal}>
-          <Text
+          {!isChecked && (
+            <Text style={{ color: "red", marginLeft: width * 0.07 }}>
+              {termspolicyError}
+            </Text>
+          )}
+          {/* Submit Button */}
+          <View>
+            <TouchableOpacity
+              onPress={handleSignUp}
+              style={{
+                borderRadius: width * 0.03,
+                padding: width * 0.03,
+                marginBottom: height * 0.03,
+                alignSelf: 'center',
+                alignItems: 'center',
+                backgroundColor: Colors.LIGHT_PURPLE,
+                width: width * 0.92,
+                marginLeft: width * 0.01,
+                marginTop: height * 0.05,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 4,
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: width * 0.05, fontWeight: 'bold' }}>{t("Submit")}</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Already have an account? */}
+          <View
             style={{
-              color: Colors.PURPLE,
-              textDecorationLine: "underline",
-              marginLeft: "15%",
+              flexDirection: "row",
+              marginLeft: width * 0.28,
+              marginTop: height * 0.05,
+              marginBottom: height * 0.03
             }}
           >
-            {t("Privacy Policy.")}
-          </Text>
-        </TouchableOpacity>
-        <PrivacyPolicy
-          isVisible={isPrivacyPolicyModalVisible}
-          onClose={togglePrivacyPolicyModal}
-        />
-        {!isChecked && (
-          <Text style={{ color: "red", marginLeft: "7%" }}>
-            {termspolicyError}
-          </Text>
-        )}
-        <View>
+            <Text style={{ alignItems: "center", fontSize: width * 0.04, color: Colors.WHITE }}>
+              {t("Already have an account?")}
+            </Text>
+          </View>
           <TouchableOpacity
-            onPress={handleSignUp}
+            onPress={navigateToLogin}
+            style={{ alignItems: "center" }}
+          >
+            <Text style={{ color: Colors.WHITE, marginLeft: width * 0.05, marginBottom: height * 0.1, fontSize: width * 0.04 }}>
+              {t("Login now!")}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Copyright Notice */}
+          <View
             style={{
-              borderColor: "gray",
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: 13,
-              marginBottom: 10,
-              width: "92%",
-              marginLeft: "4%",
-              alignItems: "center",
-              backgroundColor: Colors.PURPLE,
-              marginTop: "5%",
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: height * 0.05,
+              marginBottom: height * 0.05,
             }}
           >
-            <Text style={{ color: Colors.LIGHT_WHITE }}>{t("Submit")}</Text>
-          </TouchableOpacity>
-        </View>
-        <View
-          style={{
-            flexDirection: "row",
-            marginLeft: "28%",
-            marginTop: "5%",
-            marginBottom: '3%'
-          }}
-        >
-          <Text style={{ alignItems: "center" }}>
-            {t("Already have an account?")}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={navigateToLogin}
-          style={{ alignItems: "center" }}
-        >
-          <Text style={{ color: Colors.PURPLE, marginLeft: "5%", marginBottom: '10%' }}>
-            {t("Login now!")}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-      {isLoading && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            bottom: 0,
-            right: 0,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-          }}
-        >
-          <ActivityIndicator size="large" color={Colors.PURPLE} />
-        </View>
-      )}
-    </SafeAreaView>
+            <Text style={{ color: 'gray', fontSize: width * 0.035 }}>
+              © {new Date().getUTCFullYear()} - {t('Tawasalna - All Rights Reserved.')}
+            </Text>
+          </View>
+        </ScrollView>
+        {isLoading && (
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              bottom: 0,
+              right: 0,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            <ActivityIndicator size="large" color={Colors.PURPLE} />
+          </View>
+        )}
+      </SafeAreaView>
+    </ImageBackground>
   );
 };
 const styles = {

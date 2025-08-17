@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+//import { usePushNotifications } from '../utils/usePushNotifications';
 
 import { AuthService } from '../services/auth.service';
 import { useTranslation } from 'react-i18next';
 import { useNetworkMonitor } from './useNetworkMonitor';
 
 export const useLogin = () => {
+  //const { expoPushToken, notification } = usePushNotifications();
+
   const navigation = useNavigation();
   const { t } = useTranslation();
   const isConnected = useNetworkMonitor();
@@ -48,6 +51,7 @@ export const useLogin = () => {
     checkRememberMe();
   }, []);
 
+  
   // Form validation
   const validateForm = () => {
     const errors = {};
@@ -63,14 +67,20 @@ export const useLogin = () => {
 
   // Login handler
   const handleLogin = async () => {
+    console.log("Login button clicked");
     if (!validateForm()) return;
-
+   
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
+      //console.log("Expo Push Token:", expoPushToken);
+
+   //   const pushNotificationToken = await registerForPushNotificationsAsync();
+   //   console.log("Push Token:", pushNotificationToken);
       const response = await AuthService.login({
         email: state.email,
-        password: state.password
+        password: state.password,
+       // pushNotificationToken: pushNotificationToken|| null,
       });
       console.log(response)
       if (!response.roles?.includes("ROLE_COMMUNITY_MEMBER")) {

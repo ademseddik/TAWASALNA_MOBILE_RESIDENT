@@ -4,13 +4,13 @@
     "slug": "TAWASALNA",
     "version": "1.0.0",
     "orientation": "portrait",
-    
+    "icon": "./assets/Icons/logoc.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/Icons/logoc.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#900562"
     },
     "ios": {
       "supportsTablet": true,
@@ -21,19 +21,17 @@
       }
     },
     "android": {
-      "icon": "./assets/Icons/logoc.png",
+     
 
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/Icons/logoc.png",
-        "backgroundColor": "#FFFFFF"
-      },
+
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "CAMERA"
       ],
       "splash": {
         "resizeMode": "contain",
         "image": "./assets/Icons/logoc.png",
-        "backgroundColor": "#2A003A"
+        "backgroundColor": "#900562"
       },
       "package": "com.adem1.TAWASALNA"
     },
@@ -42,7 +40,13 @@
     },
     "plugins": [
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access camera to scan QR codes."
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -1,16 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { APP_ENV } from '../../utils/BaseUrl';
 import { ScrollView } from 'react-native-gesture-handler';
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
 import Colors from '../../../assets/Colors';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 function FriendsRoute({ userId, navigation }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [relationships, setRelationships] = useState({ followers: [], following: [] });
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnims = useRef({}).current;
 
   const fetchUserProfile = async (id) => {
     try {
@@ -77,6 +83,24 @@ function FriendsRoute({ userId, navigation }) {
     fetchUsers();
   }, []);
 
+  // Initialize animations
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
+
   const followerIds = relationships.followers.map(u => (typeof u === 'string' ? u : u._id));
   const followingIds = relationships.following.map(u => (typeof u === 'string' ? u : u._id));
 
@@ -91,60 +115,119 @@ function FriendsRoute({ userId, navigation }) {
     return true; // All
   });
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.filterContainer}>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'all' && styles.activeFilter]}
-          onPress={() => setFilter('all')}
-        >
-          <Text style={styles.filterText}>All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'followers' && styles.activeFilter]}
-          onPress={() => setFilter('followers')}
-        >
-          <Text style={styles.filterText}>Followers</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterButton, filter === 'following' && styles.activeFilter]}
-          onPress={() => setFilter('following')}
-        >
-          <Text style={styles.filterText}>Following</Text>
-        </TouchableOpacity>
-      </View>
+  const getScaleAnim = (id) => {
+    if (!scaleAnims[id]) {
+      scaleAnims[id] = new Animated.Value(1);
+    }
+    return scaleAnims[id];
+  };
 
-      {loading ? (
-        <LottieView source={loadingAnimation} autoPlay loop style={styles.loadingAnimation} />
-      ) : filteredUsers.length === 0 ? (
-        <View style={styles.noUsersContainer}>
-          <Text style={styles.noUsersText}>No users found</Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.listContent}>
-          {filteredUsers.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.userCard}
-              onPress={() => navigation.navigate("UsersProfile", { userId: item.id })}
-            >
+  const handlePressIn = (id) => {
+    Animated.spring(getScaleAnim(id), {
+      toValue: 0.98,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 8,
+    }).start();
+  };
+
+  const handlePressOut = (id) => {
+    Animated.spring(getScaleAnim(id), {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 8,
+    }).start();
+  };
+
+  const renderEmptyState = () => (
+    <Animated.View style={[styles.emptyContainer, { opacity: fadeAnim }]}>
+      <View style={styles.emptyIconContainer}>
+        <MaterialCommunityIcons name="account-group" size={48} color={Colors.LIGHT_PURPLE} />
+      </View>
+      <Text style={styles.emptyTitle}>No connections yet</Text>
+      <Text style={styles.emptySubtitle}>
+        Start connecting with people in your community
+      </Text>
+    </Animated.View>
+  );
+
+  const renderUserCard = ({ item, index }) => {
+    const scaleAnim = getScaleAnim(item.id);
+
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={styles.userCard}
+        onPress={() => navigation.navigate("UsersProfile", { userId: item.id })}
+        onPressIn={() => handlePressIn(item.id)}
+        onPressOut={() => handlePressOut(item.id)}
+        activeOpacity={0.9}
+      >
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <View style={styles.userCardContent}>
+            <View style={styles.avatarContainer}>
               <Image
                 source={{ uri: item.residentProfile?.profilephoto || 'https://placeholder.com/avatar' }}
                 style={styles.avatar}
               />
-              <View style={styles.userInfo}>
-                <Text style={styles.username}>{item.residentProfile?.fullName || 'Unknown'}</Text>
-                <Text style={styles.bio}>
-                  {item.residentProfile?.bio?.length > 30
-                    ? `${item.residentProfile.bio.slice(0, 30)}...`
-                    : item.residentProfile?.bio || 'No bio available'}
-                </Text>
-              </View>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.username}>{item.residentProfile?.fullName || 'Unknown'}</Text>
+              <Text style={styles.bio}>
+                {item.residentProfile?.bio?.length > 30
+                  ? `${item.residentProfile.bio.slice(0, 30)}...`
+                  : item.residentProfile?.bio || 'No bio available'}
+              </Text>
+            </View>
+            <View style={styles.actionContainer}>
               <TouchableOpacity style={styles.viewProfileButton}>
-                <Text style={styles.buttonText}>View Profile</Text>
+                <MaterialCommunityIcons name="account-arrow-right" size={16} color="#fff" />
+                <Text style={styles.buttonText}>View</Text>
               </TouchableOpacity>
-            </TouchableOpacity>
-          ))}
+            </View>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <Animated.View style={[styles.filterContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        <TouchableOpacity
+          style={[styles.filterButton, filter === 'all' && styles.filterButtonActive]}
+          onPress={() => setFilter('all')}
+        >
+          <Text style={[styles.filterButtonText, filter === 'all' && styles.filterButtonTextActive]}>All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterButton, filter === 'followers' && styles.filterButtonActive]}
+          onPress={() => setFilter('followers')}
+        >
+          <Text style={[styles.filterButtonText, filter === 'followers' && styles.filterButtonTextActive]}>Followers</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterButton, filter === 'following' && styles.filterButtonActive]}
+          onPress={() => setFilter('following')}
+        >
+          <Text style={[styles.filterButtonText, filter === 'following' && styles.filterButtonTextActive]}>Following</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <LottieView source={loadingAnimation} autoPlay loop style={styles.loadingAnimation} />
+          <Text style={styles.loadingText}>Loading connections...</Text>
+        </View>
+      ) : filteredUsers.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <ScrollView 
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredUsers.map((item, index) => renderUserCard({ item, index }))}
         </ScrollView>
       )}
     </View>
@@ -152,51 +235,149 @@ function FriendsRoute({ userId, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   filterContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginVertical: 10,
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   filterButton: {
-    backgroundColor: '#ddd',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginHorizontal: 5,
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
-  activeFilter: { backgroundColor: Colors.LIGHT_PURPLE },
-  filterText: { color: 'black', fontSize: 14, fontWeight: '500' },
-  noUsersContainer: {
+  filterButtonActive: {
+    backgroundColor: Colors.LIGHT_PURPLE,
+    borderColor: Colors.LIGHT_PURPLE,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  noUsersText: { fontSize: 18, color: '#777', fontWeight: 'bold' },
-  listContent: { paddingHorizontal: 15, paddingTop: 10 },
-  loadingAnimation: { width: 600, height: 500, alignSelf: 'center' },
+  loadingAnimation: {
+    width: 200,
+    height: 200,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
   userCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    overflow: 'hidden',
+  },
+  userCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    elevation: 2,
+    padding: 16,
   },
-  avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 15 },
-  userInfo: { flex: 1 },
-  username: { fontWeight: 'bold', fontSize: 16, marginBottom: 4 },
-  bio: { fontSize: 14, color: '#666', maxWidth: 140 },
+  avatarContainer: {
+    marginRight: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  username: {
+    fontWeight: '600',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  bio: {
+    fontSize: 14,
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  actionContainer: {
+    marginLeft: 12,
+  },
   viewProfileButton: {
     backgroundColor: Colors.LIGHT_PURPLE,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    width: 100,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    shadowColor: Colors.LIGHT_PURPLE,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  buttonText: { color: 'white', fontSize: 12, fontWeight: '400' },
+  buttonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
 });
 
 export default FriendsRoute;

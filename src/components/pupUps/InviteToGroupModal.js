@@ -5,131 +5,320 @@ import {
   Modal,
   TouchableOpacity,
   Image,
-  ScrollView,
+  FlatList,
   TextInput,
+  ActivityIndicator,
+  Dimensions,
+  StatusBar,
 } from "react-native";
-import { AntDesign } from "@expo/vector-icons";
+import { AntDesign, Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
 import Colors from "../../../assets/Colors";
 import Axios from 'axios';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 
+const { width, height } = Dimensions.get('window');
+
 const InviteToGroupModal = ({ isVisible, onClose, groupId }) => {
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const [selectedFriends, setSelectedFriends] = useState([]);
-  const [data, setData] = useState([]);
-  const [ setUserIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const [currentUserId, setCurrentUserId] = useState(null);
-
-  useEffect(() => {
-    const fetchCurrentUserId = async () => {
-      try {
-        const userId = await AsyncStorage.getItem("userId");
-        setCurrentUserId(userId);
-      } catch (error) {
-        console.error("Error getting current user ID:", error);
-      }
-    };
-
-    fetchCurrentUserId();
-  }, []);
-
-
-
-  // useEffect(() => {
-  //   const fetchProfilePhotos = async () => {
-  //     try {
-  //       const promises = userIds.map(async (userId) => {
-  //         const response = await Axios.get(
-  //           `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
-  //           { responseType: "arraybuffer" }
-  //         );
-  //         const base64Image = encode(response.data);
-  //         return response.data;
-  //       });
-  //       const profilePics = await Promise.all(promises);
-  //       setProfilePic(profilePics);
-  //     } catch (error) {
-  //       console.error("Error getting resident profile photos:", error.message);
-  //     }
-  //   };
-
-  //   fetchProfilePhotos();
-  // }, [userIds]);
-
-  const SearchUsers = async (fullName) => {
+  // Fetch users from community
+  const fetchUsers = async () => {
+    setLoading(true);
     try {
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/usersByFullName?fullName=${fullName}`
+      const userId = await AsyncStorage.getItem("userId");
+      const communityId = await AsyncStorage.getItem("USERCOMMUNITY");
+      
+      const response = await fetch(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getUserByCommunityid/${userId}`
       );
-
-      if (response.data && Array.isArray(response.data)) {
-        const usersProfiles = response.data;
-        const filteredUsers = usersProfiles.filter(
-          (user) => user.id !== currentUserId
-        );
-        setData(filteredUsers);
-        const ids = filteredUsers.map((user) => user.id);
-        setUserIds(ids);
-      } else {
-        console.log("No Users found.");
-        setData([]);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
       }
+      
+      const data = await response.json();
+      
+             // Filter out current user and format data
+       const formattedUsers = data
+         .filter(user => user.id !== userId)
+         .map(user => ({
+           id: user.id,
+           name: user.name || 'Unknown User',
+           avatar: user.image || 'https://via.placeholder.com/100',
+           bio: user.description || '',
+         }));
+      
+      setUsers(formattedUsers);
+      setFilteredUsers(formattedUsers);
     } catch (error) {
-      console.error("Error getting User profile:", error);
+      console.error("Error fetching users:", error);
+      Toast.show({
+        type: "error",
+        text1: "Failed to load users",
+        text2: "Please try again",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const InviteUserToGroup = async () => {
-  try {
-    const inviterId = currentUserId;
-    if (!selectedFriends || selectedFriends.length === 0) {
-      throw new Error("No friends selected for invitation.");
+  // Load users when modal opens
+  useEffect(() => {
+    if (isVisible) {
+      fetchUsers();
     }
+  }, [isVisible]);
 
-    const inviteeIds = selectedFriends.map((user) => {
-      if (!user.id) {
-        throw new Error(`User object missing 'id': ${JSON.stringify(user)}`);
-      }
-      return user.id;
-    });
-
-  console.log("Inviting users:", inviteeIds);
-
-    const response = await Promise.all(
-      inviteeIds.map((id) => 
-      
-        Axios.post(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/inviteToGroup/${groupId}/${inviterId}/${id}`)
-      )
-    );
-
-    console.log("Response", response.map((res) => res.data));
-
-    const responseMessages = response.map((res) => res.data).join(", ");
-
-    Toast.show({
-      type: "success",
-      text1: responseMessages,
-      visibilityTime: 3000,
-      autoHide: true,
-    });
-
-    setSelectedFriends([]);
-  } catch (error) {
-    console.error("Error inviting to Group", error.message || error);
-  }
-};
-
-  const handleFriendSelection = (user) => {
-    if (!selectedFriends.some((friend) => friend.id === user.id)) {
-      setSelectedFriends([...selectedFriends, user]);
+  // Filter users based on search
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setFilteredUsers(users);
     } else {
-      setSelectedFriends(
-        selectedFriends.filter((friend) => friend.id !== user.id)
+      const filtered = users.filter(user =>
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.bio.toLowerCase().includes(searchQuery.toLowerCase())
       );
+      setFilteredUsers(filtered);
     }
+  }, [searchQuery, users]);
+
+  // Handle user selection
+  const toggleUserSelection = (user) => {
+    setSelectedUsers(prev => {
+      const isSelected = prev.some(u => u.id === user.id);
+      if (isSelected) {
+        return prev.filter(u => u.id !== user.id);
+      } else {
+        return [...prev, user];
+      }
+    });
+  };
+
+  // Send invitations
+  const sendInvitations = async () => {
+    if (selectedUsers.length === 0) {
+      Toast.show({
+        type: "info",
+        text1: "Please select users to invite",
+      });
+      return;
+    }
+
+    setSending(true);
+    try {
+      const currentUserId = await AsyncStorage.getItem("userId");
+      
+      const invitations = await Promise.all(
+        selectedUsers.map(user =>
+          Axios.post(
+            `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/inviteToGroup/${groupId}/${currentUserId}/${user.id}`
+          )
+        )
+      );
+
+      const successCount = invitations.filter(res => res.status === 200).length;
+      
+      Toast.show({
+        type: "success",
+        text1: `Invitations sent successfully!`,
+        text2: `${successCount} out of ${selectedUsers.length} invitations sent`,
+      });
+
+      setSelectedUsers([]);
+      onClose();
+    } catch (error) {
+      console.error("Error sending invitations:", error);
+      Toast.show({
+        type: "error",
+        text1: "Failed to send invitations",
+        text2: "Please try again",
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Render individual user item
+  const renderUserItem = ({ item: user }) => {
+    const isSelected = selectedUsers.some(u => u.id === user.id);
+    
+    return (
+      <TouchableOpacity
+        onPress={() => toggleUserSelection(user)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 16,
+          paddingHorizontal: 20,
+          backgroundColor: isSelected ? Colors.LIGHT_PURPLE + '15' : 'transparent',
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.PLATINUM,
+        }}
+        activeOpacity={0.7}
+      >
+        {/* Avatar */}
+        <View style={{ position: 'relative' }}>
+          <Image
+            source={{ uri: user.avatar }}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 28,
+              borderWidth: 2,
+              borderColor: isSelected ? Colors.LIGHT_PURPLE : Colors.PLATINUM,
+            }}
+          />
+          {isSelected && (
+            <View style={{
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              backgroundColor: Colors.LIGHT_PURPLE,
+              borderRadius: 16,
+              width: 24,
+              height: 24,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderWidth: 2,
+              borderColor: 'white',
+            }}>
+              <Feather name="check" size={12} color="white" />
+            </View>
+          )}
+        </View>
+
+        {/* User Info */}
+        <View style={{ flex: 1, marginLeft: 16 }}>
+          <Text style={{
+            fontSize: 16,
+            fontWeight: '600',
+            color: Colors.BLACK,
+            marginBottom: 4,
+          }}>
+            {user.name}
+          </Text>
+          {user.bio && (
+            <Text style={{
+              fontSize: 14,
+              color: Colors.GunmetalGray,
+              lineHeight: 18,
+            }} numberOfLines={2}>
+              {user.bio}
+            </Text>
+          )}
+        </View>
+
+        {/* Selection Indicator */}
+        <View style={{
+          width: 24,
+          height: 24,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: isSelected ? Colors.LIGHT_PURPLE : Colors.GunmetalGray,
+          backgroundColor: isSelected ? Colors.LIGHT_PURPLE : 'transparent',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          {isSelected && (
+            <Feather name="check" size={14} color="white" />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Render selected users chips
+  const renderSelectedChips = () => {
+    if (selectedUsers.length === 0) return null;
+
+    return (
+      <View style={{
+        backgroundColor: Colors.LIGHT_PURPLE + '10',
+        borderRadius: 16,
+        padding: 16,
+        marginHorizontal: 20,
+        marginBottom: 16,
+      }}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}>
+          <Text style={{
+            fontSize: 14,
+            fontWeight: '600',
+            color: Colors.LIGHT_PURPLE,
+          }}>
+            Selected ({selectedUsers.length})
+          </Text>
+          <TouchableOpacity
+            onPress={() => setSelectedUsers([])}
+            style={{
+              padding: 4,
+            }}
+          >
+            <Text style={{
+              fontSize: 12,
+              color: Colors.GunmetalGray,
+            }}>
+              Clear all
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        <FlatList
+          data={selectedUsers}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item: user }) => (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: Colors.LIGHT_PURPLE + '20',
+              borderRadius: 20,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              marginRight: 8,
+            }}>
+              <Image
+                source={{ uri: user.avatar }}
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  marginRight: 6,
+                }}
+              />
+              <Text style={{
+                fontSize: 12,
+                fontWeight: '500',
+                color: Colors.LIGHT_PURPLE,
+                marginRight: 4,
+              }}>
+                {user.name}
+              </Text>
+              <TouchableOpacity
+                onPress={() => toggleUserSelection(user)}
+                style={{
+                  padding: 2,
+                }}
+              >
+                <Feather name="x" size={12} color={Colors.LIGHT_PURPLE} />
+              </TouchableOpacity>
+            </View>
+          )}
+          keyExtractor={item => item.id}
+        />
+      </View>
+    );
   };
 
   return (
@@ -138,115 +327,210 @@ const InviteToGroupModal = ({ isVisible, onClose, groupId }) => {
       transparent={true}
       visible={isVisible}
       onRequestClose={onClose}
-      
     >
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-        }}
-      >
-        <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 20,
-            padding: 20,
-            width: "90%",
-            maxWidth: 500,
-            marginTop: "20%",
-          }}
-        >
-          <View
-            style={{
-              borderTopColor: Colors.GunmetalGray,
-              borderRadius: 13,
-              borderTopWidth: 4,
-              marginTop: -10,
-              width: 40,
-              marginLeft: "auto",
-              marginRight: "auto",
-            }}
-          />
-          <View
-   style={{
-    flexDirection: "row",
-    backgroundColor: Colors.PLATINUM,
-    borderRadius: 13,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: "center", // <== This ensures vertical centering
-            }}
-          >
-            <AntDesign
-              name="search1"
-              size={20}
+      <StatusBar backgroundColor="rgba(0,0,0,0.5)" barStyle="light-content" />
+      
+      <View style={{
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        justifyContent: 'flex-end',
+      }}>
+        <View style={{
+          backgroundColor: 'white',
+          borderTopLeftRadius: 24,
+          borderTopRightRadius: 24,
+          minHeight: height * 0.7,
+          maxHeight: height * 0.9,
+        }}>
+          {/* Header */}
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 24,
+            paddingTop: 20,
+            paddingBottom: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: Colors.PLATINUM,
+          }}>
+            <View>
+              <Text style={{
+                fontSize: 24,
+                fontWeight: 'bold',
+                color: Colors.BLACK,
+                marginBottom: 4,
+              }}>
+                Invite to Group
+              </Text>
+              <Text style={{
+                fontSize: 14,
+                color: Colors.GunmetalGray,
+              }}>
+                Select users to invite
+              </Text>
+            </View>
+            
+            <TouchableOpacity
+              onPress={onClose}
               style={{
-                marginLeft: "2%",
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: Colors.PLATINUM,
+                justifyContent: 'center',
+                alignItems: 'center',
               }}
-            />
-            <TextInput
-              placeholder="Search"
-              keyboardType="default"
-              style={{ marginLeft: 10, flex: 1 }}
-              value={searchKeyword}
-              onChangeText={(text) => {
-                setSearchKeyword(text);
-                SearchUsers(text);
-              }}
-            />
+            >
+              <Ionicons name="close" size={24} color={Colors.BLACK} />
+            </TouchableOpacity>
           </View>
-          <ScrollView style={{ height: 300 }}>
-            {data.map((user, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => handleFriendSelection(user)}
+
+          {/* Search Bar */}
+          <View style={{
+            paddingHorizontal: 24,
+            paddingVertical: 20,
+          }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: Colors.PLATINUM,
+              borderRadius: 16,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}>
+              <AntDesign name="search1" size={20} color={Colors.GunmetalGray} />
+              <TextInput
+                placeholder="Search users by name or bio..."
+                placeholderTextColor={Colors.GunmetalGray}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 10, 
-                  paddingVertical: 5, 
+                  flex: 1,
+                  marginLeft: 12,
+                  fontSize: 16,
+                  color: Colors.BLACK,
                 }}
-              >
-                <Image
-                  source={{ uri: user.residentProfile.profilephoto }}
-                  style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 25,
-                    borderColor: selectedFriends.some(
-                      (friend) => friend.id === user.id
-                    )
-                      ? Colors.LIGHT_PURPLE
-                      : "transparent",
-                    borderWidth: selectedFriends.some(
-                      (friend) => friend.id === user.id
-                    )
-                      ? 2
-                      : 0,
-                  }}
-                />
-                <Text style={{ marginLeft: 10 }}>
-                  {user.residentProfile.fullName}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={20} color={Colors.GunmetalGray} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Selected Users */}
+          {renderSelectedChips()}
+
+          {/* Users List */}
+          <View style={{ flex: 1 }}>
+            {loading ? (
+              <View style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingVertical: 60,
+              }}>
+                <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} />
+                <Text style={{
+                  marginTop: 16,
+                  fontSize: 16,
+                  color: Colors.GunmetalGray,
+                }}>
+                  Loading users...
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {selectedFriends.length > 0 && (
+              </View>
+            ) : filteredUsers.length === 0 ? (
+              <View style={{
+                flex: 1,
+                justifyContent: 'center',
+                alignItems: 'center',
+                paddingVertical: 60,
+              }}>
+                <MaterialIcons 
+                  name="people-outline" 
+                  size={64} 
+                  color={Colors.GunmetalGray} 
+                />
+                <Text style={{
+                  marginTop: 16,
+                  fontSize: 18,
+                  fontWeight: '600',
+                  color: Colors.BLACK,
+                  textAlign: 'center',
+                }}>
+                  {searchQuery ? 'No users found' : 'No users available'}
+                </Text>
+                <Text style={{
+                  marginTop: 8,
+                  fontSize: 14,
+                  color: Colors.GunmetalGray,
+                  textAlign: 'center',
+                }}>
+                  {searchQuery ? 'Try adjusting your search' : 'There are no users in your community'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredUsers}
+                renderItem={renderUserItem}
+                keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 100 }}
+              />
+            )}
+          </View>
+
+          {/* Bottom Action Bar */}
+          <View style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'white',
+            borderTopWidth: 1,
+            borderTopColor: Colors.PLATINUM,
+            paddingHorizontal: 24,
+            paddingVertical: 20,
+            paddingBottom: 40,
+          }}>
             <TouchableOpacity
               style={{
-                backgroundColor: Colors.LIGHT_PURPLE,
-                borderRadius: 10,
-                padding: 10,
-                alignItems: "center",
-                marginTop: 10,
+                backgroundColor: selectedUsers.length > 0 ? Colors.LIGHT_PURPLE : Colors.PLATINUM,
+                borderRadius: 16,
+                paddingVertical: 16,
+                alignItems: 'center',
+                flexDirection: 'row',
+                justifyContent: 'center',
+                opacity: sending ? 0.7 : 1,
               }}
-              onPress={() => InviteUserToGroup()}
+              onPress={sendInvitations}
+              disabled={sending || selectedUsers.length === 0}
             >
-              <Text style={{ color: "white" }}>Send Invitations</Text>
+              {sending ? (
+                <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
+              ) : (
+                <Ionicons 
+                  name="send" 
+                  size={20} 
+                  color={selectedUsers.length > 0 ? "white" : Colors.GunmetalGray} 
+                  style={{ marginRight: 8 }} 
+                />
+              )}
+              <Text style={{
+                color: selectedUsers.length > 0 ? "white" : Colors.GunmetalGray,
+                fontSize: 16,
+                fontWeight: '600',
+              }}>
+                {sending 
+                  ? 'Sending Invitations...' 
+                  : selectedUsers.length > 0 
+                    ? `Send Invitations (${selectedUsers.length})`
+                    : 'Select users to invite'
+                }
+              </Text>
             </TouchableOpacity>
-          )}
+          </View>
         </View>
       </View>
     </Modal>

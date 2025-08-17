@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useNavigation } from '@react-navigation/native';
-
+import Colors from '../../assets/Colors';
 const SplashScreen = () => {
   const navigation = useNavigation();
 
@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#2A003A',
+    backgroundColor: Colors.LIGHT_PURPLE,
   },
   animation: {
     width: 700,

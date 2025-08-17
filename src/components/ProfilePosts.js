@@ -1,6 +1,6 @@
 
 
-import { View, Text, Image, ActivityIndicator, TouchableOpacity,Modal,StyleSheet  } from "react-native";
+import { View, Text, Image, ActivityIndicator, TouchableOpacity,Modal,StyleSheet, FlatList } from "react-native";
 import React, { useState, useEffect } from "react";
 import Colors from "../../assets/Colors";
 import { EvilIcons, Feather, Entypo } from "@expo/vector-icons";
@@ -13,7 +13,8 @@ import PostOptionsModel from "../components/pupUps/PostOptionsModel";
 import Axios from 'axios';
 import { APP_ENV } from '../utils/BaseUrl';
 import { ScrollView } from "react-native-gesture-handler";
-
+import { PostService } from '../services/post.service';
+import PostCard from './PostCard';
 
 
 const ProfilePosts = ({ fullName, profilePic, idfromUsersprofile }) => {
@@ -33,6 +34,9 @@ const ProfilePosts = ({ fullName, profilePic, idfromUsersprofile }) => {
   const [scrollViewImages, setScrollViewImages] = useState([]);
   const [userId, setUserId] = useState(null); 
   const [showReactionDialog, setShowReactionDialog] = useState(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 10;
   
   // Reaction emoji mapping
   const reactionEmojis = {
@@ -74,36 +78,27 @@ const ProfilePosts = ({ fullName, profilePic, idfromUsersprofile }) => {
     setModalVisible(true);
   };
 
-  const fetchProfilePosts = async () => {
+  const fetchUserPosts = async (nextPage = 0) => {
     setIsFetchingPosts(true);
     try {
-      let userId = await AsyncStorage.getItem("userId");
-      if (idfromUsersprofile) {
-        userId = idfromUsersprofile;
+      let userIdToFetch = idfromUsersprofile;
+      if (!userIdToFetch) {
+        userIdToFetch = await AsyncStorage.getItem("userId");
       }
-      const response = await Axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentpostsWithPhotos/${userId}`
+      const response = await fetch(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserPosts/${userIdToFetch}/${nextPage}/${PAGE_SIZE}`
       );
-
-      if (
-        response.data &&
-        response.data !== "No posts with photos found for user"
-      ) {
-        const residentPosts = response.data;
-        if (residentPosts.length > 0) {
-          residentPosts.sort((a, b) => {
-            const dateA = new Date(a.postDateTime);
-            const dateB = new Date(b.postDateTime);
-            return dateB - dateA;
-          });
-          setData(residentPosts);
-        }
-        setFetched(true);
+      const dataRes = await response.json();
+      if (nextPage === 0) {
+        setData(dataRes.content || []);
       } else {
-        console.log("No resident posts found.");
+        setData(prev => [...prev, ...(dataRes.content || [])]);
       }
+      setHasMore(!dataRes.last);
+      setPage(nextPage);
+      setFetched(true);
     } catch (error) {
-      console.error("Error getting resident posts:", error);
+      console.error("Error fetching user posts:", error);
     } finally {
       setIsFetchingPosts(false);
     }
@@ -111,28 +106,26 @@ const ProfilePosts = ({ fullName, profilePic, idfromUsersprofile }) => {
 
   useEffect(() => {
     if (!fetched) {
-      fetchProfilePosts();
+      fetchUserPosts(0);
     }
-  }, [fetched]);
+  }, [fetched, idfromUsersprofile]);
+
+  const loadMore = () => {
+    if (!isFetchingPosts && hasMore) {
+      fetchUserPosts(page + 1);
+    }
+  };
 
   const fetchImage = async (data) => {
     setIsFetchingImages(true);
     try {
       const filteredData = data.filter((post) => !post.video);
       const newImageUris = {};
-
       for (const post of filteredData) {
         const photoPromises = post.photos.map(async (photoId) => {
           try {
-            const response = await Axios.get(
-              `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/images?fileUrl=${encodeURIComponent(
-                photoId
-              )}`,
-              {
-                responseType: "arraybuffer",
-              }
-            );
-            const base64Image = encode(response.data);
+            const responseData = await PostService.getImage(photoId);
+            const base64Image = encode(responseData);
             return `data:image/jpeg;base64,${base64Image}`;
           } catch (error) {
             console.error(
@@ -142,11 +135,9 @@ const ProfilePosts = ({ fullName, profilePic, idfromUsersprofile }) => {
             return null;
           }
         });
-
         const photoResults = await Promise.all(photoPromises);
         newImageUris[post.id] = photoResults.filter((image) => image !== null);
       }
-
       setImageUris(newImageUris);
     } catch (error) {
       console.error("Error fetching images:", error);
@@ -193,377 +184,70 @@ const ProfilePosts = ({ fullName, profilePic, idfromUsersprofile }) => {
   // Add reaction to post with optimistic UI update
   const addReactionToPost = async (postId, reactionType = "heart") => {
     try {
-      // Optimistic UI update
       setData(prevData => 
         prevData.map(post => {
           if (post.id === postId) {
-            // Check if user already has a reaction
             const existingIndex = post.reactions.findIndex(r => r.userId === userId);
-            
             const newReactions = [...post.reactions];
-            
             if (existingIndex !== -1) {
-              // Update existing reaction
               newReactions[existingIndex] = {
                 ...newReactions[existingIndex],
                 reactionType
               };
             } else {
-              // Add new reaction
               newReactions.push({ userId, reactionType });
             }
-            
             return { ...post, reactions: newReactions };
           }
           return post;
         })
       );
-
       let userd = await AsyncStorage.getItem("userId");
-      const response = await fetch(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addReactionToPost/${postId}/${userd}/${reactionType}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-
-      const result = await response.text();
-      console.log(result);
+      await PostService.addReactionToPost(postId, userd, reactionType);
     } catch (error) {
       console.error("Error handling reaction:", error);
-      // Revert on error
       fetchProfilePosts();
     }
   };
 
   return (
-    <ScrollView>
-      {isFetchingPosts ? (
+    <FlatList
+      data={data}
+      renderItem={({ item: post }) => (
+        <PostCard
+          key={post.id}
+          user={{ name: fullName, image: profilePic }}
+          postDateTime={post.postDateTime}
+          caption={post.caption}
+          photos={post.photos}
+          reactions={post.reactions || []}
+          comments={post.comments || []}
+          commentsNumber={post.commentsNumber || 0}
+          userReaction={post.reactions.find(r => r.userId === userId)?.reactionType}
+          onLike={() => addReactionToPost(post.id)}
+          onLongPressLike={(type) => addReactionToPost(post.id, type)}
+          onComment={() => toggleCommentModal(post.id)}
+          imageUris={imageUris[post.id]}
+        />
+      )}
+      keyExtractor={item => item.id}
+      onEndReached={loadMore}
+      onEndReachedThreshold={0.5}
+      ListFooterComponent={isFetchingPosts && data.length > 0 ? (
+        <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+          <ActivityIndicator size="small" color={Colors.PURPLE} />
+        </View>
+      ) : null}
+      ListEmptyComponent={isFetchingPosts ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.PURPLE} />
         </View>
       ) : (
-        <>
-          {data.length === 0 ? (
-            <View style={styles.noPostsContainer}>
-              <Text>No posts yet</Text>
-            </View>
-          ) : (
-            data.map((post) => {
-              const reactionSummary = getReactionSummary(post.reactions);
-              const userReaction = post.reactions.find(r => r.userId === userId);
-              
-              return (
-                <View
-                  key={post.id}
-                  style={styles.postContainer}
-                >
-                  <View style={styles.postHeader}>
-                    {profilePic !== "data:image/jpeg;base64," ? (
-                      <Image
-                        source={{ uri: profilePic }}
-                        style={styles.profileImage}
-                      />
-                    ) : (
-                      <Image
-                        source={require("../../assets/default-avatar.jpg")}
-                        style={styles.profileImage}
-                      />
-                    )}
-                    <Text style={styles.profileName}>
-                      {fullName}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.optionsButton}
-                      onPressIn={() => toggleOptionsPostModal(post.id)}
-                    >
-                      <Feather name="more-horizontal" size={25} />
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.postTime}>
-                    {formatDateTime(post.postDateTime)}
-                  </Text>
-                  <View style={styles.captionContainer}>
-                    <Text>{post.caption}</Text>
-                  </View>
-                  {isFetchingImages ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={Colors.PURPLE} />
-                    </View>
-                  ) : (
-                    <TouchableOpacity style={{ alignItems: "center" }}>
-                     {post.photos && post.photos.length > 0 ? (
-    <>
-      {post.photos.length === 1 ? (
-        <Image
-          source={{
-            uri: imageUris[post.id] && imageUris[post.id][0],
-          }}
-          style={{
-            width: "95%",
-            height: 200,
-            borderRadius: 10,
-            marginTop: 10,
-          }}
-          resizeMode="cover"
-        />
-      ) : post.photos.length <= 4 ? (
-        chunkArray(post.photos, 2).map(
-          (photoRow, rowIndex) => (
-            <View
-              key={rowIndex}
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                width: "90%",
-                marginTop: 10,
-              }}
-            >
-              {photoRow.map((photo, photoIndex) => (
-                <Image
-                  key={photoIndex}
-                  source={{
-                    uri:
-                      imageUris[post.id] &&
-                      imageUris[post.id][rowIndex * 2 + photoIndex],
-                  }}
-                  style={{
-                    width: "48%",
-                    height: 200,
-                    borderRadius: 10,
-                  }}
-                  resizeMode="cover"
-                />
-              ))}
-            </View>
-          )
-        )
-      ) : (
-        <>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "90%",
-              marginTop: 10,
-            }}
-          >
-            {post.photos.slice(0, 2).map((photo, index) => (
-              <Image
-                key={index}
-                source={{
-                  uri:
-                    imageUris[post.id] &&
-                    imageUris[post.id][index],
-                }}
-                style={{
-                  width: "48%",
-                  height: 200,
-                  borderRadius: 10,
-                }}
-                resizeMode="cover"
-              />
-            ))}
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              width: "90%",
-              marginTop: 10,
-            }}
-          >
-            <Image
-              source={{
-                uri:
-                  imageUris[post.id] && imageUris[post.id][2],
-              }}
-              style={{
-                width: "48%",
-                height: 200,
-                borderRadius: 10,
-              }}
-              resizeMode="cover"
-            />
-            <TouchableOpacity 
-              onPress={() => handleImagePress(post.id)}
-              style={{ width: "48%" }}
-            >
-              <View
-                style={{
-                  width: "100%",
-                  height: 200,
-                  borderRadius: 10,
-                  backgroundColor: "black",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{ color: "white", fontSize: 18 }}
-                >
-                  +{post.photos.length - 3}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
-    </>
-  ) : null}
-                    </TouchableOpacity>
-                  )}
-                  
-                  {/* Reactions Summary */}
-                  {reactionSummary.total > 0 && (
-                    <View style={styles.reactionsSummaryContainer}>
-                      <View style={styles.reactionsEmojiContainer}>
-                        {reactionSummary.topReactions.map((type, index) => (
-                          <Text key={index} style={styles.reactionEmoji}>
-                            {reactionEmojis[type]}
-                          </Text>
-                        ))}
-                      </View>
-                      <Text style={styles.reactionsCount}>
-                        {reactionSummary.total}
-                      </Text>
-                    </View>
-                  )}
-                  
-                  <View style={styles.statsContainer}>
-                    <Text style={styles.statText}>
-                      {reactionSummary.total} {reactionSummary.total === 1 ? 'reaction' : 'reactions'}
-                    </Text>
-                    <Text style={styles.statText}>
-                      {post.comments.length} {post.comments.length === 1 ? 'comment' : 'comments'}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.divider} />
-                  
-                  <View style={styles.actionsContainer}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => addReactionToPost(post.id)}
-                      onLongPress={() => setShowReactionDialog(post.id)}
-                    >
-                      {userReaction ? (
-                        <Text style={[styles.reactionIcon, { color: Colors.LIGHT_PURPLE }]}>
-                          {reactionEmojis[userReaction.reactionType]}
-                        </Text>
-                      ) : (
-                        <EvilIcons
-                          name="heart"
-                          size={30}
-                          color={Colors.BLACK}
-                        />
-                      )}
-                      <Text style={styles.actionText}>Like</Text>
-                    </TouchableOpacity>
-                    
-                    {showReactionDialog === post.id && (
-                      
-                      <View style={[styles.reactionDialog, { zIndex: 3 }]}>
-                        {Object.entries(reactionEmojis).map(([type, emoji]) => (
-                          <TouchableOpacity
-                            key={type}
-                            style={styles.reactionButton}
-                            onPress={() => {
-                              addReactionToPost(post.id, type);
-                              setShowReactionDialog(null);
-                            }}
-                          >
-                            <Text style={styles.reactionText}>{emoji}</Text>
-                          </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity
-                          style={styles.cancelButton}
-                          onPress={() => setShowReactionDialog(null)}
-                        >
-                          <Text style={styles.cancelText}>Cancel</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPressIn={() => toggleCommentModal(post.id)}
-                    >
-                      <EvilIcons name="comment" size={30} color={Colors.LIGHT_PURPLE} />
-                      <Text style={styles.actionText}>Comment</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={toggleSendModal}
-                    >
-                      <Feather
-                        name="send"
-                        size={22}
-                        color={Colors.LIGHT_PURPLE}
-                      />
-                      <Text style={styles.actionText}>Send</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={toggleShareModal}
-                    >
-                      <Entypo
-                        name="share"
-                        size={22}
-                        color={Colors.LIGHT_PURPLE}
-                      />
-                      <Text style={styles.actionText}>Share</Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  <View style={styles.divider} />
-                </View>
-              );
-            })
-          )}
-        </>
-      )}
-      <Modal animationType="slide" transparent={true} visible={modalVisible}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-          }}
-        >
-          <TouchableOpacity
-            style={{ position: "absolute", top: 20, right: 20 }}
-            onPress={() => setModalVisible(false)}
-          >
-            <Text style={{ color: "white", fontSize: 18 }}>Close</Text>
-          </TouchableOpacity>
-          <Image
-            source={selectedImage}
-            style={{ width: "90%", height: "90%", resizeMode: "contain" }}
-          />
+        <View style={styles.noPostsContainer}>
+          <Text>No posts yet</Text>
         </View>
-      </Modal>
-      <CommentModel
-        isVisible={isCommentModalVisible}
-        onClose={toggleCommentModal}
-        postId={selectedPostCommentId}
-        fullName={fullName}
-        refreshPosts={fetchProfilePosts}
-      />
-      <SendModel isVisible={isSendModalVisible} onClose={toggleSendModal} />
-      <ShareModel isVisible={isShareModalVisible} onClose={toggleShareModal} />
-      <PostOptionsModel
-        isVisible={isOptionsPostModalVisible}
-        onClose={toggleOptionsPostModal}
-        postId={selectedPostId}
-        refreshPosts={fetchProfilePosts}
-        //refreshImages={fetchImage}
-      />
-    </ScrollView>
+      )}
+    />
   );
 
 

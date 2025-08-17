@@ -5,7 +5,6 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   StatusBar,
   SafeAreaView,
   ActivityIndicator,
@@ -13,8 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  Pressable
+  Pressable,
+  Animated,
+  FlatList,
+  ScrollView
 } from 'react-native';
+import PropTypes from 'prop-types';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { APP_ENV } from '../../utils/BaseUrl';
@@ -23,12 +26,41 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../../assets/Colors';
 import { initializeChatSocket } from '../../utils/initializeChatSocket';
 import * as ImagePicker from 'expo-image-picker';
+import { getProductsByIds } from '../../services/marketplaceProduct.service';
+import { getServicesByIds } from '../../services/marketplaceService.service';
+import { getNeedsByIds } from '../../services/marketplaceNeed.service';
+
+// Reusable top-level component to avoid redefining on each render
+const DateSeparator = ({ date }) => (
+  <View style={styles.dateSeparatorContainer}>
+    <View style={styles.dateSeparatorLine} />
+    <Text style={styles.dateSeparatorText}>{date}</Text>
+    <View style={styles.dateSeparatorLine} />
+  </View>
+);
+
+DateSeparator.propTypes = {
+  date: PropTypes.string.isRequired,
+};
 
 const ConversationScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   
-  const { chatId, userName, userImage } = route.params || {};
+  const { 
+    chatId, 
+    userName, 
+    userImage, 
+    user1ID, 
+    user2ID, 
+    productId, 
+    serviceId,  
+    needId      
+  } = route.params || {};
+
+  // Navigation source detection
+  const [navigationSource, setNavigationSource] = useState(null);
+  const [conversationExists, setConversationExists] = useState(false);
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +68,13 @@ const ConversationScreen = () => {
   const [otherUserId, setOtherUserId] = useState('');
   const [messageInput, setMessageInput] = useState('');
   const [otherUserIsTyping, setOtherUserIsTyping] = useState(false);
+  
+  // Debug typing state changes
+  useEffect(() => {
+    // Typing state changed
+  }, [otherUserIsTyping]);
   const [isRoomCreated, setIsRoomCreated] = useState(false);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
   
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -44,6 +82,9 @@ const ConversationScreen = () => {
   const [editText, setEditText] = useState('');
 
   const [tappedMessageId, setTappedMessageId] = useState(null);
+  // Header animation to match other screens
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const headerSlideAnim = useRef(new Animated.Value(50)).current;
 
   // PAGINATION: State for pagination
   const [page, setPage] = useState(1);
@@ -52,21 +93,152 @@ const ConversationScreen = () => {
 
   // State to track when profile section should be shown
   const [showProfileSection, setShowProfileSection] = useState(false);
+  const profileSectionOpacity = useRef(new Animated.Value(0)).current;
 
+  // Filter states
+  const [filterItems, setFilterItems] = useState([]);
+  const [selectedFilter, setSelectedFilter] = useState(null);
+  const [filterDetailsVisible, setFilterDetailsVisible] = useState(false);
+  const [loadingFilters, setLoadingFilters] = useState(false);
 
   const chatSocketRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const scrollViewRef = useRef();
+  const flatListRef = useRef(null);
   const timestampTimeoutRef = useRef(null);
+  const connectionCheckIntervalRef = useRef(null);
 
-  // Keep track of scroll position to prevent jumping after prepending messages
-  const scrollPositionRef = useRef(0);
-
-  const scrollToBottom = (animated = true) => {
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollToEnd({ animated });
+  // Detect navigation source
+  const detectNavigationSource = useCallback(() => {
+    // From Conversations: Has arrays of productId, serviceId, needId
+    if (Array.isArray(productId) && productId.length > 0 || 
+        Array.isArray(serviceId) && serviceId.length > 0 || 
+        Array.isArray(needId) && needId.length > 0) {
+      return 'conversations';
     }
-  };
+    
+    // From Marketplace: Has single productId, serviceId, or needId
+    if ((productId && !Array.isArray(productId)) || 
+        (serviceId && !Array.isArray(serviceId)) || 
+        (needId && !Array.isArray(needId))) {
+      return 'marketplace';
+    }
+    
+    // From Profile: Only has user1ID and user2ID
+    if (user1ID && user2ID && !productId && !serviceId && !needId) {
+      return 'profile';
+    }
+    
+    return 'unknown';
+  }, [productId, serviceId, needId, user1ID, user2ID]);
+
+  // Check if conversation exists (for marketplace navigation)
+  const checkConversationExists = useCallback(async () => {
+    if (!user1ID || !user2ID) return false;
+    
+    try {
+      const response = await axios.get(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages?page=0&size=1&user1ID=${user1ID}&user2ID=${user2ID}`
+      );
+      const { content } = response.data;
+      return content && content.length > 0;
+    } catch (error) {
+      return false;
+    }
+  }, [user1ID, user2ID]);
+
+  // Fetch single item for marketplace navigation
+  const fetchSingleItem = useCallback(async () => {
+    if (navigationSource !== 'marketplace') return;
+    
+    setLoadingFilters(true);
+    try {
+      let itemData = null;
+      let itemType = null;
+      let itemId = null;
+
+      // Fetch single product
+      if (productId && !Array.isArray(productId)) {
+        try {
+          const response = await getProductsByIds([productId]);
+          if (response.data && response.data.length > 0) {
+            itemData = response.data[0];
+            itemType = 'product';
+            itemId = productId;
+          }
+        } catch (error) {
+          // Error fetching product
+        }
+      }
+
+      // Fetch single service
+      if (serviceId && !Array.isArray(serviceId)) {
+        try {
+          const response = await getServicesByIds([serviceId]);
+          if (response.data && response.data.length > 0) {
+            itemData = response.data[0];
+            itemType = 'service';
+            itemId = serviceId;
+          }
+        } catch (error) {
+          // Error fetching service
+        }
+      }
+
+      // Fetch single need
+      if (needId && !Array.isArray(needId)) {
+        try {
+          const response = await getNeedsByIds([needId]);
+          if (response.data && response.data.length > 0) {
+            itemData = response.data[0];
+            itemType = 'need';
+            itemId = needId;
+          }
+        } catch (error) {
+          // Error fetching need
+        }
+      }
+
+      if (itemData) {
+        const filterItem = {
+          id: itemId,
+          type: itemType,
+          title: itemType === 'need' ? itemData.needTitle : 
+                 itemType === 'service' ? itemData.serviceName : 
+                 itemData.name,
+          image: itemType === 'need' ? null : 
+                 itemType === 'service' ? itemData.photos : 
+                 itemData.image,
+          data: itemData
+        };
+
+        // Add default "All Messages" filter
+        const filterItemsData = [
+          {
+            id: 'all',
+            type: 'all',
+            title: 'All Messages',
+            image: userImage,
+            data: null
+          },
+          filterItem
+        ];
+
+        setFilterItems(filterItemsData);
+        
+        // Auto-select the item filter if conversation exists
+        if (conversationExists) {
+          setSelectedFilter(filterItem);
+          setFilterDetailsVisible(true);
+        }
+      }
+    } catch (error) {
+      // Error fetching single item
+    } finally {
+      setLoadingFilters(false);
+    }
+  }, [navigationSource, productId, serviceId, needId, userImage, conversationExists]);
+
+  // no additional keys needed; FlatList keyExtractor handles uniqueness
 
   const formatDateForSeparator = (timestamp) => {
     if (!timestamp) return null;
@@ -84,17 +256,266 @@ const ConversationScreen = () => {
     return date.toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  // Fetch filter data (products, services, needs) - for conversations navigation
+  const fetchFilterData = useCallback(async () => {
+    if (navigationSource !== 'conversations') return;
+    
+    if (!productId?.length && !serviceId?.length && !needId?.length) {
+      return;
+    }
+
+    setLoadingFilters(true);
+    try {
+      const filterItemsData = [];
+
+      // Fetch products
+      if (productId && productId.length > 0) {
+        try {
+          const productsResponse = await getProductsByIds(productId);
+          const products = productsResponse.data || [];
+          products.forEach(product => {
+            filterItemsData.push({
+              id: product.id,
+              type: 'product',
+              title: product.name,
+              image: product.image,
+              data: product
+            });
+          });
+              } catch (error) {
+        // Error fetching products
+      }
+      }
+
+      // Fetch services
+      if (serviceId && serviceId.length > 0) {
+        try {
+          const servicesResponse = await getServicesByIds(serviceId);
+          const services = servicesResponse.data || [];
+          // Services fetched for conversations
+          services.forEach(service => {
+            // Service data processed
+            filterItemsData.push({
+              id: service.id,
+              type: 'service',
+              title: service.serviceName,
+              image: service.photos,
+              data: service
+            });
+          });
+        } catch (error) {
+          // Error fetching services
+        }
+      }
+
+      // Fetch needs
+      if (needId && needId.length > 0) {
+        try {
+          const needsResponse = await getNeedsByIds(needId);
+          const needs = needsResponse.data || [];
+          // Needs fetched for conversations
+          needs.forEach(need => {
+            // Need data processed
+            filterItemsData.push({
+              id: need.id,
+              type: 'need',
+              title: need.needTitle,
+              image: null, // Needs don't have images
+              data: need
+            });
+          });
+        } catch (error) {
+          // Error fetching needs
+        }
+      }
+
+      // Add default "All Messages" filter
+      filterItemsData.unshift({
+        id: 'all',
+        type: 'all',
+        title: 'All Messages',
+        image: userImage,
+        data: null
+      });
+
+      setFilterItems(filterItemsData);
+    } catch (error) {
+      // Error fetching filter data
+    } finally {
+      setLoadingFilters(false);
+    }
+  }, [navigationSource, productId, serviceId, needId, userImage]);
+
+  // Handle filter selection
+  const handleFilterSelect = useCallback((filterItem) => {
+    // Filter selected
+    setSelectedFilter(filterItem);
+    
+    if (filterItem.type === 'all') {
+      setFilterDetailsVisible(false);
+      // Reset to default conversation view
+      setMessages([]);
+      setPage(1);
+      setHasMore(true);
+      setShowProfileSection(false);
+      // Fetch initial data again
+      fetchInitialData();
+    } else {
+      setFilterDetailsVisible(true);
+      
+      // Reset messages and fetch filtered messages
+      setMessages([]);
+      setPage(1);
+      setHasMore(true);
+      setShowProfileSection(false);
+      
+      // Fetch filtered messages
+      fetchFilteredMessages(filterItem);
+    }
+  }, [fetchFilteredMessages, fetchInitialData]);
+
+  // Fetch filtered messages
+  const fetchFilteredMessages = useCallback(async (filterItem) => {
+    if (!user1ID || !user2ID) return;
+
+    setLoading(true);
+    try {
+      const filterDTO = {
+        user1Id: user1ID,
+        user2Id: user2ID,
+        productId: filterItem.type === 'product' ? filterItem.id : "",
+        serviceId: filterItem.type === 'service' ? filterItem.id : "",
+        needId: filterItem.type === 'need' ? filterItem.id : "",
+      };
+
+      const response = await axios.post(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messagesfiltered?page=0&size=10`,
+        filterDTO
+      );
+
+      const { content, last, empty } = response.data;
+      
+      if (content && content.length > 0) {
+        const normalized = [...content].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setMessages(normalized);
+        setPage(2);
+        setHasMore(!last);
+        setIsRoomCreated(true);
+      } else {
+        setMessages([]);
+        setHasMore(false);
+        setIsRoomCreated(false);
+      }
+    } catch (error) {
+      // Error fetching filtered messages
+      setMessages([]);
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [user1ID, user2ID]);
+
+  // Fetch initial data function
+  const fetchInitialData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const id = await AsyncStorage.getItem('userId');
+      if (!id || !chatId || !user1ID || !user2ID) {
+        setLoading(false);
+        return;
+      }
+      
+      // All required data available, setting up conversation
+      setCurrentUserId(id);
+
+      // Determine which user ID is the other user (not the current user)
+      const otherId = id === user1ID ? user2ID : user1ID;
+      setOtherUserId(otherId);
+      
+      // ALWAYS connect to socket first, regardless of whether there are existing messages
+      await connectToSocket(id, chatId);
+      
+      // Wait a moment for socket connection to be established
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // PAGINATION: Fetch the very first page using the new endpoint
+      let response;
+      try {
+        const initialUrl = `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages?page=0&size=10&user1ID=${user1ID}&user2ID=${user2ID}`;
+        response = await axios.get(initialUrl);
+      } catch (error) {
+        // If new endpoint fails with 500, try the old endpoint as fallback
+        if (error.response?.status === 500) {
+          try {
+            const fallbackUrl = `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages-paged/${chatId}?pageNo=1`;
+            response = await axios.get(fallbackUrl);
+          } catch (fallbackError) {
+            throw error; // Re-throw the original error for consistent handling
+          }
+        } else {
+          throw error;
+        }
+      }
+      
+      // PAGINATION: Handle response from paginated endpoint
+      const { content, last, empty } = response.data;
+
+      if (content && content.length > 0) {
+        const normalized = [...content].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setMessages(normalized);
+        setPage(2); // Prepare to fetch the next page
+        setHasMore(!last); // Set whether there are more pages
+        setIsRoomCreated(true);
+      } else {
+        setMessages([]);
+        setHasMore(false);
+        setIsRoomCreated(false);
+        // Show profile section immediately for new conversations or when content is empty
+        setShowProfileSection(true);
+        Animated.timing(profileSectionOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setMessages([]);
+        setIsRoomCreated(false);
+        setHasMore(false);
+      } else if (error.response?.status === 500) {
+        // Handle backend error - assume no messages available
+        console.log('Backend error on initial fetch, treating as empty conversation');
+        setMessages([]);
+        setIsRoomCreated(false);
+        setHasMore(false);
+        setShowProfileSection(true);
+        Animated.timing(profileSectionOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      } else {
+        console.error('Error fetching messages:', error);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [chatId, user1ID, user2ID, connectToSocket]);
+
   const sendTypingStatus = useCallback((typing) => {
     const socket = chatSocketRef.current;
-    if (socket && currentUserId && otherUserId && chatId) {
+    if (socket && socket.client && socket.client.connected && currentUserId && otherUserId && chatId && isSocketConnected) {
       socket.sendMessage('/app/typing', {
         sender: currentUserId,
         recipient: otherUserId,
         chatId: chatId,
         typing: typing,
       });
+    } else {
+      // Cannot send typing status
     }
-  }, [currentUserId, otherUserId, chatId]);
+  }, [currentUserId, otherUserId, chatId, isSocketConnected]);
 
   const handleTextInputChange = useCallback((text) => {
     setMessageInput(text);
@@ -105,190 +526,366 @@ const ConversationScreen = () => {
       return;
     }
     
+    // Try to send typing status immediately
     sendTypingStatus(true);
+    
+    // If socket is not connected yet, retry after a short delay
+    if (!isSocketConnected || !chatSocketRef.current?.client?.connected) {
+      setTimeout(() => {
+        if (isSocketConnected && chatSocketRef.current?.client?.connected) {
+          sendTypingStatus(true);
+        }
+      }, 1000);
+    }
+    
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     
     typingTimeoutRef.current = setTimeout(() => {
       sendTypingStatus(false);
     }, 3000);
-  }, [sendTypingStatus]);
+  }, [sendTypingStatus, isSocketConnected]);
 
-  const connectToSocket = useCallback(async () => {
-    if (!currentUserId || !chatId || (chatSocketRef.current && chatSocketRef.current.connected)) {
+  const connectToSocket = useCallback(async (userId = null, chatRoomId = null) => {
+    const userIdToUse = userId || currentUserId;
+    const chatIdToUse = chatRoomId || chatId;
+    
+    if (!userIdToUse || !chatIdToUse) {
       return;
     }
 
-    try {
-      chatSocketRef.current = await initializeChatSocket();
-      const socket = chatSocketRef.current;
-      
-      socket.subscribe(`/user/${currentUserId}/queue/messages/${chatId}`, (notification) => {
-        const newMsg = JSON.parse(notification.body);
-        setMessages(prev => [
-          ...prev.filter(m => m.tempId !== newMsg.tempId),
-          {
-            ...newMsg,
+    // Check if already connected
+    if (chatSocketRef.current && chatSocketRef.current.client && chatSocketRef.current.client.connected) {
+      setIsSocketConnected(true);
+      return;
+    }
+
+    // Attempting to connect to chat socket
+      try {
+        chatSocketRef.current = await initializeChatSocket();
+        const socket = chatSocketRef.current;
+        
+        // Enable debug logging
+        socket.enableDebugLogging(true);
+        
+        // Test the connection
+        const connectionStatus = socket.testConnection();
+        
+        // Force connection if not already connected
+        if (!connectionStatus.connected) {
+          socket.forceConnect();
+        }
+        
+        // Add connection event listener
+        socket.on('connected', () => {
+          setIsSocketConnected(true);
+        });
+        
+        // Add global error handlers
+        socket.onError((error) => {
+          setIsSocketConnected(false);
+        });
+        
+        socket.onUnhandledFrame((frame) => {
+          // Unhandled frame received
+        });
+        
+        socket.onUnhandledMessage((message) => {
+          // Unhandled message received
+        });
+        
+        socket.onWebSocketError((error) => {
+          setIsSocketConnected(false);
+        });
+        
+        socket.onDisconnected((frame) => {
+          setIsSocketConnected(false);
+        });
+        
+        // Set up subscriptions
+        socket.subscribe(`/user/${userIdToUse}/queue/messages/${chatIdToUse}`, (notification) => {
+        // Handle parsing errors gracefully
+        if (notification.error === 'PARSE_ERROR') {
+          return;
+        }
+        
+        try {
+          const newMsg = notification;
+          console.log('📨 New message received:', {
             id: newMsg.id,
-            senderId: newMsg.sender.id,
-            message: newMsg.content,
-            image: newMsg.image,
-            userImage: newMsg.sender.residentProfile.profilephoto,
-            deletedBy: newMsg.deletedBy || [],
-          }
-        ]);
-      });
-
-      socket.subscribe(`/topic/messages/${chatId}/edited`, (notification) => {
-        const editedMsg = JSON.parse(notification.body);
-        if (editedMsg.sender.id !== currentUserId) {
-          setMessages(prev => prev.map(msg => msg.id === editedMsg.id ? { ...msg, message: editedMsg.content, edited: true } : msg));
+            senderId: newMsg.sender?.id,
+            hasImage: !!newMsg.image,
+            imageUrl: newMsg.image,
+            content: newMsg.content,
+            tempId: newMsg.tempId
+          });
+          
+          setMessages(prev => {
+            const filtered = prev.filter(m => m.tempId !== newMsg.tempId);
+            const normalized = {
+              ...newMsg,
+              id: newMsg.id,
+              senderId: newMsg.sender.id,
+              message: newMsg.content,
+              image: newMsg.image,
+              userImage: newMsg.sender?.residentProfile?.profilephoto,
+              deletedBy: newMsg.deletedBy || [],
+            };
+            console.log('📨 Normalized message:', {
+              id: normalized.id,
+              senderId: normalized.senderId,
+              hasImage: !!normalized.image,
+              imageUrl: normalized.image
+            });
+            return [normalized, ...filtered];
+          });
+        } catch (error) {
+          // Error processing new message
         }
       });
 
-      socket.subscribe(`/topic/messages/${chatId}/deleted`, (notification) => {
-        const deletedMsg = JSON.parse(notification.body);
-        if (deletedMsg.sender.id !== currentUserId) {
-          setMessages(prev => prev.map(msg => msg.id === deletedMsg.id ? { ...msg, message: deletedMsg.content, deleted: true } : msg));
+      socket.subscribe(`/topic/messages/${chatIdToUse}/edited`, (notification) => {
+        if (notification.error === 'PARSE_ERROR') {
+          return;
+        }
+        
+        try {
+          const editedMsg = notification;
+          if (editedMsg.sender && editedMsg.sender.id !== userIdToUse) {
+            setMessages(prev => prev.map(msg => msg.id === editedMsg.id ? { ...msg, message: editedMsg.content, edited: true } : msg));
+          }
+        } catch (error) {
+          // Error processing edited message
+        }
+      });
+
+      socket.subscribe(`/topic/messages/${chatIdToUse}/deleted`, (notification) => {
+        if (notification.error === 'PARSE_ERROR') {
+          return;
+        }
+        
+        try {
+          const deletedMsg = notification;
+          if (deletedMsg.sender && deletedMsg.sender.id !== userIdToUse) {
+            setMessages(prev => prev.map(msg => msg.id === deletedMsg.id ? { ...msg, message: deletedMsg.content, deleted: true } : msg));
+          }
+        } catch (error) {
+          // Error processing deleted message
         }
       });
       
-      socket.subscribe(`/user/${currentUserId}/queue/messages/deleted-for-me`, (notification) => {
-        const deletedForMeMsg = JSON.parse(notification.body);
-        if (deletedForMeMsg.sender.id !== currentUserId) {
-          setMessages(prev => prev.map(msg => 
-            msg.id === deletedForMeMsg.id 
-            ? { ...msg, deletedBy: [...(msg.deletedBy || []), deletedForMeMsg.recipient.id] } 
-            : msg
-          ));
+      socket.subscribe(`/user/${userIdToUse}/queue/messages/deleted-for-me`, (notification) => {
+        if (notification.error === 'PARSE_ERROR') {
+          console.error('Failed to parse deleted-for-me notification:', notification);
+          return;
+        }
+        
+        try {
+          const deletedForMeMsg = notification;
+          if (deletedForMeMsg.sender && deletedForMeMsg.sender.id !== userIdToUse) {
+            setMessages(prev => prev.map(msg => 
+              msg.id === deletedForMeMsg.id 
+              ? { ...msg, deletedBy: [...(msg.deletedBy || []), deletedForMeMsg.recipient.id] } 
+              : msg
+            ));
+          }
+        } catch (error) {
+          // Error processing deleted-for-me message
         }
       });
 
-      socket.subscribe(`/user/${currentUserId}/queue/typing/${chatId}`, (notification) => {
-        const typingIndicator = JSON.parse(notification.body);
-        if (typingIndicator.sender === otherUserId) {
-          setOtherUserIsTyping(typingIndicator.typing);
+      socket.subscribe(`/user/${userIdToUse}/queue/typing/${chatIdToUse}`, (notification) => {
+        if (notification.error === 'PARSE_ERROR') {
+          return;
+        }
+        
+        try {
+          const typingIndicator = notification;
+          // Check if the typing is from the other user (not the current user)
+          if (typingIndicator.sender !== userIdToUse) {
+            setOtherUserIsTyping(typingIndicator.typing);
+          }
+        } catch (error) {
+          // Error processing typing indicator
         }
       });
+
+      // Socket connected and subscriptions set up successfully
+      
+      // Check if already connected after setup
+      if (socket.client && socket.client.connected) {
+        setIsSocketConnected(true);
+      }
+
+      // Set up periodic connection check
+      if (connectionCheckIntervalRef.current) {
+        clearInterval(connectionCheckIntervalRef.current);
+      }
+      connectionCheckIntervalRef.current = setInterval(checkSocketConnection, 2000);
 
     } catch (error) {
-      console.error('Failed to connect to chat socket:', error);
+      setIsSocketConnected(false);
+      throw error; // Re-throw to handle in calling function
     }
-  }, [currentUserId, chatId, otherUserId]);
+  }, [checkSocketConnection]);
+
+  // Add connection check function
+  const checkSocketConnection = useCallback(() => {
+    const socket = chatSocketRef.current;
+    if (socket) {
+      const status = socket.getConnectionStatus();
+      if (!status.connected && isSocketConnected) {
+        setIsSocketConnected(false);
+      } else if (status.connected && !isSocketConnected) {
+        setIsSocketConnected(true);
+      }
+    }
+  }, [isSocketConnected]);
+
 
   // PAGINATION: Function to fetch more messages
   const fetchMoreMessages = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || !user1ID || !user2ID) {
+      return;
+    }
 
+    // Starting fetchMoreMessages for page
     setLoadingMore(true);
+    
     try {
-      const response = await axios.get(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages-paged/${chatId}?pageNo=${page}`
-      );
       
-      const { content, last } = response.data;
+      // Try the new endpoint first
+      const url = `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages?page=${page}&size=10&user1ID=${user1ID}&user2ID=${user2ID}`;
+      
+      const response = await axios.get(url);
+      
+      const { content, last, empty } = response.data;
       
       if (content && content.length > 0) {
-        // Prepend older messages to the start of the array
-        setMessages(prevMessages => [...content.reverse(), ...prevMessages]);
+        // Normalize to newest-first order in state
+        const olderNewestFirst = [...content].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setMessages(prevMessages => {
+          const existingIds = new Set(prevMessages.map(m => m.id));
+          const toAdd = olderNewestFirst.filter(m => !existingIds.has(m.id));
+          return [...prevMessages, ...toAdd];
+        });
         setPage(prevPage => prevPage + 1);
       }
       
       // Update hasMore based on the 'last' property from the backend
       setHasMore(!last);
       
-      // If this was the last page, check if we should show profile section
-      if (last && !loadingMore) {
+      // If this was the last page or content is empty, show profile section
+      if (last || empty) {
         setShowProfileSection(true);
+        Animated.timing(profileSectionOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
       }
 
     } catch (error) {
-      console.error('Error fetching more messages:', error);
+      // If it's a 500 error, try the old endpoint as fallback
+      if (error.response && error.response.status === 500) {
+        try {
+          const fallbackUrl = `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages-paged/${chatId}?pageNo=${page}`;
+          
+          const fallbackResponse = await axios.get(fallbackUrl);
+          
+          const { content, last } = fallbackResponse.data;
+          
+          if (content && content.length > 0) {
+            const olderNewestFirst = [...content].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            setMessages(prevMessages => {
+              const existingIds = new Set(prevMessages.map(m => m.id));
+              const toAdd = olderNewestFirst.filter(m => !existingIds.has(m.id));
+              return [...prevMessages, ...toAdd];
+            });
+            setPage(prevPage => prevPage + 1);
+          }
+          
+          setHasMore(!last);
+          
+          if (last) {
+            setShowProfileSection(true);
+            Animated.timing(profileSectionOpacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+        } catch (fallbackError) {
+          // If both endpoints fail, assume no more messages
+          setHasMore(false);
+          setShowProfileSection(true);
+          Animated.timing(profileSectionOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+        }
+      }
     } finally {
       setLoadingMore(false);
     }
-  }, [page, loadingMore, hasMore, chatId]);
+  }, [page, loadingMore, hasMore, user1ID, user2ID, chatId, messages.length]);
 
-  // PAGINATION: Scroll handler
-  const handleScroll = ({ nativeEvent }) => {
-    // A small threshold to trigger the fetch before reaching the absolute top
-    if (nativeEvent.contentOffset.y <= 20) {
-      fetchMoreMessages();
-    }
-    
-    // Show profile section when at the very top and no more messages to load
-    if (nativeEvent.contentOffset.y <= 10 && !hasMore && !loadingMore) {
-      setShowProfileSection(true);
-    } else if (nativeEvent.contentOffset.y > 10) {
-      setShowProfileSection(false);
-    }
-  };
+  // With FlatList inverted and maintainVisibleContentPosition we no longer need manual scroll handling
 
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoading(true);
-      try {
-        const id = await AsyncStorage.getItem('userId');
-        if (!id || !chatId) {
-          setLoading(false);
-          return;
-        }
-        setCurrentUserId(id);
+    // Entrance animation for header
+    Animated.parallel([
+      Animated.timing(headerFadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerSlideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-        const ids = chatId.split('_');
-        const otherId = ids[0] === id ? ids[1] : ids[0];
-        setOtherUserId(otherId);
-        
-        // PAGINATION: Fetch the very first page
-        const response = await axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/messages-paged/${chatId}?pageNo=1`
-        );
-        
-        // PAGINATION: Handle response from paginated endpoint
-        const { content, last } = response.data;
+    // Detect navigation source
+    const source = detectNavigationSource();
+    setNavigationSource(source);
 
-        if (content && content.length > 0) {
-          setMessages(content.reverse());
-          setPage(2); // Prepare to fetch the next page
-          setHasMore(!last); // Set whether there are more pages
-          setIsRoomCreated(true);
-          connectToSocket();
-        } else {
-          setMessages([]);
-          setHasMore(false);
-          setIsRoomCreated(false);
-          // Show profile section immediately for new conversations
-          setShowProfileSection(true);
-        }
-      } catch (error) {
-        if (error.response?.status === 404) {
-          setMessages([]);
-          setIsRoomCreated(false);
-          setHasMore(false);
-        } else {
-          console.error('Error fetching messages:', error);
-        }
-      } finally {
-        setLoading(false);
+    // Initialize conversation existence check
+    setConversationExists(false);
+
+    // Handle different navigation sources
+    const initializeScreen = async () => {
+      if (source === 'conversations') {
+        fetchFilterData();
+      } else if (source === 'marketplace') {
+        const exists = await checkConversationExists();
+        setConversationExists(exists);
+        fetchSingleItem();
+      } else if (source === 'profile') {
+        const exists = await checkConversationExists();
+        setConversationExists(exists);
       }
     };
 
+    initializeScreen();
+
+    // Reset any per-conversation state if needed when conversation changes
     fetchInitialData();
 
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (timestampTimeoutRef.current) clearTimeout(timestampTimeoutRef.current);
-      if (chatSocketRef.current && chatSocketRef.current.connected) {
-        console.log("Chat screen unmounting...");
+      if (connectionCheckIntervalRef.current) clearInterval(connectionCheckIntervalRef.current);
+      setIsSocketConnected(false);
+      if (chatSocketRef.current && chatSocketRef.current.client && chatSocketRef.current.client.connected) {
+        // Chat screen unmounting, socket will be cleaned up by the socket service
       }
     };
-  }, [chatId, connectToSocket]);
+  }, [chatId, user1ID, user2ID, connectToSocket, fetchFilterData, fetchInitialData, detectNavigationSource, fetchSingleItem, checkConversationExists]);
 
-  useEffect(() => {
-    if(messages.length <= 20) { // Only auto-scroll on initial load or for new messages
-      scrollToBottom();
-    }
-  }, [messages]);
+  // No auto-scroll side-effects needed with inverted FlatList
   
   // ... (the rest of your functions: handleMessagePress, handleLongPress, startEdit, etc. remain the same) ...
 
@@ -303,7 +900,7 @@ const ConversationScreen = () => {
   };
   
   const handleLongPress = (message) => {
-    if (message.senderId === currentUserId && !message.deleted && !message.image) {
+    if (!message.deleted && !message.image) {
       setSelectedMessage(message);
       setModalVisible(true);
     }
@@ -325,7 +922,7 @@ const ConversationScreen = () => {
   const confirmEdit = () => {
     if (!editText.trim() || !selectedMessage) return;
     const socket = chatSocketRef.current;
-    if (socket) {
+    if (socket && socket.client && socket.client.connected) {
       socket.sendMessage('/app/editMessage', {
         messageId: selectedMessage.id,
         newContent: editText,
@@ -348,7 +945,7 @@ const ConversationScreen = () => {
     if (!selectedMessage) return;
     const socket = chatSocketRef.current;
     
-    if (socket) {
+    if (socket && socket.client && socket.client.connected) {
       socket.sendMessage('/app/deleteMessage', {
         messageId: selectedMessage.id,
         userId: currentUserId,
@@ -387,29 +984,75 @@ const ConversationScreen = () => {
     sending: true,
     tempId: tempId,
   };
+
+  // Determine filter IDs based on navigation source
+  let productIdToSend = "";
+  let serviceIdToSend = "";
+  let needIdToSend = "";
+
+  if (navigationSource === 'conversations' || navigationSource === 'marketplace') {
+    // For conversations and marketplace, use selected filter
+    productIdToSend = selectedFilter?.type === 'product' ? selectedFilter.id : "";
+    serviceIdToSend = selectedFilter?.type === 'service' ? selectedFilter.id : "";
+    needIdToSend = selectedFilter?.type === 'need' ? selectedFilter.id : "";
+  } else if (navigationSource === 'profile') {
+    // For profile navigation, no filtering
+    productIdToSend = "";
+    serviceIdToSend = "";
+    needIdToSend = "";
+  }
+
+  const firstMessage = {
+    senderId: currentUserId,
+    receiverId: otherUserId,
+    content: content,
+    productId: productIdToSend,
+    serviceId: serviceIdToSend,
+    needId: needIdToSend,
+  };
+
+  // Sending message with navigation source
   
-  setMessages(prev => [...prev, optimisticMessage]);
+  setMessages(prev => [optimisticMessage, ...prev]);
   setMessageInput('');
 
   if (isRoomCreated) {
     const socket = chatSocketRef.current;
-    if (socket) {
+    if (socket && socket.client && socket.client.connected) {
       socket.sendMessage('/app/chat', {
         sender: currentUserId,
         recipient: otherUserId,
         content,
         image: null,
-        tempId: tempId  
+        tempId: tempId,
+        productId: productIdToSend,
+        serviceId: serviceIdToSend,
+        needId: needIdToSend,
       });
+
+      // Sending socket message with filter
     } else {
-      console.warn("Socket not connected. Trying to reconnect and send.");
-      await connectToSocket();
+      await connectToSocket(currentUserId, chatId);
+      // After reconnecting, try to send the message again
+      const reconnectedSocket = chatSocketRef.current;
+      if (reconnectedSocket && reconnectedSocket.client && reconnectedSocket.client.connected) {
+        reconnectedSocket.sendMessage('/app/chat', {
+          sender: currentUserId,
+          recipient: otherUserId,
+          content,
+          image: null,
+          tempId: tempId,
+          productId: productIdToSend,
+          serviceId: serviceIdToSend,
+          needId: needIdToSend,
+        });
+      }
     }
   } else {
     try {
-      const url = `${APP_ENV.SOCIAL_PORT}/tawasalna-community/send?senderId=${currentUserId}&receiverId=${otherUserId}`;
-      const response = await axios.post(url, content, {
-        headers: { 'Content-Type': 'text/plain' }
+      const url = `${APP_ENV.SOCIAL_PORT}/tawasalna-community/sendtest?senderId=${currentUserId}&receiverId=${otherUserId}`;
+      const response = await axios.post(url, firstMessage, {
+   
       });
 
       // Use lastMessage[0] from backend response
@@ -421,25 +1064,28 @@ const ConversationScreen = () => {
         } catch (e) {
           // fallback: use as is
         }
-        setMessages(prev => [
-          ...prev.filter(m => m.tempId !== tempId),
-          {
-            id: Date.now().toString(), // or any unique id
+        setMessages(prev => {
+          const filtered = prev.filter(m => m.tempId !== tempId);
+          const newMsg = {
+            id: Date.now().toString(),
             senderId: lastMessage.senderId,
-            message: parsedContent.messageContent || parsedContent, // fallback if not an object
+            message: parsedContent.messageContent || parsedContent,
             timestamp: new Date().toISOString(),
-          }
-        ]);
+          };
+          return [newMsg, ...filtered];
+        });
       }
       setIsRoomCreated(true);
-      connectToSocket();
+      // Connect to socket if not already connected
+      if (!chatSocketRef.current || !chatSocketRef.current.client || !chatSocketRef.current.client.connected) {
+        await connectToSocket(currentUserId, chatId);
+      }
 
     } catch (error) {
-      console.error("Failed to create chat room:", error);
       setMessages(prev => prev.filter(m => m.tempId !== tempId));
     }
   }
-}, [messageInput, currentUserId, otherUserId, isRoomCreated, connectToSocket]);
+}, [messageInput, currentUserId, otherUserId, isRoomCreated, navigationSource, selectedFilter]);
 
   const handleImageSelection = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -459,7 +1105,7 @@ const ConversationScreen = () => {
 
     const localUri = pickerResult.assets[0].uri;
     const tempId = `temp_${Date.now()}`;
-
+    
     const optimisticMessage = {
       id: tempId,
       senderId: currentUserId,
@@ -467,7 +1113,7 @@ const ConversationScreen = () => {
       timestamp: new Date().toISOString(),
       sending: true,
     };
-    setMessages(prev => [...prev, optimisticMessage]);
+    setMessages(prev => [optimisticMessage, ...prev]);
 
     const formData = new FormData();
     const filename = localUri.split('/').pop();
@@ -477,6 +1123,7 @@ const ConversationScreen = () => {
     formData.append('file', { uri: localUri, name: filename, type });
     formData.append('userId', currentUserId);
 
+    // Uploading image to server
     try {
       const response = await axios.post(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/chat/upload-image`,
@@ -494,21 +1141,37 @@ const ConversationScreen = () => {
       ));
 
       const socket = chatSocketRef.current;
-      if (socket && isRoomCreated) {
+      if (socket && socket.client && socket.client.connected && isRoomCreated) {
+        // Determine filter IDs based on navigation source
+        let productIdToSend = "";
+        let serviceIdToSend = "";
+        let needIdToSend = "";
+
+        if (navigationSource === 'conversations' || navigationSource === 'marketplace') {
+          // For conversations and marketplace, use selected filter
+          productIdToSend = selectedFilter?.type === 'product' ? selectedFilter.id : "";
+          serviceIdToSend = selectedFilter?.type === 'service' ? selectedFilter.id : "";
+          needIdToSend = selectedFilter?.type === 'need' ? selectedFilter.id : "";
+        } else if (navigationSource === 'profile') {
+          // For profile navigation, no filtering
+          productIdToSend = "";
+          serviceIdToSend = "";
+          needIdToSend = "";
+        }
+        
         socket.sendMessage('/app/chat', { 
           sender: currentUserId, 
           recipient: otherUserId, 
           content: null,
           image: imageUrl,
           tempId: tempId,
+          productId: productIdToSend,
+          serviceId: serviceIdToSend,
+          needId: needIdToSend,
         });
-      } else {
-        console.error("Cannot send image: chat room not ready or socket not connected.");
-        // We don't remove the message because we already updated it to have the image and no loading.
       }
 
     } catch (error) {
-      console.error('Image upload failed:', error);
       alert('Failed to send image. Please try again.');
       setMessages(prev => prev.filter(m => m.id !== tempId));
     }
@@ -522,40 +1185,38 @@ const ConversationScreen = () => {
       <View style={styles.suggestionRow}>
         <TouchableOpacity 
           style={styles.suggestionButton} 
-          onPress={() => setMessageInput('Hi!')}>
+          onPress={() => setMessageInput('Hi!')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Text style={styles.suggestionText}>Hi!</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.suggestionButton} 
-          onPress={() => setMessageInput('How are you?')}>
+          onPress={() => setMessageInput('How are you?')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Text style={styles.suggestionText}>How are you?</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 
-  const groupedMessages = useMemo(() => {
-    return messages.reduce((acc, message) => {
-      const dateKey = formatDateForSeparator(message.timestamp);
-      if (dateKey) {
-        if (!acc[dateKey]) {
-          acc[dateKey] = [];
-        }
-        acc[dateKey].push(message);
+  // Build FlatList data with date separators in chronological order (oldest -> newest)
+  const decoratedData = useMemo(() => {
+    const items = [];
+    let lastDateKey = null;
+    for (const m of messages) {
+      const dateKey = formatDateForSeparator(m.timestamp);
+      if (dateKey && dateKey !== lastDateKey) {
+        items.push({ type: 'separator', date: dateKey });
+        lastDateKey = dateKey;
       }
-      return acc;
-    }, {});
+      items.push({ type: 'message', message: m });
+    }
+    return items;
   }, [messages]);
 
-  const DateSeparator = ({ date }) => (
-    <View style={styles.dateSeparatorContainer}>
-      <View style={styles.dateSeparatorLine} />
-      <Text style={styles.dateSeparatorText}>{date}</Text>
-      <View style={styles.dateSeparatorLine} />
-    </View>
-  );
-
-  const renderMessage = (message, index) => { // Added index for key
+  const renderMessage = (message) => {
     if (message.deletedBy && message.deletedBy.includes(currentUserId)) {
       return null;
     }
@@ -581,22 +1242,21 @@ const ConversationScreen = () => {
     ];
 
     return (
-      <View key={message.id || `msg-${index}`}>
-        {tappedMessageId === message.id && (
-          <Text style={styles.transientTimestamp}>
-            {formatTime(message.timestamp)}
-          </Text>
-        )}
+      <View style={{ marginVertical: 1 }}>
         <TouchableOpacity
           onLongPress={() => handleLongPress(message)}
           onPress={() => handleMessagePress(message.id)}
           activeOpacity={0.8}
-          disabled={isUnsent}>
+          disabled={isUnsent}
+          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+        >
           <View style={[styles.messageContainer, isCurrentUser && styles.currentUserContainer]}>
             {!isCurrentUser && !isUnsent && (
               <Image
                 source={{ uri: message.userImage || 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg' }}
-                style={styles.messageAvatar}/>
+                style={styles.messageAvatar}
+                resizeMode="cover"
+              />
             )}
             <View style={bubbleStyle}>
               {isImageMessage ? (
@@ -604,6 +1264,7 @@ const ConversationScreen = () => {
                   <Image
                     source={{ uri: message.image || message.imageUri }}
                     style={styles.chatImage}
+                    resizeMode="cover"
                   />
                   {message.sending && (
                     <View style={styles.imageLoader}>
@@ -612,18 +1273,40 @@ const ConversationScreen = () => {
                   )}
                 </View>
               ) : (
-                <Text style={messageTextStyle}>{messageContent}</Text>
+                <Text 
+                  style={messageTextStyle}
+                  numberOfLines={0}
+                  ellipsizeMode="tail"
+                >
+                  {messageContent}
+                </Text>
               )}
 
               {!isUnsent && (
                 <View style={[styles.timestampContainer, isImageMessage && styles.imageTimestampContainer]}>
-                  {message.edited && <Text style={[styles.editedText, { color: isCurrentUser ? '#eee' : '#999' }]}>edited</Text>}
-                  {isCurrentUser && message.viewedAt && <Ionicons name="checkmark-done" size={14} color={isImageMessage ? 'white' : '#ADD8E6'} style={styles.seenIcon} />}
+                  {message.edited && (
+                    <Text style={[styles.editedText, { color: isCurrentUser ? '#eee' : '#999' }]}>
+                      edited
+                    </Text>
+                  )}
+                  {isCurrentUser && message.viewedAt && (
+                    <Ionicons 
+                      name="checkmark-done" 
+                      size={14} 
+                      color={isImageMessage ? 'white' : '#ADD8E6'} 
+                      style={styles.seenIcon} 
+                    />
+                  )}
                 </View>
               )}
             </View>
           </View>
         </TouchableOpacity>
+        {tappedMessageId === message.id && (
+          <Text style={styles.transientTimestamp}>
+            {formatTime(message.timestamp)}
+          </Text>
+        )}
       </View>
     );
   };
@@ -639,116 +1322,350 @@ const ConversationScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.LIGHT_PURPLE} />
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={Colors.WHITE} />
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      
+      {/* Modern Header Section */}
+      <Animated.View style={[styles.header, { opacity: headerFadeAnim, transform: [{ translateY: headerSlideAnim }] }]}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={22} color="#64748B" />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{userName}</Text>
-          {otherUserIsTyping && <Text style={styles.typingText}>typing...</Text>}
+          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
+            {userName}
+          </Text>
+          {otherUserIsTyping && (
+            <Text style={styles.typingText} numberOfLines={1}>
+              typing...
+            </Text>
+          )}
         </View>
-      </View>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
-        <ScrollView
-          style={styles.content}
-          contentContainerStyle={styles.scrollContent}
-          ref={scrollViewRef}
-          onScroll={handleScroll} // PAGINATION: Attach scroll handler
-          scrollEventThrottle={16} // PAGINATION: Optimize scroll event frequency
-          onContentSizeChange={() => {
-              if (messages.length <= 20) { // Only autoscroll on initial load
-                  scrollToBottom(false);
-              }
-          }}
+      </Animated.View>
+
+      {/* Filter Bubbles - Only show for conversations and marketplace navigation */}
+      {filterItems.length > 1 && (navigationSource === 'conversations' || navigationSource === 'marketplace') && (
+        <View style={styles.filterContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScrollContent}
+            bounces={false}
           >
-          {/* PAGINATION: Loading indicator for older messages */}
-          {loadingMore && <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} style={{ marginVertical: 10 }} />}
-          
-          {/* Profile section - only show when at the very top and all messages loaded */}
-          {showProfileSection && (
-            <View style={styles.profileSection}>
-              <Image
-                source={{ uri: userImage || 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg' }}
-                style={styles.profileImage}/>
-              <Text style={styles.profileName}>{userName}</Text>
-              <Text style={styles.connectionText}>You can now message each other on Tawasalna</Text>
-              <TouchableOpacity style={styles.viewProfileButton} onPress={() => navigation.navigate("UsersProfile", { userId: otherUserId })}>
-                <Text style={styles.viewProfileText}>View profile</Text>
+            {filterItems.map((filterItem) => (
+              <TouchableOpacity
+                key={filterItem.id}
+                style={[
+                  styles.filterBubble,
+                  selectedFilter?.id === filterItem.id && styles.selectedFilterBubble
+                ]}
+                onPress={() => handleFilterSelect(filterItem)}
+                activeOpacity={0.8}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              >
+                {filterItem.type === 'need' ? (
+                  <Image
+                    source={{ uri: "https://i.ibb.co/qM0wGwdH/N-1.png" }}
+                    style={styles.filterBubbleImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Image
+                    source={{ uri: filterItem.image }}
+                    style={styles.filterBubbleImage}
+                    resizeMode="cover"
+                  />
+                )}
               </TouchableOpacity>
-            </View>
-          )}
-          {loading && !loadingMore ? ( // Show main loader only on initial load
-            <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} style={{marginTop: 20}} />
-          ) : (
-            <View style={styles.messageSection}>
-              {messages.length === 0 && !isRoomCreated && <SuggestedMessages />}
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Filter Details Modal - Only show for conversations and marketplace navigation */}
+      {filterDetailsVisible && selectedFilter && (navigationSource === 'conversations' || navigationSource === 'marketplace') && (
+        <View style={styles.filterDetailsContainer}>
+          <View style={styles.filterDetailsHeader}>
+            <Text style={styles.filterDetailsTitle}>
+              {selectedFilter.type === 'product' ? 'Product Details' :
+               selectedFilter.type === 'service' ? 'Service Details' :
+               selectedFilter.type === 'need' ? 'Need Details' : 'All Messages'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setFilterDetailsVisible(false)}
+              style={styles.closeFilterButton}
+            >
+              <Ionicons name="close" size={24} color={Colors.LIGHT_PURPLE} />
+            </TouchableOpacity>
+          </View>
+          {selectedFilter.data && (
+            <View style={styles.filterDetailsContent}>
+              {selectedFilter.image && (
+                <Image
+                  source={{ uri: selectedFilter.image }}
+                  style={styles.filterDetailsImage}
+                />
+              )}
+              <Text style={styles.filterDetailsName}>{selectedFilter.title}</Text>
               
-              {Object.entries(groupedMessages).map(([date, msgs]) => (
-                <React.Fragment key={date}>
-                  <DateSeparator date={date} />
-                  {msgs.map(renderMessage)}
-                </React.Fragment>
-              ))}
+              {/* Description */}
+              {selectedFilter.data.description && (
+                <Text style={styles.filterDetailsDescription}>
+                  {selectedFilter.data.description}
+                </Text>
+              )}
+              
+              {/* Price Information */}
+              {selectedFilter.type === 'service' && selectedFilter.data.price && (
+                <Text style={styles.filterDetailsPrice}>
+                  ${selectedFilter.data.price}
+                </Text>
+              )}
+              
+              {/* Need Price Range */}
+              {selectedFilter.type === 'need' && (selectedFilter.data.minPrice || selectedFilter.data.maxPrice) && (
+                <Text style={styles.filterDetailsPrice}>
+                  ${selectedFilter.data.minPrice || 0} - ${selectedFilter.data.maxPrice || 0}
+                </Text>
+              )}
+              
+              {/* Service Details */}
+              {selectedFilter.type === 'service' && (
+                <View style={styles.filterDetailsInfo}>
+                  {selectedFilter.data.deliveryTimeInHours && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      📦 Delivery: {selectedFilter.data.deliveryTimeInHours}h
+                    </Text>
+                  )}
+                  {selectedFilter.data.category?.title && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      📂 Category: {selectedFilter.data.category.title}
+                    </Text>
+                  )}
+                  {selectedFilter.data.owner?.name && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      👤 Provider: {selectedFilter.data.owner.name}
+                    </Text>
+                  )}
+                  {selectedFilter.data.averageStars && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      ⭐ Rating: {selectedFilter.data.averageStars.toFixed(1)} ({selectedFilter.data.totalReviews || 0} reviews)
+                    </Text>
+                  )}
+                </View>
+              )}
+              
+              {/* Need Details */}
+              {selectedFilter.type === 'need' && (
+                <View style={styles.filterDetailsInfo}>
+                  {selectedFilter.data.publisher?.name && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      👤 Publisher: {selectedFilter.data.publisher.name}
+                    </Text>
+                  )}
+                  {selectedFilter.data.status && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      📊 Status: {selectedFilter.data.status}
+                    </Text>
+                  )}
+                  {selectedFilter.data.needDayStart && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      📅 Start: {new Date(selectedFilter.data.needDayStart).toLocaleDateString()}
+                    </Text>
+                  )}
+                  {selectedFilter.data.needDayEnd && (
+                    <Text style={styles.filterDetailsInfoText}>
+                      📅 End: {new Date(selectedFilter.data.needDayEnd).toLocaleDateString()}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           )}
-        </ScrollView>
+        </View>
+      )}
+
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
+        <FlatList
+          ref={flatListRef}
+          inverted={messages.length > 0}
+          data={decoratedData}
+          keyExtractor={(item, index) => item.type === 'separator' ? `sep_${item.date}_${index}` : `${item.message.id || 'temp'}_${index}`}
+          renderItem={({ item }) => (
+            item.type === 'separator' ? (
+              <DateSeparator date={item.date} />
+            ) : (
+              renderMessage(item.message)
+            )
+          )}
+          contentContainerStyle={styles.listContent}
+          maintainVisibleContentPosition={{ minIndexForVisible: 1, autoscrollToTopThreshold: 10 }}
+          onEndReachedThreshold={0.1}
+          onEndReached={() => {
+            if (!loadingMore && hasMore) {
+              fetchMoreMessages();
+            }
+          }}
+          ListEmptyComponent={loading ? (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 40 }}>
+              <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} />
+            </View>
+          ) : (
+            !isRoomCreated ? <SuggestedMessages /> : null
+          )}
+          ListFooterComponent={() => (
+            <View>
+              {loadingMore && (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                  <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+                </View>
+              )}
+              {!hasMore && (
+                <Animated.View style={[styles.profileSection, { opacity: profileSectionOpacity }]}> 
+                  <Image
+                    source={{ uri: userImage || 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg' }}
+                    style={styles.profileImage}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.profileName} numberOfLines={2}>
+                    {userName}
+                  </Text>
+                  <Text style={styles.connectionText}>
+                    You can now message each other on Tawasalna
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.viewProfileButton} 
+                    onPress={() => navigation.navigate("UsersProfile", { userId: otherUserId })}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Text style={styles.viewProfileText}>View profile</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+            </View>
+          )}
+          initialNumToRender={20}
+          windowSize={10}
+          removeClippedSubviews
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        />
         {isEditing ? (
           <View style={styles.editContainer}>
-            <Ionicons name="create-outline" size={20} color={Colors.LIGHT_PURPLE} style={{marginRight: 10}}/>
+            <Ionicons name="create-outline" size={20} color={Colors.LIGHT_PURPLE} style={{marginRight: 12}}/>
             <TextInput
               value={editText}
               onChangeText={setEditText}
               style={styles.editInput}
               placeholder="Editing message..."
+              placeholderTextColor="#94A3B8"
               autoFocus
-              multiline/>
-            <TouchableOpacity onPress={confirmEdit} style={styles.editButton}>
-                <Text style={{color: Colors.LIGHT_PURPLE, fontWeight: 'bold'}}>Save</Text>
+              multiline
+              maxLength={1000}
+            />
+            <TouchableOpacity 
+              onPress={confirmEdit} 
+              style={[styles.editButton, { backgroundColor: Colors.LIGHT_PURPLE }]}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              activeOpacity={0.8}
+            >
+              <Text style={{color: '#FFFFFF', fontWeight: '600'}}>Save</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={cancelEdit} style={styles.editButton}>
-                <Text style={{color: 'gray'}}>Cancel</Text>
+            <TouchableOpacity 
+              onPress={cancelEdit} 
+              style={styles.editButton}
+              hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+              activeOpacity={0.8}
+            >
+              <Text style={{color: '#64748B', fontWeight: '500'}}>Cancel</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.bottomInput}>
-            <TouchableOpacity style={styles.inputAction} onPress={handleImageSelection}>
-              <Ionicons name="attach-outline" size={28} color={Colors.LIGHT_PURPLE} />
-            </TouchableOpacity>
-            <View style={styles.inputContainer}>
-              <TextInput
-                placeholder="Message..."
-                placeholderTextColor={Colors.LIGHT_BLACK}
-                style={styles.textInput}
-                value={messageInput}
-                onChangeText={handleTextInputChange}
-                multiline/>
+          <SafeAreaView style={{ backgroundColor: '#FFFFFF' }}>
+            <View style={styles.bottomInput}>
+              <TouchableOpacity 
+                style={styles.inputAction} 
+                onPress={handleImageSelection}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="attach-outline" size={24} color="#64748B" />
+              </TouchableOpacity>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  placeholder="Type a message..."
+                  placeholderTextColor="#94A3B8"
+                  style={styles.textInput}
+                  value={messageInput}
+                  onChangeText={handleTextInputChange}
+                  multiline
+                  maxLength={1000}
+                  textAlignVertical="center"
+                />
+              </View>
+              <TouchableOpacity 
+                style={[styles.inputAction, { backgroundColor: messageInput.trim() ? Colors.LIGHT_PURPLE : '#F1F5F9' }]} 
+                onPress={handleSendMessage}
+                hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+                activeOpacity={0.8}
+                disabled={!messageInput.trim()}
+              >
+                <Ionicons 
+                  name="send" 
+                  size={20} 
+                  color={messageInput.trim() ? '#FFFFFF' : '#94A3B8'} 
+                />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.inputAction} onPress={handleSendMessage}>
-              <Ionicons name="send" size={24} color={Colors.LIGHT_PURPLE} />
-            </TouchableOpacity>
-          </View>
+          </SafeAreaView>
         )}
       </KeyboardAvoidingView>
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setModalVisible(false)}>
+        onRequestClose={() => setModalVisible(false)}
+        statusBarTranslucent={true}
+      >
+        <Pressable 
+          style={styles.modalOverlay} 
+          onPress={() => setModalVisible(false)}
+        >
           <View style={styles.modalContent}>
-            <TouchableOpacity style={styles.modalButton} onPress={startEdit}>
-              <Text style={styles.modalButtonText}>Edit Message</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.modalButton} onPress={() => confirmDelete(false)}>
+            {selectedMessage && selectedMessage.senderId === currentUserId && (
+              <TouchableOpacity 
+                style={styles.modalButton} 
+                onPress={startEdit}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.modalButtonText}>Edit Message</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              style={styles.modalButton} 
+              onPress={() => confirmDelete(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <Text style={styles.modalButtonText}>Delete for Me</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalButton, { borderBottomWidth: 0 }]} onPress={() => confirmDelete(true)}>
-              <Text style={[styles.modalButtonText, { color: 'red' }]}>Unsend for Everyone</Text>
-            </TouchableOpacity>
+            {selectedMessage && selectedMessage.senderId === currentUserId && (
+              <TouchableOpacity 
+                style={[styles.modalButton, { borderBottomWidth: 0 }]} 
+                onPress={() => confirmDelete(true)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={[styles.modalButtonText, { color: 'red' }]}>
+                  Unsend for Everyone
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Pressable>
       </Modal>
@@ -756,145 +1673,533 @@ const ConversationScreen = () => {
   );
 };
 
-// ... (your styles remain the same) ...
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: Colors.WHITE },
-    loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    content: { flex: 1 },
-    scrollContent: { paddingBottom: 20, paddingTop: 10 }, // Added paddingTop
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 0.5,
-      backgroundColor: Colors.LIGHT_PURPLE,
-      borderBottomColor: Colors.LIGHT_PURPLE,
-    },
-    backButton: { padding: 8, marginRight: 10 },
-    headerCenter: { flex: 1, alignItems: 'flex-start' },
-    headerTitle: { color: Colors.WHITE, fontSize: 18, fontWeight: '600' },
-    typingText: { color: Colors.WHITE, fontSize: 12, fontStyle: 'italic' },
-    profileSection: {
-      alignItems: 'center',
-      paddingVertical: 32,
-      paddingHorizontal: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee'
-    },
-    profileImage: { width: 100, height: 100, borderRadius: 50, marginBottom: 16 },
-    profileName: { color: Colors.LIGHT_PURPLE, fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
-    connectionText: { color: '#999', fontSize: 14, textAlign: 'center', marginBottom: 16 },
-    viewProfileButton: { backgroundColor: Colors.LIGHT_PURPLE, paddingHorizontal: 32, paddingVertical: 12, borderRadius: 25 },
-    viewProfileText: { color: 'white', fontSize: 16, fontWeight: '600' },
-    messageSection: { paddingHorizontal: 10, paddingBottom: 20, flex: 1 },
-    messageContainer: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 2 },
-    currentUserContainer: { justifyContent: 'flex-end' },
-    messageAvatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
-    messageBubble: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 20, maxWidth: '80%' },
-    otherUserBubble: { backgroundColor: '#f1f0f0', borderBottomLeftRadius: 4 },
-    currentUserBubble: { backgroundColor: Colors.LIGHT_PURPLE, borderBottomRightRadius: 4 },
-    messageText: { fontSize: 16 },
-    timestampContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', alignSelf: 'flex-end', marginTop: 4, minHeight: 0 },
-    seenIcon: { marginLeft: 4 },
-    bottomInput: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: Colors.WHITE },
-    inputContainer: { flex: 1, backgroundColor: '#f1f0f0', borderRadius: 20, paddingHorizontal: 16, paddingVertical: Platform.OS === 'ios' ? 10 : 0, },
-    textInput: { color: Colors.LIGHT_BLACK, fontSize: 16, maxHeight: 100 },
-    inputAction: { padding: 8 },
-    editedText: { fontSize: 10, alignSelf: 'flex-end', marginRight: 8 },
-    editContainer: { flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1, borderColor: '#ccc', backgroundColor: '#f9f9f9' },
-    editInput: { flex: 1, borderColor: '#e0e0e0', borderWidth: 1, borderRadius: 20, paddingHorizontal: 15, paddingVertical: 10, backgroundColor: 'white', maxHeight: 100 },
-    editButton: { marginLeft: 10, padding: 8 },
-    modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
-    modalContent: { backgroundColor: 'white', paddingVertical: 10, borderRadius: 15, width: '80%', elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 4 },
-    modalButton: { paddingVertical: 16, borderBottomWidth: 1, borderColor: '#f0f0f0', alignItems: 'center' },
-    modalButtonText: { fontSize: 17, color: '#007AFF' },
-    unsentBubble: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 20,
-      borderWidth: 1,
-      maxWidth: '80%',
-      borderColor: '#e0e0e0',
-      backgroundColor: 'transparent',
-    },
-    unsentText: {
-      fontSize: 16,
-      color: '#a0a0a0',
-      fontStyle: 'italic',
-    },
-    suggestionContainer: {
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      alignItems: 'center',
-    },
-    suggestionTitle: {
-      color: '#a0a0a0',
-      fontSize: 14,
-      marginBottom: 12,
-      textAlign: 'center'
-    },
-    suggestionRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-    },
-    suggestionButton: {
-      backgroundColor: '#f1f0f0',
-      paddingVertical: 10,
-      paddingHorizontal: 16,
-      borderRadius: 20,
-      marginHorizontal: 5,
-    },
-    suggestionText: {
-      color: Colors.LIGHT_PURPLE,
-      fontSize: 15,
-      fontWeight: '500',
-    },
-    chatImage: {
-      width: 200,
-      height: 200,
-      borderRadius: 15,
-      resizeMode: 'cover',
-    },
-    imageLoader: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      borderRadius: 15,
-    },
-    imageTimestampContainer: {
-      position: 'absolute',
-      bottom: 5,
-      right: 10,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 10,
-    },
-    dateSeparatorContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginVertical: 20,
-      marginHorizontal: 10,
-    },
-    dateSeparatorLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: '#e0e0e0',
-    },
-    dateSeparatorText: {
-      color: '#a0a0a0',
-      marginHorizontal: 10,
-      fontSize: 12,
-      fontWeight: '600'
-    },
-    transientTimestamp: {
-      alignSelf: 'center',
-      color: '#a0a0a0',
-      fontSize: 12,
-      marginBottom: 8,
-    },
-  });
+  // Main Container
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  
+  // Loading State
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  
+  // Header Section - Modern Gradient Design
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
+    minHeight: 70,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  headerCenter: {
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  headerTitle: {
+    color: '#1E293B',
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  typingText: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  
+  // Profile Section - Card Design
+  profileSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderRadius: 20,
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
+    alignItems: 'center',
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 20,
+    borderWidth: 4,
+    borderColor: '#F1F5F9',
+  },
+  profileName: {
+    color: '#1E293B',
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  connectionText: {
+    color: '#64748B',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+    paddingHorizontal: 20,
+  },
+  viewProfileButton: {
+    backgroundColor: Colors.LIGHT_PURPLE,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+    minWidth: 140,
+    alignItems: 'center',
+    shadowColor: Colors.LIGHT_PURPLE,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  viewProfileText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Message List
+  listContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  
+  // Message Bubbles - Modern Design
+  messageContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    marginVertical: 4,
+    paddingHorizontal: 4,
+  },
+  currentUserContainer: {
+    justifyContent: 'flex-end',
+  },
+  messageAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#F1F5F9',
+  },
+  messageBubble: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 24,
+    maxWidth: '70%',
+    minWidth: 80,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  otherUserBubble: {
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  currentUserBubble: {
+    backgroundColor: Colors.LIGHT_PURPLE,
+    borderBottomRightRadius: 8,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    alignSelf: 'flex-end',
+    marginTop: 6,
+    minHeight: 16,
+  },
+  seenIcon: {
+    marginLeft: 6,
+  },
+  editedText: {
+    fontSize: 11,
+    alignSelf: 'flex-end',
+    marginRight: 8,
+    fontWeight: '500',
+  },
+  
+  // Unsent Messages
+  unsentBubble: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 24,
+    maxWidth: '70%',
+    minWidth: 80,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  unsentText: {
+    fontSize: 16,
+    color: '#94A3B8',
+    fontStyle: 'italic',
+    lineHeight: 24,
+  },
+  
+  // Chat Images
+  chatImage: {
+    width: 240,
+    height: 240,
+    borderRadius: 20,
+    resizeMode: 'cover',
+    maxWidth: '100%',
+  },
+  imageLoader: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  imageTimestampContainer: {
+    position: 'absolute',
+    bottom: 8,
+    right: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  
+  // Date Separators
+  dateSeparatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+    marginHorizontal: 16,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dateSeparatorText: {
+    color: '#64748B',
+    marginHorizontal: 16,
+    fontSize: 13,
+    fontWeight: '600',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  transientTimestamp: {
+    alignSelf: 'center',
+    color: '#64748B',
+    fontSize: 12,
+    marginBottom: 8,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  
+  // Bottom Input - Modern Design
+  bottomInput: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    minHeight: 80,
+  },
+  inputContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginHorizontal: 12,
+    minHeight: 48,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  textInput: {
+    color: '#1E293B',
+    fontSize: 16,
+    maxHeight: 120,
+    minHeight: 24,
+    lineHeight: 22,
+  },
+  inputAction: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Edit Mode
+  editContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    minHeight: 80,
+  },
+  editInput: {
+    flex: 1,
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    maxHeight: 120,
+    minHeight: 48,
+    fontSize: 16,
+  },
+  editButton: {
+    marginLeft: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    minWidth: 60,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Modal Design
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderRadius: 20,
+    width: '85%',
+    maxWidth: 320,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+  },
+  modalButton: {
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderColor: '#F1F5F9',
+    alignItems: 'center',
+    minHeight: 56,
+  },
+  modalButtonText: {
+    fontSize: 17,
+    color: '#1E293B',
+    fontWeight: '500',
+  },
+  
+  // Suggestions
+  suggestionContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginVertical: 16,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  suggestionTitle: {
+    color: '#64748B',
+    fontSize: 16,
+    marginBottom: 24,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  suggestionButton: {
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 28,
+    marginHorizontal: 8,
+    marginVertical: 6,
+    minWidth: 100,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  suggestionText: {
+    color: Colors.LIGHT_PURPLE,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  
+  // Filter System - Modern Design
+  filterContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingVertical: 16,
+    minHeight: 70,
+  },
+  filterScrollContent: {
+    paddingHorizontal: 20,
+  },
+  filterBubble: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    width: 56,
+    height: 56,
+    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+  },
+  selectedFilterBubble: {
+    borderColor: Colors.LIGHT_PURPLE,
+    backgroundColor: '#F0F4FF',
+  },
+  filterBubbleImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  
+  // Filter Details
+  filterDetailsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  filterDetailsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    minHeight: 44,
+  },
+  filterDetailsTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+  },
+  closeFilterButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterDetailsContent: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  filterDetailsImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#F1F5F9',
+  },
+  filterDetailsName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 6,
+    textAlign: 'center',
+    flexWrap: 'wrap',
+  },
+  filterDetailsDescription: {
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+    lineHeight: 20,
+  },
+  filterDetailsPrice: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.LIGHT_PURPLE,
+    marginBottom: 12,
+  },
+  filterDetailsInfo: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    width: '100%',
+  },
+  filterDetailsInfoText: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 6,
+    lineHeight: 18,
+    flexWrap: 'wrap',
+  },
+});
   
 export default ConversationScreen;

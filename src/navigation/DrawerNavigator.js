@@ -2,6 +2,7 @@ import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import HomeScreen from '../screens/HomeScreen';
 import { Text } from 'react-native';
+import MarketplaceNav from '../marketplace/navigation/MarketplaceNav';
 
 const Drawer = createDrawerNavigator();
 
@@ -17,6 +18,7 @@ const DrawerNavigator = () => {
       }}
     >
       <Drawer.Screen name="HomeTabs" component={HomeScreen} />
+      <Drawer.Screen name="Marketplace" component={MarketplaceNav} />
       {/* Example additional screens in the drawer */}
       <Drawer.Screen name="Settings" children={() => <DummyScreen title="Settings" />} />
       <Drawer.Screen name="Notifications" children={() => <DummyScreen title="Notifications" />} />

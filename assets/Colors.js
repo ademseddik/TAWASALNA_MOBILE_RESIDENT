@@ -12,6 +12,8 @@ export default Colors = {
   PURPLE: "#2A003A",
   LIGHT_WHITE: "#f0f2f5",
   LIGHT_PURPLE: "#900562",
+  BABY_PURPLE: "#e9cafc",
+  LIGHT_PURPLE_OPACITY: "rgba(144, 5, 98, 0.1)",
   PUPRLE2: "#723881",
   GRAY: "#D3D3D3",
   PLATINUM: "#E5E4E2",
@@ -20,5 +22,4 @@ export default Colors = {
   BABYBLUE: "#89CFF0",
   Periwinkle: "#CCCCFF",
   Azure: "#F0FFFF",
-
 };

@@ -23,8 +23,8 @@ import FriendsRoute from '../../profile/FriendsRoute';
 import PostsRoute from '../../profile/PostsRoute';
 import { ScrollView } from 'react-native-virtualized-view';
 import { Ionicons } from '@expo/vector-icons';
-
-
+import QRCode from 'react-native-qrcode-svg';
+import Modal from 'react-native-modal';
 
 
 const initialLayout = { width: Dimensions.get('window').width };
@@ -56,6 +56,7 @@ const ProfileScreen = ({ navigation }) => {
 
   const [loading, setLoading] = useState(true);
   const [isCompleteInformationsModalVisible, setCompleteInformationsModalVisible] = useState(false);
+  const [isQRModalVisible, setQRModalVisible] = useState(false);
 
 
   const toggleCompleteInformationsModal = () => {
@@ -63,6 +64,9 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const toggleBio = () => setIsBioExpanded(prev => !prev);
+
+  const openQRModal = () => setQRModalVisible(true);
+  const closeQRModal = () => setQRModalVisible(false);
 
 
   const fetchProfileData = async () => {
@@ -143,6 +147,13 @@ const ProfileScreen = ({ navigation }) => {
   <View style={styles.coverImageWrapper}>
   
     <Image source={{ uri: coverImage }} style={styles.coverImage} />
+    {/* QR Code Button */}
+    <TouchableOpacity
+      style={styles.qrButton}
+      onPress={openQRModal}
+    >
+      <Ionicons name="qr-code-outline" size={28} color={Colors.LIGHT_PURPLE} />
+    </TouchableOpacity>
   </View>
   
   <View style={styles.avatarWrapper}>
@@ -165,7 +176,7 @@ const ProfileScreen = ({ navigation }) => {
         ? `${profileData.bio.slice(0, 50)}...`
         : profileData.bio}
       {profileData.bio.length > 50 && (
-        <Text style={{ color: Colors.LIGHT_PURPLE }}>
+        <Text style={{ color: Colors.LIGHT_PURPLE,fontSize:14 }}>
           {isBioExpanded ? " Show less" : " Read more"}
         </Text>
       )}
@@ -179,7 +190,29 @@ const ProfileScreen = ({ navigation }) => {
         isVisible={isCompleteInformationsModalVisible}
         onClose={toggleCompleteInformationsModal}
       />
-      <View style={{ flex: 1, height: Dimensions.get('window').height * 0.6 }}>
+      <Modal
+        isVisible={isQRModalVisible}
+        onBackdropPress={closeQRModal}
+        onBackButtonPress={closeQRModal}
+        style={styles.qrModal}
+      >
+        <View style={styles.qrModalContent}>
+          <Text style={styles.qrModalTitle}>{t('Share your profile')}</Text>
+          {userId && (
+            <QRCode
+              value={userId}
+              size={180}
+            />
+          )}
+          <Text style={styles.qrModalInstruction}>
+            {t('To share your profile, ask a friend to go to the Search screen and tap the QR code scanner to scan this code and find your profile.')}
+          </Text>
+          <TouchableOpacity style={styles.qrModalCloseButton} onPress={closeQRModal}>
+            <Text style={styles.qrModalCloseButtonText}>{t('Close')}</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+      <View style={{ flex: 1, height: Dimensions.get('window').height * 0.85 }}>
 
         <TabView
               style={{ flex: 1 }}
@@ -375,7 +408,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
  
- 
+  qrButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 8,
+    elevation: 4,
+    zIndex: 2,
+  },
+  qrModal: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 0,
+  },
+  qrModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  qrModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: Colors.PURPLE,
+  },
+  qrModalInstruction: {
+    marginTop: 20,
+    fontSize: 15,
+    color: Colors.DARK_GRAY,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  qrModalCloseButton: {
+    marginTop: 10,
+    backgroundColor: Colors.LIGHT_PURPLE,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+  },
+  qrModalCloseButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
 export default ProfileScreen;

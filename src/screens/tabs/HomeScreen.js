@@ -1,127 +1,169 @@
 import AddPostModal from '../../components/pupUps/AddPostModal';
-import React, { useEffect, useState } from 'react';
+import CommentModel from '../../components/pupUps/CommentModel';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-  View, Text, Image, StyleSheet,  TouchableOpacity, RefreshControl,Animated} from 'react-native';
+  View, Text, Image, StyleSheet, TouchableOpacity, RefreshControl, Animated, FlatList, ActivityIndicator, Easing, SafeAreaView, StatusBar, Dimensions
+} from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
 import Colors from '../../../assets/Colors';
-import { MaterialIcons, AntDesign } from "@expo/vector-icons";
+import { MaterialIcons, AntDesign, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from '@react-navigation/native';
+import PostCard from '../../components/PostCard';
+import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width } = Dimensions.get('window');
+
 export default function HomeScreen() {
 
   const [buttonAnim] = useState(new Animated.Value(100));
+  const [scaleAnim] = useState(new Animated.Value(1));
+  const [rotateAnim] = useState(new Animated.Value(0));
+  const [translateAnim] = useState(new Animated.Value(0));
+  const [pulseAnim] = useState(new Animated.Value(1));
+  const [glowAnim] = useState(new Animated.Value(0));
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [userName, setUserName] = useState('');
+  const [userProfilePic, setUserProfilePic] = useState(null);
 
+  // Animation values for header and content
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
 
-    useFocusEffect(
-    React.useCallback(() => {
-      // Reset animation value
-      buttonAnim.setValue(100);
-      
-      // Run the animation
-      Animated.spring(buttonAnim, {
-        toValue: 0,
-        delay:20,
-        friction: 20,
-        tension: 0,
+  const PAGE_SIZE = 10;
+
+  // Initialize animations
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
         useNativeDriver: true,
-      }).start();
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-     
-      return () => {
-        // Cleanup if needed
-      };
-    }, [buttonAnim])
-  );
+    // Start continuous pulse animation
+    const startPulseAnimation = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
 
-  const fetchPosts = async () => {
+    // Start glow animation
+    const startGlowAnimation = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(glowAnim, {
+            toValue: 0.5,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(glowAnim, {
+            toValue: 0,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    startPulseAnimation();
+    startGlowAnimation();
+  }, []);
+
+  const fetchPosts = async (nextPage = 0, refreshing = false) => {
     const userId = await AsyncStorage.getItem("userId");
+    if (!userId) return;
+    if (refreshing) setRefreshing(true);
+    else setLoading(true);
     try {
       const response = await fetch(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserRelatedPost/${userId}`
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserRelatedPost/${userId}/${nextPage}/${PAGE_SIZE}`
       );
-      const data = await response.json();
-
-      const uniquePosts = data.filter(
-        (post, index, self) =>
-          index === self.findIndex((p) => p.id === post.id)
-      );
-
-      // Sort and shuffle logic
-      const now = new Date();
-      const currentWeek = getWeekNumber(now);
-      const currentYear = now.getFullYear();
-
-      const currentWeekPosts = [];
-      const otherPosts = [];
-
-      for (let post of uniquePosts) {
-        const postDate = new Date(post.postDateTime);
-        const postWeek = getWeekNumber(postDate);
-        const postYear = postDate.getFullYear();
-
-        if (postWeek === currentWeek && postYear === currentYear) {
-          currentWeekPosts.push(post);
-        } else {
-          otherPosts.push(post);
-        }
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+      const data = JSON.parse(responseText);
+      if (refreshing || nextPage === 0) {
+        setPosts(data.content);
+      } else {
+        setPosts(prev => [...prev, ...data.content]);
       }
-
-      currentWeekPosts.sort((a, b) =>
-        new Date(b.postDateTime) - new Date(a.postDateTime)
-      );
-      shuffleArray(otherPosts);
-
-      const finalSortedPosts = [...currentWeekPosts, ...otherPosts];
-
-      setPosts(finalSortedPosts);
-
+      setHasMore(!data.last);
+      setPage(nextPage);
     } catch (error) {
       console.error('Failed to fetch posts:', error);
     } finally {
-      setRefreshing(false);
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  // Helper function to get ISO week number
-  function getWeekNumber(date) {
-    const onejan = new Date(date.getFullYear(), 0, 1);
-    const millisInDay = 86400000;
-    return Math.ceil(
-      ((date - onejan + ((onejan.getDay() + 6) % 7) * millisInDay) / millisInDay + 1) / 7
-    );
-  }
+  const onRefresh = () => {
+    fetchPosts(0, true);
+  };
 
-  // Helper function to shuffle array
-  function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
+  useEffect(() => {
+    fetchPosts(0);
+  }, []);
+
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const name = await AsyncStorage.getItem('userFullName');
+        setUserName(name || '');
+        // Try to get profile photo if available
+        const photo = await AsyncStorage.getItem('userProfilePhoto');
+        setUserProfilePic(photo);
+      } catch (e) {
+        // ignore
+      }
+    };
+    fetchUserInfo();
+  }, []);
+
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      fetchPosts(page + 1);
     }
-  }
-
-
-
+  };
 
   const formatPostTime = (timestamp) => {
     const date = new Date(timestamp);
     if (isNaN(date)) return 'Just now';
-
     const now = new Date();
     const diff = now - date;
-
     const seconds = Math.floor(diff / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-
     if (days > 7) {
       return new Intl.DateTimeFormat('en-US', {
         month: 'short',
@@ -134,270 +176,479 @@ export default function HomeScreen() {
     if (minutes > 0) return `${minutes}m ago`;
     return 'Just now';
   };
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchPosts();
+
+  const handleCommentPress = (postId) => {
+    setSelectedPostId(postId);
+    setIsCommentModalVisible(true);
   };
-  useEffect(() => {
-    fetchPosts();
-  }, []);
 
- // Inside the functional component … ---------------------------------
-const renderBody = () => {
-  if (loading) {
-    return (
-      <LottieView
-        source={loadingAnimation}
-        autoPlay
-        loop
-        style={styles.loadingAnimation}
-      />
-    );
-  }
+  const handleCloseCommentModal = () => {
+    setIsCommentModalVisible(false);
+    setSelectedPostId(null);
+  };
 
-  if (posts.length === 0) {
-    return (
-      <View style={styles.noPostsContainer}>
-        <Text style={styles.noPostsText}>No posts available</Text>
+  const refreshPosts = () => {
+    fetchPosts(0, true);
+  };
+
+  const handleAddButtonPress = () => {
+    // Beautiful press animation sequence
+    Animated.parallel([
+      // Scale down on press
+      Animated.spring(scaleAnim, {
+        toValue: 0.9,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 8,
+      }),
+      // Quick rotation
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      // Slide out
+      Animated.timing(translateAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Show modal immediately
+      setIsModalVisible(true);
+      
+      // Reset scale for next press
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 8,
+      }).start();
+    });
+  };
+
+  const renderHeader = () => (
+    <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+      <View style={styles.headerContent}>
+        <View style={styles.headerLeft}>
+          <Image source={require('../../../assets/Icons/logo.png')} style={styles.headerLogo} resizeMode="contain" />
+        </View>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Home Feed</Text>
+          <Text style={styles.headerSubtitle}>Stay connected with your community</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.marketplaceButton}
+            onPress={() => navigation.navigate('Marketplace')}
+          >
+            <MaterialCommunityIcons name="shopping-outline" size={24} color={Colors.LIGHT_PURPLE} />
+          </TouchableOpacity>
+        </View>
       </View>
-    );
-  }
-
-  // default branch: we actually have posts
-  return (
-    <ScrollView
-      contentContainerStyle={styles.listContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={[Colors.LIGHT_PURPLE]}
-          tintColor={Colors.LIGHT_PURPLE}
-        />
-      }
-    >
-      {posts.map(item => {
-        const user        = item.user?.residentProfile;
-        const hasPhoto    = item.photos?.length > 0;
-        const isFromGroup = item.groupId && item.groupImage && item.groupName;
-
-        return (
-          <View key={item.id} style={styles.postContainer}>
-            {/* ------- header ------- */}
-            <View style={styles.postHeader}>
-              <Image
-                source={{
-                  uri: isFromGroup ? item.groupImage : user?.profilephoto
-                      ?? "https://placeholder.com/avatar",
-                }}
-                style={styles.avatar}
-              />
-              <View style={styles.userInfo}>
-                <Text style={styles.username}>
-                  {isFromGroup ? item.groupName : user?.fullName}
-                </Text>
-
-                {isFromGroup && (
-                  <View style={{ flexDirection: "row", alignItems: "center", top: 5 }}>
-                    <Image
-                      source={{
-                        uri: user?.profilephoto ?? "https://placeholder.com/avatar",
-                      }}
-                      style={{ width: 20, height: 20, borderRadius: 10, marginRight: 6 }}
-                    />
-                    <Text style={{ fontSize: 13, color: Colors.GRAY }}>
-                      {user?.fullName}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.postMeta}>
-                  <Text
-                    style={{
-                      left: isFromGroup ? 26 : 0,
-                      color: Colors.GRAY,
-                      fontSize: 12,
-                    }}
-                  >
-                    {formatPostTime(item.postDateTime)}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity style={styles.menuButton}>
-                <MaterialIcons name="more-horiz" size={24} color={Colors.BLACK} />
-              </TouchableOpacity>
-            </View>
-
-            {/* ------- photo ------- */}
-            {hasPhoto && (
-              <Image
-                source={{ uri: item.photos[0] }}
-                style={styles.postImage}
-                resizeMode="cover"
-              />
-            )}
-
-            {/* ------- actions ------- */}
-            <View style={styles.postActions}>
-              <TouchableOpacity style={styles.actionButton}>
-                <AntDesign name="hearto" size={24} color={Colors.LIGHT_PURPLE} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <MaterialIcons name="comment" size={24} color={Colors.LIGHT_PURPLE} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton}>
-                <MaterialIcons name="send" size={24} color={Colors.LIGHT_PURPLE} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.caption}>{item.caption}</Text>
-          </View>
-        );
-      })}
-    </ScrollView>
+    </Animated.View>
   );
-};
-// --------------------------------------------------------------------
 
-return (
-  <View style={{ flex: 1, backgroundColor: Colors.WHITE }}>
-    <View style={styles.container}>{renderBody()}</View>
-
-    {/* modal & floating "+" button stay unchanged */}
-    <AddPostModal
-      visible={isModalVisible}
-      onClose={() => setIsModalVisible(false)}
-    />
-
-    <Animated.View
-      style={[styles.addButton, { transform: [{ translateX: buttonAnim }] }]}
-    >
-      <TouchableOpacity onPress={() => setIsModalVisible(true)}>
-        <Text style={styles.addText}>＋</Text>
+  const renderEmptyState = () => (
+    <Animated.View style={[styles.emptyContainer, { opacity: fadeAnim }]}>
+      <View style={styles.emptyIconContainer}>
+        <MaterialCommunityIcons name="post-outline" size={48} color={Colors.LIGHT_PURPLE} />
+      </View>
+      <Text style={styles.emptyTitle}>No posts yet</Text>
+      <Text style={styles.emptySubtitle}>
+        Be the first to share something with your community
+      </Text>
+      <TouchableOpacity 
+        style={styles.createPostButton}
+        onPress={handleAddButtonPress}
+      >
+        <Text style={styles.createPostButtonText}>Create Post</Text>
       </TouchableOpacity>
     </Animated.View>
-  </View>
-);
+  );
 
+  const renderLoadingMore = () => (
+    <View style={styles.loadingMore}>
+      <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+      <Text style={styles.loadingMoreText}>Loading more posts...</Text>
+    </View>
+  );
+
+  const renderItem = ({ item, index }) => (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+      }}
+    >
+      <PostCard
+        postId={item.id}
+        user={item.user}
+        group={item.group}
+        postDateTime={item.postDateTime}
+        caption={item.caption}
+        photos={item.photos}
+        reactions={item.reactions || []}
+        comments={item.comments || []}
+        commentsNumber={item.commentsNumber || 0}
+        userReaction={item.userReaction}
+        onLike={() => {}}
+        onLongPressLike={() => {}}
+        onComment={() => handleCommentPress(item.id)}
+      />
+    </Animated.View>
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // Reset animation value
+      buttonAnim.setValue(200);
+      console.log('Add button animation triggered');
+      // Run the animation - faster and more responsive
+      Animated.spring(buttonAnim, {
+        toValue: 0,
+        delay: 0,
+        friction: 15,
+        tension: 50,
+        useNativeDriver: true,
+      }).start();
+      return () => {
+        // Cleanup if needed
+      };
+    }, [buttonAnim])
+  );
+
+  // Fallback: Ensure button is visible after mount if animation fails
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      buttonAnim.stopAnimation((value) => {
+        if (value !== 0) {
+          buttonAnim.setValue(0);
+          console.log('Fallback: Add button forced visible');
+        }
+      });
+    }, 500); // Reduced from 1000ms to 500ms
+    return () => clearTimeout(timeout);
+  }, [buttonAnim]);
+
+  const navigation = useNavigation();
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {renderHeader()}
+
+      <View style={styles.content}>
+        {loading && posts.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <LottieView
+              source={loadingAnimation}
+              autoPlay
+              loop
+              style={styles.loadingAnimation}
+            />
+            <Text style={styles.loadingText}>Loading your feed...</Text>
+          </View>
+        ) : posts.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          <FlatList
+            data={posts}
+            renderItem={renderItem}
+            keyExtractor={(_, idx) => idx.toString()}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.5}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[Colors.LIGHT_PURPLE]}
+                tintColor={Colors.LIGHT_PURPLE}
+              />
+            }
+            ListFooterComponent={loading && posts.length > 0 ? renderLoadingMore() : null}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+
+      {/* Floating Add Button with Beautiful Animation */}
+      <Animated.View
+        style={[
+          styles.addButton, 
+          { 
+            transform: [
+              { translateX: buttonAnim },
+              { translateX: translateAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 200]
+              })},
+              { rotate: rotateAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0deg', '360deg']
+              })},
+              { scale: scaleAnim },
+            ],
+            opacity: pulseAnim,
+          }
+        ]}
+      >
+        {/* Glow Effect */}
+        <Animated.View 
+          style={[
+            styles.addButtonGlow,
+            {
+              opacity: glowAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.3, 0.8],
+              }),
+              transform: [{
+                scale: glowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.2],
+                }),
+              }],
+            }
+          ]}
+        />
+        
+        <TouchableOpacity 
+          style={styles.addButtonInner}
+          onPress={handleAddButtonPress}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={[Colors.LIGHT_PURPLE, Colors.LIGHT_PURPLE]}
+            style={styles.addButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.addText}>＋</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Modals */}
+      <AddPostModal
+        visible={isModalVisible}
+        onClose={() => {
+          setIsModalVisible(false);
+          // Beautiful reverse animation
+          Animated.parallel([
+            Animated.timing(translateAnim, {
+              toValue: 0,
+              duration: 300,
+              easing: Easing.out(Easing.back(1.2)),
+              useNativeDriver: true,
+            }),
+            Animated.timing(rotateAnim, {
+              toValue: 0,
+              duration: 300,
+              easing: Easing.out(Easing.back(1.2)),
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            // Bounce back effect
+            Animated.sequence([
+              Animated.timing(translateAnim, {
+                toValue: -0.03,
+                duration: 100,
+                useNativeDriver: true,
+              }),
+              Animated.spring(translateAnim, {
+                toValue: 0,
+                tension: 200,
+                friction: 8,
+                useNativeDriver: true,
+              }),
+            ]).start();
+          });
+        }}
+      />
+      <CommentModel
+        isVisible={isCommentModalVisible}
+        onClose={handleCloseCommentModal}
+        postId={selectedPostId}
+        refreshPosts={refreshPosts}
+      />
+    </SafeAreaView>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.WHITE,
-    marginTop: 40
+    backgroundColor: '#fff',
   },
-  listContent: {
-    paddingBottom: 20,
-
-
+  header: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  loadingAnimation: {
-    width: 600,
-    height: 500,
-    alignSelf: 'center',
-  },
-  postContainer: {
-    marginVertical: 8,
-    marginBottom: 8,
-  
-    borderBottomColor: Colors.LIGHT_PURPLE,
-    borderBottomWidth: 3,
-    paddingBottom: 16,
-    borderBottomEndRadius: 50,
-    borderBottomStartRadius: 50
-  },
-  postHeader: {
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  headerLeft: {
     marginRight: 12,
   },
-  userInfo: {
+  headerLogo: {
+    width: 36,
+    height: 36,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  headerRight: {
+    marginLeft: 12,
+  },
+  marketplaceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  content: {
     flex: 1,
   },
-  username: {
-    fontWeight: '600',
-    fontSize: 16,
-    color: Colors.BLACK,
+  listContent: {
+    paddingBottom: 100,
+    paddingHorizontal: 0,
   },
-  postMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  postTime: {
-    color: Colors.GRAY,
-    fontSize: 12,
-    marginLeft: 4,
-  },
-  menuButton: {
-    padding: 8,
-  },
-  postImage: {
-    width: '100%',
-    height: 375,
-    marginVertical: 8,
-  },
-  postActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginTop: 8,
-  },
-  actionButton: {
-    marginRight: 16,
-  },
-  caption: {
-    fontSize: 14,
-    color: Colors.BLACK,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  noPostsContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  noPostsText: {
-    fontSize: 18,
-    color: Colors.GRAY,
+  loadingAnimation: {
+    width: 200,
+    height: 200,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 16,
     fontWeight: '500',
   },
-   addButton: {
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  createPostButton: {
     backgroundColor: Colors.LIGHT_PURPLE,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_PURPLE,
+  },
+  createPostButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
+  addButton: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    zIndex: 1000,
+  },
+  addButtonInner: {
+    shadowColor: Colors.LIGHT_PURPLE,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  addButtonGradient: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    position: 'absolute',
-    bottom: 25,
-    right: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 20,
-    shadowColor: Colors.BLACK,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  addButtonGlow: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.LIGHT_PURPLE,
+    opacity: 0.3,
+    transform: [{ scale: 1 }],
   },
   addText: {
-    color: Colors.WHITE,
-    fontSize: 32,
+    color: '#fff',
+    fontSize: 28,
     fontWeight: '300',
-    marginTop: -4,
-  },
-  ownerLabel: {
-    fontSize: 12,
-    color: Colors.GRAY,
-    marginTop: 2,
+    marginTop: -2,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

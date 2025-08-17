@@ -1,45 +1,25 @@
-import { View, Text, Modal, TouchableOpacity, FlatList, Image } from "react-native";
-import React, { useEffect, useState } from "react";
-import { encode } from "base64-arraybuffer";
-import Axios from 'axios';
-import { APP_ENV } from '../../utils/BaseUrl';
-import { Ionicons } from "@expo/vector-icons"; 
-
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  Modal,
+  TouchableOpacity,
+  FlatList,
+  Image,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "../../../assets/Colors";
 
 const GroupMembersModal = ({ isVisible, onClose, members }) => {
-
   const [profilePics, setProfilePics] = useState([]);
 
-
- useEffect(() => {
-   //console.log("Members:", members);
-
-   if (members) {
-     const fetchProfilePhotos = async () => {
-       try {
-         const promises = members.map(async (member) => {
-           const response = await Axios.get(
-             `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${member.id}`,
-             { responseType: "arraybuffer" }
-           );
-           const base64Image = encode(response.data);
-           return `data:image/jpeg;base64,${base64Image}`;
-         });
-         const profilePics = await Promise.all(promises);
-         console.log("Profile pics length:", profilePics.length);
-         setProfilePics(profilePics);
-       } catch (error) {
-         console.error(
-           "Error getting resident profile photos for Home:",
-           error.message
-         );
-       }
-     };
-
-     fetchProfilePhotos();
-   }
- }, [members]);
-
+  useEffect(() => {
+    if (members && members.length > 0) {
+      // Since members are now just user IDs, we'll use default avatars
+      // or we could fetch user details if needed in the future
+      setProfilePics([]);
+    }
+  }, [members]);
 
   return (
     <Modal
@@ -63,7 +43,7 @@ const GroupMembersModal = ({ isVisible, onClose, members }) => {
             borderRadius: 20,
             borderColor: Colors.PURPLE,
             width: "80%",
-            height: "30%",
+            height: "60%",
           }}
         >
           <TouchableOpacity
@@ -73,10 +53,22 @@ const GroupMembersModal = ({ isVisible, onClose, members }) => {
               top: 5,
               right: 5,
               padding: 5,
+              zIndex: 1,
             }}
           >
             <Ionicons name="close" size={24} color="black" />
           </TouchableOpacity>
+          
+          <Text style={{ 
+            fontSize: 18, 
+            fontWeight: "bold", 
+            textAlign: "center", 
+            marginBottom: 15,
+            color: Colors.LIGHT_PURPLE 
+          }}>
+            Group Members ({members ? members.length : 0})
+          </Text>
+          
           {members && members.length > 0 ? (
             <FlatList
               data={members}
@@ -86,27 +78,29 @@ const GroupMembersModal = ({ isVisible, onClose, members }) => {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    marginBottom: 10,
+                    marginBottom: 15,
+                    paddingHorizontal: 10,
                   }}
                 >
-                  { <Image
-                  source={{
-                    uri:
-                      profilePics[index] || "../../../assets/photoprofil.png",
-                  }}
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
-                    marginRight: 10,
-                  }}
-                /> }
-                  <Text>{item.residentProfile.fullName}</Text>
+                  <Image
+                    source={require("../../../assets/photoprofil.png")}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      marginRight: 10,
+                    }}
+                  />
+                  <Text style={{ fontSize: 16, color: "#333" }}>
+                    Member {index + 1}
+                  </Text>
                 </View>
               )}
             />
           ) : (
-            <Text>No members available</Text>
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <Text style={{ fontSize: 16, color: "#666" }}>No members available</Text>
+            </View>
           )}
         </View>
       </View>

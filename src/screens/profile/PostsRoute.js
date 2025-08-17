@@ -1,76 +1,169 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Animated } from 'react-native';
+import { ScrollView, FlatList } from 'react-native-gesture-handler';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
+import PostCard from '../../components/PostCard';
+import CommentModel from '../../components/pupUps/CommentModel';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Colors from '../../../assets/Colors';
 
 function PostsRoute({ userId }) {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchPosts = async () => {
-    //const userId = await AsyncStorage.getItem("userId");
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const [isCommentModalVisible, setCommentModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  const fetchPosts = async (reset = false) => {
+    setLoading(true);
     try {
       const response = await fetch(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentposts/${userId}/${userId}`
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserPosts/${userId}/${reset ? 0 : page}/${PAGE_SIZE}`
       );
       const data = await response.json();
-      setPosts(data);
+      if (reset) {
+        setPosts(data.content || []);
+      } else {
+        setPosts(prev => [...prev, ...(data.content || [])]);
+      }
+      setHasMore((data.content?.length || 0) === PAGE_SIZE);
     } catch (error) {
-   //   console.error('Failed to fetch posts:', error);
+      //   console.error('Failed to fetch posts:', error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPosts();
-  }, []);
+    setPage(0);
+    fetchPosts(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Initialize animations
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
+
+  const loadMore = () => {
+    if (hasMore && !loading) {
+      setPage(prev => prev + 1);
+    }
+  };
+
+  useEffect(() => {
+    if (page > 0) {
+      fetchPosts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  const renderEmptyState = () => (
+    <Animated.View style={[styles.emptyContainer, { opacity: fadeAnim }]}>
+      <View style={styles.emptyIconContainer}>
+        <MaterialCommunityIcons name="post-outline" size={48} color={Colors.LIGHT_PURPLE} />
+      </View>
+      <Text style={styles.emptyTitle}>No posts yet</Text>
+      <Text style={styles.emptySubtitle}>
+        Share your first post with your community
+      </Text>
+    </Animated.View>
+  );
+
+  const renderLoadingMore = () => (
+    <View style={styles.loadingMore}>
+      <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+      <Text style={styles.loadingMoreText}>Loading more posts...</Text>
+    </View>
+  );
+
+  const renderPostItem = ({ item, index }) => (
+    <Animated.View
+      style={{
+        opacity: fadeAnim,
+        transform: [{ translateY: slideAnim }],
+      }}
+    >
+      <PostCard
+        key={item.id}
+        user={item.user}
+        postDateTime={item.postDateTime}
+        postId={item.id}
+        caption={item.caption}
+        photos={item.photos}
+        reactions={item.reactions || []}
+        comments={item.comments || []}
+        commentsNumber={item.commentsNumber || 0}
+        userReaction={item.userReaction}
+        onLike={() => {}}
+        onLongPressLike={() => {}}
+        onComment={() => {
+          setSelectedPostId(item.id);
+          setCommentModalVisible(true);
+        }}
+      />
+    </Animated.View>
+  );
 
   return (
     <View style={styles.container}>
-      {loading ? (
-        <LottieView
-          source={loadingAnimation}
-          autoPlay
-          loop
-          style={styles.loadingAnimation}
-        />
-      ) : posts.length === 0 ? (
-        <View style={styles.noPostsContainer}>
-          <Text style={styles.noPostsText}>No posts available</Text>
+      {loading && page === 0 ? (
+        <View style={styles.loadingContainer}>
+          <LottieView
+            source={loadingAnimation}
+            autoPlay
+            loop
+            style={styles.loadingAnimation}
+          />
+          <Text style={styles.loadingText}>Loading posts...</Text>
         </View>
+      ) : posts.length === 0 ? (
+        renderEmptyState()
       ) : (
-        <ScrollView contentContainerStyle={styles.listContent}>
-          {posts.map((item) => {
-            const user = item.user?.residentProfile;
-            const hasPhoto = item.photos && item.photos.length > 0;
-  
-            return (
-              <View key={item.id.toString()} style={styles.postCard}>
-                <View style={styles.userInfo}>
-                  <Image
-                    source={{ uri: user?.profilephoto || 'https://placeholder.com/avatar' }}
-                    style={styles.avatar}
-                  />
-                  <Text style={styles.username}>{user?.fullName}</Text>
-                </View>
-  
-                {hasPhoto && (
-                  <Image source={{ uri: item.photos[0] }} style={styles.postImage} />
-                )}
-  
-                <Text style={styles.caption}>{item.caption}</Text>
-              </View>
-            );
-          })}
-        </ScrollView>
+        <FlatList
+          data={posts}
+          renderItem={renderPostItem}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          showsVerticalScrollIndicator={false}
+          ListFooterComponent={loading && page > 0 ? renderLoadingMore() : null}
+        />
       )}
+      
+      {/* Comment Modal */}
+      <CommentModel
+        isVisible={isCommentModalVisible}
+        onClose={() => setCommentModalVisible(false)}
+        postId={selectedPostId}
+      />
     </View>
   );
-  
 }
 
 const styles = StyleSheet.create({
@@ -78,64 +171,64 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  listContent: {
-    paddingHorizontal: 10,
-    paddingTop: 10,
-  },
-  loadingAnimation: {
-    width: 600, // Adjust the size as needed
-    height: 500, // Adjust the size as needed
-    alignSelf: 'center',
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  postCard: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 15,
-    elevation: 2,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    marginRight: 10,
-  },
-  username: {
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  postImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  caption: {
-    fontSize: 14,
-    color: '#333',
-  },
-  noPostsContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  noPostsText: {
-    fontSize: 18,
-    color: '#777',
-    fontWeight: 'bold',
+  loadingAnimation: {
+    width: 200,
+    height: 200,
   },
-  
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  listContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 20,
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
+  },
 });
 
 export default PostsRoute;

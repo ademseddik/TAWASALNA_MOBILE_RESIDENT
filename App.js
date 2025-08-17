@@ -3,6 +3,7 @@ import { enableScreens } from 'react-native-screens';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
+import { StatusBar } from 'react-native';
 
 ///////////////////////screens import/////////////////////////////
 import SplashScreen from './src/components/SplashScreen';
@@ -22,6 +23,7 @@ import ShowGroup from './src/screens/groups/ShowGroup';
 import GroupDetails from './src/screens/groups/GroupDetails';
 import ConversationScreen from './src/screens/messaging/ConversationScreen';
 import PostDetail from './src/components/PostDetail';
+import MarketplaceNav from './src/marketplace/navigation/MarketplaceNav';
 //////////////////////////////////////////////////////////////////
 import { I18nextProvider } from 'react-i18next';
 import { ClerkProvider } from '@clerk/clerk-expo';
@@ -38,6 +40,11 @@ const App = () => {
   }
   return (
     <NavigationContainer>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="#900562" 
+        translucent={false}
+      />
       <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
         <I18nextProvider i18n={i18n}>
 
@@ -127,7 +134,13 @@ const App = () => {
         component={ConversationScreen} 
         options={{ headerShown: false }}
       />
+
      <Stack.Screen name="PostDetail" component={PostDetail} />
+         <Stack.Screen
+           name="Marketplace"
+           component={MarketplaceNav}
+           options={{ headerShown: false }}
+         />
           </Stack.Navigator>
 
         </I18nextProvider>

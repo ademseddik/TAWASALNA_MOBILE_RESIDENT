@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  FlatList,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import Colors from "../../../assets/Colors";
@@ -14,7 +15,6 @@ import {
   AntDesign,
   Ionicons,
 } from "@expo/vector-icons";
-import ProfilePosts from "../../components/ProfilePosts";
 import ProfileVideos from "../../components/ProfileVideos";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { encode } from "base64-arraybuffer";
@@ -25,6 +25,9 @@ import { APP_ENV } from '../../utils/BaseUrl';
 import Toast from "react-native-toast-message";
 import ProfileSurveys from "../../components/ProfileSurveys";
 import { FollowService } from '../../services/follow.service';
+import { ProfileService } from '../../services/profile.service';
+import PostCard from "../../components/PostCard";
+import CommentModel from '../../components/pupUps/CommentModel';
 
 const UsersProfile = () => {
   const route = useRoute();
@@ -43,11 +46,16 @@ const UsersProfile = () => {
   const [followerCount, setFollowerCount] = useState(0);
   const [postsCount, setPostsCount] = useState(0);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
-  
-  // New follow state management
   const [loadingFollow, setLoadingFollow] = useState(false);
   const [followStatus, setFollowStatus] = useState("follow");
-
+  const [posts, setPosts] = useState([]);
+  const [isFetchingPosts, setIsFetchingPosts] = useState(false);
+  const [postsPage, setPostsPage] = useState(0);
+  const [hasMorePosts, setHasMorePosts] = useState(true);
+  const [isCommentModalVisible, setCommentModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+  const PAGE_SIZE = 10;
+  
   ///////////////////////////////////////////////////////
   const handleButtonPress = (buttonName) => {
     setSelectedButton(buttonName);
@@ -88,24 +96,35 @@ const handleSendMessagePress = async () => {
     try {
       const currentUserId = await AsyncStorage.getItem("userId");
       if (!currentUserId) {
-    
         return;
       }
       
       const otherUserId = userId;
 
-   
+      // Create chatId by sorting user IDs and joining with underscore
       const ids = [currentUserId, otherUserId].sort();
       const chatId = ids.join('_');
+      
+      // Extract user IDs for the conversation screen
+      const user1ID = ids[0];
+      const user2ID = ids[1];
+
+      console.log('🚀 UsersProfile navigation to conversation:', {
+        chatId,
+        user1ID,
+        user2ID,
+        userName: fullName
+      });
 
       navigation.navigate('Conversation', {
         chatId: chatId,
         userName: fullName,
         userImage: profilePic,
+        user1ID: user1ID,
+        user2ID: user2ID
       });
     } catch (error) {
       console.error("Failed to navigate to conversation:", error);
-     
     }
   };
   const handleFollowAction = async () => {
@@ -164,11 +183,8 @@ const handleSendMessagePress = async () => {
     const fetchConnectedUserProfile = async () => {
       try {
         const userId = await AsyncStorage.getItem("userId");
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
-        );
-        setDataConnectedUser(response.data);
-        const residentProfile = response.data;
+        const residentProfile = await ProfileService.GetConnectedUserProfile(userId);
+        setDataConnectedUser(residentProfile);
         setFullNameConnectedUser(residentProfile.fullName);
         setFollowing(residentProfile.following);
       } catch (error) {
@@ -184,16 +200,14 @@ const handleSendMessagePress = async () => {
   useEffect(() => {
     const fetchProfile = async () => {
       setIsLoading(true);
-
       try {
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
-        );
-        setData(response.data);
-        const residentProfile = response.data;
+        const residentProfile = await ProfileService.GetUserProfileById(userId);
+        setData(residentProfile);
         setFullName(residentProfile.fullName);
+        setCoverPic(residentProfile.coverphoto);
+        setProfilePic(residentProfile.profilephoto);
         setAccountType(residentProfile.accountType);
-        updateFollowStatus(); // Update follow status when profile data is loaded
+        updateFollowStatus();
       } catch (error) {
         console.error("Error getting resident profile:", error);
         throw new Error(error);
@@ -217,68 +231,50 @@ const handleSendMessagePress = async () => {
   useEffect(() => {
     const fetchPostsCount = async () => {
       try {
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentposts/${userId}/${userId}`
+        const response = await fetch(
+          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserPosts/${userId}/0/10`
         );
-        setPostsCount(response.data === "No posts found" ? 0 : response.data.length);
+        const data = await response.json();
+        setPostsCount(data.totalElements || 0);
       } catch (error) {
-        console.error("Error fetching posts:", error);
+        console.error("Error fetching posts count:", error);
       }
     };
 
     fetchPostsCount();
   }, [userId]);
 
-  useEffect(() => {
-    const fetchProfilePhoto = async () => {
-      setIsLoading(true);
-
-      try {
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
-          {
-            responseType: "arraybuffer",
-          }
-        );
-        const base64Image = encode(response.data);
-        const imageUrl = `data:image/jpeg;base64,${base64Image}`;
-        setProfilePic(imageUrl);
-      } catch (error) {
-        console.error("Error getting profile photo:", error);
-        throw new Error(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProfilePhoto();
-  }, [userId]);
   
-  /////////////////////////////////////////////////////
+
   useEffect(() => {
-    const fetchCoverPhoto = async () => {
-      setIsLoading(true);
-
+    const fetchUserPosts = async () => {
+      setIsFetchingPosts(true);
       try {
-        const response = await Axios.get(
-          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getcoverphoto/${userId}`,
-          {
-            responseType: "arraybuffer",
-          }
+        const response = await fetch(
+          `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserPosts/${userId}/${postsPage}/${PAGE_SIZE}`
         );
-
-        const base64Image = encode(response.data);
-        const imageUrl = `data:image/jpeg;base64,${base64Image}`;
-        setCoverPic(imageUrl);
+        const data = await response.json();
+        if (postsPage === 0) {
+          setPosts(data.content || []);
+        } else {
+          setPosts(prev => [...prev, ...(data.content || [])]);
+        }
+        setHasMorePosts((data.content?.length || 0) === PAGE_SIZE);
       } catch (error) {
-        //console.error("Error getting cover photo:", error);
+        console.error("Error fetching user posts:", error);
       } finally {
-        setIsLoading(false);
+        setIsFetchingPosts(false);
       }
     };
+    fetchUserPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, postsPage]);
 
-    fetchCoverPhoto();
-  }, [userId]);
+  const loadMorePosts = () => {
+    if (hasMorePosts && !isFetchingPosts) {
+      setPostsPage(prev => prev + 1);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -310,29 +306,42 @@ const handleSendMessagePress = async () => {
       <TouchableOpacity
         onPress={handleFollowAction}
         disabled={loadingFollow}
+        style={{
+          flex: 1,
+          marginRight: 8,
+        }}
       >
         <View
           style={{
-            backgroundColor: Colors.LIGHT_PURPLE,
+            backgroundColor: followStatus === "unfollow" ? "#e9ecef" : Colors.LIGHT_PURPLE,
             alignItems: "center",
-            
-            borderRadius: 10,
-            margin: "2%",
-            height: 35,
+            justifyContent: "center",
+            borderRadius: 12,
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            borderWidth: 1,
+            borderColor: followStatus === "unfollow" ? "#dee2e6" : Colors.LIGHT_PURPLE,
+            shadowColor: "#000",
+            shadowOffset: {
+              width: 0,
+              height: 2,
+            },
+            shadowOpacity: 0.1,
+            shadowRadius: 3.84,
+            elevation: 3,
           }}
         >
           {loadingFollow ? (
-            <ActivityIndicator color="white" size="small" />
+            <ActivityIndicator color={followStatus === "unfollow" ? Colors.LIGHT_PURPLE : "white"} size="small" />
           ) : (
             <Text
               style={{
-                color: Colors.WHITE,
-                paddingTop: 6,
-                fontWeight: "500",
-                fontSize: 17,
+                color: followStatus === "unfollow" ? Colors.LIGHT_PURPLE : Colors.WHITE,
+                fontWeight: "600",
+                fontSize: 15,
               }}
             >
-              {followStatus === "unfollow" ? "Followed" :
+              {followStatus === "unfollow" ? "Following" :
                followStatus === "pending" ? "Cancel Request" :
                followStatus === "follow-back" ? "Follow Back" :
                "Follow"}
@@ -344,10 +353,12 @@ const handleSendMessagePress = async () => {
   };
 
   ///////////////////////////////////////////////////////////////
-  return (
-    <ScrollView style={{ backgroundColor: Colors.WHITE }}>
-      {accountType === "PRIVATE" && (followStatus === "follow" || followStatus === "pending") ?(
+  // 1. Define a function to render the profile header (all profile info, stats, buttons, tab selector)
+  const renderProfileHeader = () => (
+    <>
+      {accountType === "PRIVATE" && (followStatus === "follow" || followStatus === "pending") ? (
         <View>
+          {/* Profile info and private account UI */}
           <View>
             <View style={{ flexDirection: "row", marginTop: "12%" }}>
               <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -365,7 +376,6 @@ const handleSendMessagePress = async () => {
                   />
                 </View>
               </TouchableOpacity>
-
               <View
                 style={{
                   borderRadius: 10,
@@ -415,7 +425,8 @@ const handleSendMessagePress = async () => {
                 fontWeight: "bold",
               }}
             >
-              {postsCount}              </Text>
+              {postsCount}
+            </Text>
             <Text
               style={{
                 color: Colors.BLACK,
@@ -472,13 +483,10 @@ const handleSendMessagePress = async () => {
               Following
             </Text>
           </View>
-
           <View style={{ marginLeft: "5%", marginTop: "4%" }}>
             <Text style={{ fontWeight: "500" }}> {data.fullName}</Text>
           </View>
-          
           {renderFollowButton()}
-          
           <View style={{ alignItems: "center" }}>
             <Image
               source={require("../../../assets/Icons/private-account.png")}
@@ -498,31 +506,31 @@ const handleSendMessagePress = async () => {
           </View>
         </View>
       ) : (
-        <View>
+        <>
+          {/* Profile info and public account UI */}
           <View style={{ position: "relative" }}>
             {coverPic !== "data:image/jpeg;base64," ? (
               <Image
-                style={{ width: "100%", height: 200, borderRadius: 10 }}
+                style={{ width: "100%", height: 200 }}
                 source={{ uri: coverPic }}
               />
             ) : (
               <Image
                 source={require("../../../assets/default-avatar.jpg")}
-                style={{ width: "100%", height: 200, borderRadius: 10 }}
+                style={{ width: "100%", height: 200 }}
               />
             )}
           </View>
-
           <View style={{ flexDirection: "row", position: "relative" }}>
             {profilePic !== "data:image/jpeg;base64," ? (
               <Image
                 style={{
                   borderRadius: 50,
-                  marginTop: "-5%",
-                  marginLeft: "3%",
-                  width: 90,
-                  height: 90,
-                  borderWidth: 3,
+                  marginTop: "-10%",
+                  marginLeft: "5%",
+                  width: 100,
+                  height: 100,
+                  borderWidth: 0,
                 }}
                 source={{ uri: profilePic }}
               />
@@ -531,15 +539,14 @@ const handleSendMessagePress = async () => {
                 source={require("../../../assets/default-avatar.jpg")}
                 style={{
                   borderRadius: 50,
-                  marginTop: "-5%",
-                  marginLeft: "3%",
-                  width: 90,
-                  height: 90,
-                  borderWidth: 3,
+                  marginTop: "-15%",
+                  marginLeft: "5%",
+                  width: 100,
+                  height: 100,
+                  borderWidth: 0,
                 }}
               />
             )}
-
             <View style={{ marginLeft: 25, flex: 1 }}>
               <View style={{ flexDirection: "row" }}>
                 <Text style={{ color: Colors.BLACK, fontSize: 20 }}>
@@ -558,9 +565,9 @@ const handleSendMessagePress = async () => {
                   onPress={toggleBio}
                   activeOpacity={0.7}
                 >
-                  <AntDesign name="filetext1" size={18} />
+                  <MaterialIcons name="description" size={18} color="#6c757d" />
                   <Text
-                    style={{ color: "grey", flexWrap: "wrap", marginLeft: 5, maxWidth: 200 }}
+                    style={{ color: "#6c757d", flexWrap: "wrap", marginLeft: 5, maxWidth: 200 }}
                   >
                     {isBioExpanded || data.bio.length <= 100 ? data.bio : `${data.bio.substring(0, 100)}...`}
                   </Text>
@@ -568,9 +575,9 @@ const handleSendMessagePress = async () => {
               ) : null}
               {data.address ? (
                 <View style={{ flexDirection: "row", marginTop: 3 }}>
-                  <Entypo name="address" size={18} />
+                  <MaterialIcons name="location-on" size={18} color="#6c757d" />
                   <Text
-                    style={{ color: "grey", flexWrap: "wrap", marginLeft: 5 }}
+                    style={{ color: "#6c757d", flexWrap: "wrap", marginLeft: 5 }}
                   >
                     {data.address}
                   </Text>
@@ -582,80 +589,141 @@ const handleSendMessagePress = async () => {
             style={{
               flexDirection: "row",
               marginTop: "7%",
-              justifyContent: "space-around",
+              marginHorizontal: 20,
+              backgroundColor: "#f8f9fa",
+              borderRadius: 16,
+              paddingVertical: 20,
+              paddingHorizontal: 10,
+              shadowColor: "#000",
+              shadowOffset: {
+                width: 0,
+                height: 2,
+              },
+              shadowOpacity: 0.1,
+              shadowRadius: 3.84,
+              elevation: 3,
             }}
           >
-            <View style={{ alignItems: "center" }}>
+            <View style={{ 
+              flex: 1, 
+              alignItems: "center",
+              borderRightWidth: 1,
+              borderRightColor: "#e9ecef",
+              paddingRight: 10
+            }}>
               <Text
                 style={{
-                  color: Colors.BLACK,
-                  fontSize: 20,
-                  fontWeight: "bold",
+                  color: Colors.LIGHT_PURPLE,
+                  fontSize: 24,
+                  fontWeight: "700",
+                  marginBottom: 4,
                 }}
               >
                 {postsCount}
               </Text>
-              <Text style={{ color: Colors.BLACK, fontSize: 13 }}>Posts</Text>
+              <Text style={{ 
+                color: "#6c757d", 
+                fontSize: 12,
+                fontWeight: "500",
+                textTransform: "uppercase",
+                letterSpacing: 0.5
+              }}>
+                Posts
+              </Text>
             </View>
-            <View style={{ alignItems: "center" }}>
+            <View style={{ 
+              flex: 1, 
+              alignItems: "center",
+              borderRightWidth: 1,
+              borderRightColor: "#e9ecef",
+              paddingHorizontal: 10
+            }}>
               <Text
                 style={{
-                  color: Colors.BLACK,
-                  fontSize: 20,
-                  fontWeight: "bold",
+                  color: Colors.LIGHT_PURPLE,
+                  fontSize: 24,
+                  fontWeight: "700",
+                  marginBottom: 4,
                 }}
               >
                 {data.followers ? data.followers.length : 0}
               </Text>
-              <Text style={{ color: Colors.BLACK, fontSize: 13 }}>
+              <Text style={{ 
+                color: "#6c757d", 
+                fontSize: 12,
+                fontWeight: "500",
+                textTransform: "uppercase",
+                letterSpacing: 0.5
+              }}>
                 Followers
               </Text>
             </View>
-            <View style={{ alignItems: "center" }}>
+            <View style={{ 
+              flex: 1, 
+              alignItems: "center",
+              paddingLeft: 10
+            }}>
               <Text
                 style={{
-                  color: Colors.BLACK,
-                  fontSize: 20,
-                  fontWeight: "bold",
+                  color: Colors.LIGHT_PURPLE,
+                  fontSize: 24,
+                  fontWeight: "700",
+                  marginBottom: 4,
                 }}
               >
                 {data.following ? data.following.length : 0}
               </Text>
-              <Text style={{ color: Colors.BLACK, fontSize: 13 }}>
+              <Text style={{ 
+                color: "#6c757d", 
+                fontSize: 12,
+                fontWeight: "500",
+                textTransform: "uppercase",
+                letterSpacing: 0.5
+              }}>
                 Following
               </Text>
             </View>
           </View>
-
           <View
             style={{
               flexDirection: "row",
-              marginLeft: "auto",
-              marginRight: "auto",
+              marginHorizontal: 20,
               marginTop: "3%",
             }}
           >
             {renderFollowButton()}
             <TouchableOpacity 
-            onPress={handleSendMessagePress}
+              onPress={handleSendMessagePress}
+              style={{
+                flex: 1,
+                marginLeft: 8,
+              }}
             >
               <View
                 style={{
-                  backgroundColor: Colors.LIGHT_PURPLE,
+                  backgroundColor: "#f8f9fa",
                   alignItems: "center",
-                  width: 150,
-                  borderRadius: 10,
-                  marginLeft: "3%",
-                  marginTop: "2%",
-                  height: 35,
+                  justifyContent: "center",
+                  borderRadius: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderWidth: 1,
+                  borderColor: "#e9ecef",
+                  shadowColor: "#000",
+                  shadowOffset: {
+                    width: 0,
+                    height: 2,
+                  },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 3.84,
+                  elevation: 3,
                 }}
               >
                 <Text
                   style={{
-                    color: Colors.WHITE,
-                    paddingTop: 6,
-                    fontWeight: "500",
-                    fontSize: 17,
+                    color: Colors.LIGHT_PURPLE,
+                    fontWeight: "600",
+                    fontSize: 15,
                   }}
                 >
                   Send Message
@@ -663,87 +731,159 @@ const handleSendMessagePress = async () => {
               </View>
             </TouchableOpacity>
           </View>
-
-          <View style={{ flexDirection: "row", marginTop: "5%" }}>
+          <View style={{ 
+            flexDirection: "row", 
+            marginTop: "5%", 
+            justifyContent: "center",
+            paddingHorizontal: 20,
+            gap: 20
+          }}>
             <TouchableOpacity
-              style={{ marginLeft: "9%", marginRight: "4%" }}
+              style={{
+                alignItems: "center",
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 12,
+                backgroundColor: selectedButton === "Posts" ? Colors.LIGHT_PURPLE : "#f8f9fa",
+                borderWidth: 1,
+                borderColor: selectedButton === "Posts" ? Colors.LIGHT_PURPLE : "#e9ecef",
+                minWidth: 80,
+                shadowColor: "#000",
+                shadowOffset: {
+                  width: 0,
+                  height: 2,
+                },
+                shadowOpacity: selectedButton === "Posts" ? 0.25 : 0.1,
+                shadowRadius: 3.84,
+                elevation: selectedButton === "Posts" ? 5 : 2,
+              }}
               onPress={() => handleButtonPress("Posts")}
             >
               <MaterialIcons
-                name="add-photo-alternate"
-                size={40}
+                name="photo-library"
+                size={26}
                 color={
                   selectedButton === "Posts"
-                    ? Colors.LIGHT_PURPLE
-                    : Colors.BLACK
+                    ? Colors.WHITE
+                    : Colors.LIGHT_PURPLE
                 }
               />
+              <Text style={{
+                fontSize: 13,
+                marginTop: 6,
+                color: selectedButton === "Posts" ? Colors.WHITE : Colors.LIGHT_PURPLE,
+                fontWeight: selectedButton === "Posts" ? "700" : "600"
+              }}>
+                Posts
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={{ marginLeft: "11%" }}
-              onPress={() => handleButtonPress("Videos")}
-            >
-              <Entypo
-                name="video"
-                size={40}
-                color={
-                  selectedButton === "Videos"
-                    ? Colors.LIGHT_PURPLE
-                    : Colors.BLACK
-                }
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginLeft: "13%" }}
+              style={{
+                alignItems: "center",
+                paddingVertical: 12,
+                paddingHorizontal: 20,
+                borderRadius: 12,
+                backgroundColor: selectedButton === "status" ? Colors.LIGHT_PURPLE : "#f8f9fa",
+                borderWidth: 1,
+                borderColor: selectedButton === "status" ? Colors.LIGHT_PURPLE : "#e9ecef",
+                minWidth: 80,
+                shadowColor: "#000",
+                shadowOffset: {
+                  width: 0,
+                  height: 2,
+                },
+                shadowOpacity: selectedButton === "status" ? 0.25 : 0.1,
+                shadowRadius: 3.84,
+                elevation: selectedButton === "status" ? 5 : 2,
+              }}
               onPress={() => handleButtonPress("status")}
             >
               <MaterialIcons
-                name="post-add"
-                size={40}
+                name="article"
+                size={26}
                 color={
                   selectedButton === "status"
-                    ? Colors.LIGHT_PURPLE
-                    : Colors.BLACK
+                    ? Colors.WHITE
+                    : Colors.LIGHT_PURPLE
                 }
               />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{ marginLeft: "13%" }}
-              onPress={() => handleButtonPress("surveys")}
-            >
-              <Ionicons
-                name="stats-chart"
-                size={35}
-                color={
-                  selectedButton === "surveys"
-                    ? Colors.LIGHT_PURPLE
-                    : Colors.BLACK
-                }
-              />
+              <Text style={{
+                fontSize: 13,
+                marginTop: 6,
+                color: selectedButton === "status" ? Colors.WHITE : Colors.LIGHT_PURPLE,
+                fontWeight: selectedButton === "status" ? "700" : "600"
+              }}>
+                Status
+              </Text>
             </TouchableOpacity>
           </View>
-
-          {selectedButton === "Posts" && (
-            <ProfilePosts
-              fullName={fullName}
-              profilePic={profilePic}
-              idfromUsersprofile={userId}
-            />
-          )}
-          {selectedButton === "Videos" && <ProfileVideos />}
-          {selectedButton === "status" && (
-            <ProfileStatus
-              fullName={fullName}
-              profilePic={profilePic}
-              idfromUsersprofile={userId}
-            />
-          )}
-          {selectedButton === "surveys" && (
-            <ProfileSurveys fullName={fullName} profilePic={profilePic} />
-          )}
-        </View>
+        </>
       )}
-    </ScrollView>
+    </>
+  );
+
+  // 2. Main return: Only FlatList, no ScrollView
+  return (
+    selectedButton === "Posts" ? (
+      <>
+        <FlatList
+          data={posts}
+          renderItem={({ item: post }) => (
+            <PostCard
+              key={post.id}
+              user={{ name: fullName, image: profilePic }}
+              postDateTime={post.postDateTime}
+              caption={post.caption}
+              photos={post.photos}
+              reactions={post.reactions || []}
+              comments={post.comments || []}
+              commentsNumber={post.commentsNumber || 0}
+              userReaction={post.reactions?.find(r => r.userId === dataConnectedUser.id)?.reactionType}
+              postId={post.id}
+              onComment={() => {
+                setSelectedPostId(post.id);
+                setCommentModalVisible(true);
+              }}
+            />
+          )}
+          keyExtractor={item => item.id}
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={renderProfileHeader}
+          ListFooterComponent={isFetchingPosts && posts.length > 0 ? (
+            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={Colors.PURPLE} />
+            </View>
+          ) : null}
+          ListEmptyComponent={isFetchingPosts ? (
+            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={Colors.PURPLE} />
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center', marginTop: 32 }}>
+              <Text>No posts yet</Text>
+            </View>
+          )}
+          contentContainerStyle={{ paddingBottom: 32 }}
+        />
+        {/* Comment Modal */}
+        <CommentModel
+          isVisible={isCommentModalVisible}
+          onClose={() => setCommentModalVisible(false)}
+          postId={selectedPostId}
+        />
+      </>
+    ) : (
+      // For status tab, just render the header and ProfileStatus
+      <>
+        {renderProfileHeader()}
+        <ProfileStatus
+          fullName={fullName}
+          profilePic={profilePic}
+          idfromUsersprofile={userId}
+        />
+      </>
+    )
   );
 };
 

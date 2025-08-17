@@ -19,6 +19,7 @@ export const Card = styled.TouchableOpacity`
 export const UserInfo = styled.View`
   flex-direction: row;
   justify-content: space-between;
+  margin-left: 20px;
 `;
 
 export const UserImgWrapper = styled.View`
@@ -29,6 +30,7 @@ export const UserImgWrapper = styled.View`
 export const UserImg = styled.Image`
   width: 40px;
   height: 40px;
+  margin-left: 20px;
   border-radius: 25px;
 `;
 

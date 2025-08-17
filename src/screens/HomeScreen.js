@@ -1,7 +1,7 @@
 // src/screens/HomeScreen.js
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Animated, BackHandler, View, Image, Text, StyleSheet } from 'react-native';
+import { Animated, BackHandler, View, Image, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -10,6 +10,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { initializeSocket } from '../services/WebSocketService'; 
 import { initializeChatSocket } from '../utils/initializeChatSocket';
 import Colors from '../../assets/Colors';
+import Axios from 'axios';
+import { APP_ENV } from '../utils/BaseUrl';
 // Screenss
 import Home from './tabs/HomeScreen';
 import Search from './tabs/SearchScreen';
@@ -32,7 +34,7 @@ const HomeScreen = ({ route }) => {
   const [currentTab, setCurrentTab] = useState(initialTab); // <<< NEW
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
-  // --- NEW: useEffect to manage WebSocket connections ---
+  // --- WebSocket connections for notification counter ---
   useEffect(() => {
     let generalSocketWrapper = null;
     let chatSocketWrapper = null;
@@ -50,6 +52,7 @@ const HomeScreen = ({ route }) => {
         
         const handleNewGeneralNotification = (notification) => {
           console.log('Received general notification:', notification.type);
+          // Increment the unread count for new notifications
           setUnreadNotificationCount(prevCount => prevCount + 1);
         };
         
@@ -62,39 +65,32 @@ const HomeScreen = ({ route }) => {
         generalSocketWrapper.on('reactionOnCommentNotification', handleNewGeneralNotification);
         generalSocketWrapper.on('groupInvitation', handleNewGeneralNotification);
 
-
         // --- 2. Connect to the Chat Message Socket ---
         chatSocketWrapper = await initializeChatSocket();
 
         // Subscribe to the user's personal notification queue for new messages
-        // This is where your backend sends a signal for a new message
         chatSocketWrapper.subscribe(`/user/${userId}/queue/notifications`, (messageNotification) => {
           console.log('Received new message notification.');
-          // You can add a check here if this queue sends other types of notifications
           if (messageNotification.typeNotif === 'MESSAGE') {
             setUnreadNotificationCount(prevCount => prevCount + 1);
           }
         });
 
       } catch (error) {
-        console.error("Failed to setup WebSocket listeners:", error);
+        
       }
     };
 
     setupAndListen();
 
-    // --- 3. Cleanup Function ---
-    // This is crucial to prevent memory leaks and duplicate connections
+    // --- Cleanup Function ---
     return () => {
       console.log("Cleaning up Home screen sockets...");
       if (generalSocketWrapper) {
         generalSocketWrapper.disconnect();
       }
       if (chatSocketWrapper) {
-        // Since your chat socket is shared, you might not want to fully disconnect
-        // unless the user is logging out. For now, we'll assume disconnecting on screen unload is okay.
-        // A more advanced pattern would use a global context to manage the socket lifecycle.
-        // chatSocketWrapper.disconnect(); // Comment out if you want it to persist across screens
+        // chatSocketWrapper.disconnect(); // Uncomment if you want to disconnect on screen unload
       }
     };
   }, []); 
@@ -115,9 +111,46 @@ const HomeScreen = ({ route }) => {
     }
   };
 
+  const fetchInitialNotificationCount = async () => {
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+      
+      // Fetch notifications from the new backend endpoint
+      const response = await Axios.get(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/findNotificationsForUser/${userId}?page=0&size=100`);
+      
+      const notificationsData = response.data.content || [];
+      
+      // Count only unread notifications
+      const unreadCount = notificationsData.filter(notification => !notification.read).length;
+      
+      setUnreadNotificationCount(unreadCount);
+    } catch (error) {
+      console.error("Error fetching initial notification count:", error);
+    }
+  };
+
+  const refreshNotificationCount = async () => {
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+      
+      // Fetch notifications from the new backend endpoint
+      const response = await Axios.get(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/findNotificationsForUser/${userId}?page=0&size=100`);
+      
+      const notificationsData = response.data.content || [];
+      
+      // Count only unread notifications
+      const unreadCount = notificationsData.filter(notification => !notification.read).length;
+      
+      setUnreadNotificationCount(unreadCount);
+    } catch (error) {
+      console.error("Error refreshing notification count:", error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       await fetchProfileData();
+      await fetchInitialNotificationCount();
     };
     loadData();
   }, []);
@@ -130,6 +163,9 @@ const HomeScreen = ({ route }) => {
       };
 
       BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+      // Refresh notification count when screen comes into focus
+      refreshNotificationCount();
 
       return () => {
         BackHandler.removeEventListener('hardwareBackPress', onBackPress);
@@ -148,12 +184,14 @@ const HomeScreen = ({ route }) => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
 
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: Colors.WHITE }}>
 
       <Tab.Navigator
         initialRouteName={initialTab}
-        screenOptions={({ route }) => ({
+        screenOptions={({ route, navigation }) => ({
           headerShown: false,
+        
+     
           tabBarShowLabel: true,
           tabBarStyle: {
             backgroundColor: '#fff',
@@ -169,7 +207,35 @@ const HomeScreen = ({ route }) => {
          case 'Chat':
   return <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={24} color={color} />;
                 case 'Notifications':
-                  return <MaterialCommunityIcons name="bell-outline" size={24} color={color} />;
+                  return (
+                    <View style={{ position: 'relative' }}>
+                      <MaterialCommunityIcons name="bell-outline" size={24} color={color} />
+                      {unreadNotificationCount > 0 && (
+                        <View style={{
+                          position: 'absolute',
+                          top: -5,
+                          right: -5,
+                          backgroundColor: '#FF4444',
+                          borderRadius: 10,
+                          minWidth: unreadNotificationCount > 99 ? 24 : 20,
+                          height: 20,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          borderWidth: 2,
+                          borderColor: '#fff',
+                          paddingHorizontal: 2
+                        }}>
+                          <Text style={{
+                            color: '#fff',
+                            fontSize: unreadNotificationCount > 99 ? 8 : 10,
+                            fontWeight: 'bold'
+                          }}>
+                            {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  );
               case 'Profile':
                 return (
                   <Image
@@ -194,7 +260,12 @@ const HomeScreen = ({ route }) => {
           state: (e) => {
             const index = e.data.state.index;
             const routeName = e.data.state.routeNames[index];
-            setCurrentTab(routeName); // <<< when tab changes, update the header title
+            setCurrentTab(routeName);
+            
+            // Refresh notification counter when user visits Notifications tab
+            if (routeName === 'Notifications') {
+              refreshNotificationCount();
+            }
           },
         }}
       >

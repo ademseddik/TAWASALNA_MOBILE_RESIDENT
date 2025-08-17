@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  ScrollView,
   TextInput,
   SafeAreaView,
   StatusBar,
-  StyleSheet
+  StyleSheet,
+  RefreshControl,
+  Animated
 } from 'react-native';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,6 +27,10 @@ const Conversations = () => {
   const [lastPage, setLastPage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState(null); // Store userId in state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
   const PAGE_SIZE = 10;
 
   // Use useFocusEffect to refetch conversations when the screen comes into focus
@@ -45,6 +50,20 @@ const Conversations = () => {
   );
 
   useEffect(() => {
+    // Simple entrance animation to match other screens
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
     let notificationSocketInstance;
 
     const setupSocket = async () => {
@@ -61,9 +80,9 @@ const Conversations = () => {
             if (conv.chatId === notification.chatId) {
               return {
                 ...conv,
-                lastMessage: notification.content, // Update with new message content
+                lastMessage: [{ senderId: notification.senderId, content: notification.content }], // Update with new message content in array format
                 lastMessageTimestamp: notification.timestamp,
-                unreadCount: conv.unreadCount + 1, // Increment unread count
+                isSeen: false, // Mark as unread when new message arrives
               };
             }
             return conv;
@@ -97,7 +116,7 @@ const Conversations = () => {
     if (!currentUserId || (loading && !reset) || (lastPage && !reset)) return;
     setLoading(true);
     try {
-      const res = await fetch(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/myrooms-paged/${currentUserId}?pageNo=${currentPage + 1}`);
+      const res = await fetch(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/getmyrooms/${currentUserId}?page=${currentPage}&size=${PAGE_SIZE}`);
       const data = await res.json();
       setConversations(prev => reset ? [...data.content] : [...prev, ...data.content]);
       setPage(data.number);
@@ -110,40 +129,81 @@ const Conversations = () => {
   };
 
   const loadMoreConversations = () => {
-    fetchConversations(userId, page);
+    if (!loading && !lastPage) {
+      fetchConversations(userId, page + 1);
+    }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    if (userId) {
+      await fetchConversations(userId, 0, true);
+    }
+    setRefreshing(false);
+  }, [userId]);
+
+  // Filter conversations based on searchQuery
+  const filteredConversations = conversations.filter(conv =>
+    conv.userName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const renderConversationItem = ({ item }) => {
-    // Check if lastMessage is an array and take the first element, otherwise use directly
-    const lastMsgContent = Array.isArray(item.lastMessage) ? item.lastMessage[0]?.content : item.lastMessage;
-    const hasNewMessages = item.unreadCount > 0; // Use unreadCount for new messages
+    // Handle the new data structure where lastMessage is an array
+    let lastMsgContent = '';
+    if (Array.isArray(item.lastMessage) && item.lastMessage.length > 0) {
+      lastMsgContent = item.lastMessage[0]?.content || '';
+    } else if (typeof item.lastMessage === 'string') {
+      lastMsgContent = item.lastMessage;
+    }
+    
+    // Use isSeen field from the new API response
+    const hasNewMessages = !item.isSeen;
+
+    // Extract user IDs from chatId (format: user1ID_user2ID)
+    const userIds = item.chatId.split('_');
+    const user1ID = userIds[0];
+    const user2ID = userIds[1];
 
     return (
-      <TouchableOpacity key={item.chatId}
-        style={styles.conversationItem}
-        onPress={() => navigation.navigate('Conversation', {
-          chatId: item.chatId,
-          userName: item.userName,
-          userImage: item.userImage
-        })}
+      <TouchableOpacity
+        key={item.chatId}
+        style={styles.conversationCard}
+        onPress={() =>
+          navigation.navigate('Conversation', {
+            chatId: item.chatId,
+            userName: item.userName,
+            userImage: item.userImage,
+            user1ID: user1ID,
+            user2ID: user2ID,
+            productId: item.productId || [],
+            serviceId: item.serviceId || [],
+            needId: item.needId || [],
+          })
+        }
+        activeOpacity={0.9}
       >
-        <View style={styles.conversationLeft}>
+        {/* Avatar */}
+        <View style={styles.avatarContainer}>
           <Image
             source={{ uri: item.userImage || 'https://i.ibb.co/cXTTnFdP/profile-photo.jpg' }}
             style={styles.conversationAvatar}
           />
-          <View style={styles.conversationInfo}>
-            <Text style={styles.conversationName}>{item.userName}</Text>
-            <Text style={[
-              styles.conversationMessage,
-              hasNewMessages && styles.newMessage
-            ]}>
-              {lastMsgContent || 'No messages yet'}
-            </Text>
-          </View>
         </View>
-        <View style={styles.conversationRight}>
-          {hasNewMessages && <View style={styles.newMessageDot} />}
+
+        {/* Content */}
+        <View style={styles.conversationInfo}>
+          <View style={styles.headerRow}>
+            <Text style={styles.conversationName} numberOfLines={1}>
+              {item.userName ? String(item.userName) : ''}
+            </Text>
+            {hasNewMessages && <View style={styles.newMessageDot} />}
+          </View>
+          <Text
+            style={[styles.conversationMessage, hasNewMessages && styles.newMessage]}
+            numberOfLines={1}
+          >
+            {lastMsgContent || 'No messages yet'}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -153,56 +213,63 @@ const Conversations = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
-        </TouchableOpacity>
+      <Animated.View style={[styles.header, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerSubtitle}>Chat with people and groups</Text>
+      </Animated.View>
 
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>adem_seddik</Text>
-          <View style={styles.onlineIndicator} />
-        </View>
-      </View>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+      {/* Search */}
+      <Animated.View style={[styles.searchContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}> 
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={20} color={Colors.LIGHT_PURPLE} style={styles.searchIcon} />
           <TextInput
-            placeholder="Search"
-            placeholderTextColor="#c4c4c2"
-            style={styles.searchInput}
+            style={styles.searchBar}
+            placeholder="Search conversations..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholderTextColor="#9CA3AF"
           />
         </View>
-      </View>
+      </Animated.View>
 
-      <ScrollView style={styles.content}>
-        {/* Stories Section */}
-
-
-        {/* Messages Header */}
-        <View style={styles.messagesHeader}>
-          <Text style={styles.messagesTitle}>Messages</Text>
-        </View>
-
-        {/* Conversations List */}
-        <View style={styles.conversationsList}>
-          <FlatList
-            data={conversations}
-            renderItem={renderConversationItem}
-            keyExtractor={item => item.chatId}
-            ListFooterComponent={
-              loading ? <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} /> : null
-            }
-            onEndReached={loadMoreConversations}
-            onEndReachedThreshold={0.5}
-            scrollEnabled={false}
+      {/* Conversations List */}
+      <FlatList
+        data={filteredConversations}
+        renderItem={renderConversationItem}
+        keyExtractor={(item) => item.chatId}
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="chatbubbles-outline" size={48} color={Colors.LIGHT_PURPLE} />
+            </View>
+            <Text style={styles.emptyTitle}>No conversations yet</Text>
+            <Text style={styles.emptySubtitle}>Start a conversation to see it here</Text>
+          </View>
+        }
+        ListFooterComponent={
+          loading ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+              <Text style={styles.loadingMoreText}>Loading...</Text>
+            </View>
+          ) : null
+        }
+        onEndReached={loadMoreConversations}
+        onEndReachedThreshold={0.5}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.LIGHT_PURPLE]}
+            tintColor={Colors.LIGHT_PURPLE}
           />
-        </View>
-      </ScrollView>
+        }
+      />
     </SafeAreaView>
   );
 };
@@ -210,177 +277,150 @@ const Conversations = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.WHITE,
+    backgroundColor: '#fff',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 12,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+    backgroundColor: '#fff',
   },
   headerTitle: {
-    color: Colors.LIGHT_PURPLE,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
   },
-  onlineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF3040',
-    marginLeft: 8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 8,
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    fontWeight: '500',
   },
   searchContainer: {
-padding:10,
-   
-    borderRadius:20,
-    marginHorizontal:10,
-    marginVertical:10,
-    backgroundColor:Colors.WHITE,
-    elevation:10,
-   height:65,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  searchBar: {
+  listContainer: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+  },
+  conversationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.LIGHT_BLACK,
-    borderRadius: 15,
-    paddingHorizontal: 16,
-    paddingVertical: 5,
-    height:44,
-    
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
-  searchIcon: {
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  avatarContainer: {
     marginRight: 12,
-    color:Colors.LIGHT_PURPLE,
-  },
-  searchInput: {
-    flex: 1,
-    color: 'white',
-    fontSize: 16,
-    height:44,
-    
-  },
-  content: {
-    flex: 1,
-  },
-  storiesContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  storyItem: {
-    alignItems: 'center',
-    marginRight: 16,
-    width: 70,
-  },
-  storyImageContainer: {
-    position: 'relative',
-  },
-  storyImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginBottom: 8,
-  },
-  onlineStatus: {
-    position: 'absolute',
-    bottom: 8,
-    right: 0,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#00FF00',
-    borderWidth: 2,
-    borderColor: '#000',
-  },
-  storyName: {
-    color: Colors.LIGHT_PURPLE,
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  messagesHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  messagesTitle: {
-    color: Colors.LIGHT_PURPLE,
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  requestsText: {
-    color: Colors.LIGHT_PURPLE,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  conversationsList: {
-    paddingHorizontal: 16,
-  },
-  conversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  conversationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
   },
   conversationAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: '#F3F4F6',
   },
   conversationInfo: {
     flex: 1,
   },
   conversationName: {
-    color: Colors.BLACK,
+    color: '#1F2937',
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
   },
   conversationMessage: {
-    color: Colors.LIGHT_PURPLE,
+    color: '#6B7280',
     fontSize: 14,
   },
   newMessage: {
     color: Colors.LIGHT_PURPLE,
-    fontWeight: '500',
-  },
-  conversationRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: '600',
   },
   newMessageDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4A90E2',
-    marginRight: 12,
+    backgroundColor: Colors.LIGHT_PURPLE,
+    marginLeft: 8,
   },
-  cameraButton: {
-    padding: 8,
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchBar: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1F2937',
+    paddingVertical: 0,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 8,
   },
 });
 

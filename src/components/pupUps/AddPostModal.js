@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import {
   Modal,
   View,
@@ -7,12 +8,9 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Switch,
-  ActivityIndicator,
-  Button
+  Switch
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,7 +22,7 @@ import * as Haptics from 'expo-haptics';
 
 const MAX_IMAGES = 5;
 
-const AddPostModal = ({ visible, onClose }) => {
+const AddPostModal = ({ visible, onClose, onPostAdded }) => {
   const [caption, setCaption] = useState('');
   const [photos, setPhotos] = useState([]); // changed from single photo to array
   const [isAnnouncement, setIsAnnouncement] = useState(false);
@@ -107,7 +105,11 @@ const AddPostModal = ({ visible, onClose }) => {
       setIsLoading(false);
       playSuccessSound();
       resetFields();
+      // Close first for better UX, then notify parent to refresh
       onClose();
+      if (typeof onPostAdded === 'function') {
+        onPostAdded();
+      }
     } catch (err) {
       console.error('Error adding post:', err);
       setIsLoading(false);
@@ -129,18 +131,18 @@ const AddPostModal = ({ visible, onClose }) => {
             placeholder="Caption"
             value={caption}
             onChangeText={setCaption}
-            style={styles.input}
+            style={styles.textField}
             placeholderTextColor="#888"
           />
 
           {photos.length > 0 && (
             <View style={styles.imageGrid}>
-              {photos.map((img, idx) => (
-                <View key={idx} style={styles.imageWrapper}>
+              {photos.map((img) => (
+                <View key={img.uri} style={styles.imageWrapper}>
                   <Image source={{ uri: img.uri }} style={styles.image} />
                   <TouchableOpacity
                     style={styles.removeButton}
-                    onPress={() => removeImage(idx)}
+                    onPress={() => removeImage(photos.findIndex(p => p.uri === img.uri))}
                     activeOpacity={0.7}
                   >
                     <MaterialIcons name="close" size={18} color="#fff" />
@@ -173,21 +175,21 @@ const AddPostModal = ({ visible, onClose }) => {
                 placeholder="Title"
                 value={title}
                 onChangeText={setTitle}
-                style={styles.input}
+                style={styles.textField}
                 placeholderTextColor="#888"
               />
               <TextInput
                 placeholder="Description"
                 value={description}
                 onChangeText={setDescription}
-                style={styles.input}
+                style={styles.textField}
                 placeholderTextColor="#888"
               />
               <TextInput
                 placeholder="Category"
                 value={category}
                 onChangeText={setCategory}
-                style={styles.input}
+                style={styles.textField}
                 placeholderTextColor="#888"
               />
             </>
@@ -220,14 +222,19 @@ const AddPostModal = ({ visible, onClose }) => {
   );
 };
 
+AddPostModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onPostAdded: PropTypes.func,
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
     justifyContent: 'center',
     backgroundColor: '#2196F3',
-    borderRadius: 20,
-    padding: 20
+    borderRadius: 20
   },
   addPostButton: {
     backgroundColor: Colors.LIGHT_PURPLE, // or any hex like '#4CAF50'
@@ -266,7 +273,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: { fontSize: 20, fontWeight: 'bold', marginBottom: 10 },
-  input: { borderBottomWidth: 1, marginBottom: 10, padding: 8 },
   image: {
     width: 80,
     height: 80,
@@ -402,7 +408,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 2,
   },
-  input: {
+  textField: {
     width: '100%',
     borderRadius: 14,
     backgroundColor: '#f5f5fa',

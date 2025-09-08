@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-//import { usePushNotifications } from '../utils/usePushNotifications';
 
 import { AuthService } from '../services/auth.service';
+import { ProfileService } from '../services/profile.service';
+import { UserStorage } from '../storage/userStorage';
 import { useTranslation } from 'react-i18next';
 import { useNetworkMonitor } from './useNetworkMonitor';
 
 export const useLogin = () => {
-  //const { expoPushToken, notification } = usePushNotifications();
 
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -73,32 +73,55 @@ export const useLogin = () => {
     setState(prev => ({ ...prev, isLoading: true }));
 
     try {
-      //console.log("Expo Push Token:", expoPushToken);
-
-   //   const pushNotificationToken = await registerForPushNotificationsAsync();
-   //   console.log("Push Token:", pushNotificationToken);
+      // Ensure no stale tokens are attached to signin request
+      try { await AsyncStorage.multiRemove(["USER_ACCESS", "USER_REFRESH"]); } catch (e) {}
+      
       const response = await AuthService.login({
         email: state.email,
         password: state.password,
-       // pushNotificationToken: pushNotificationToken|| null,
       });
       console.log(response)
-      if (!response.roles?.includes("ROLE_COMMUNITY_MEMBER")) {
-        throw new Error("UNAUTHORIZED_ROLE");
+      const hasRequiredRole = Array.isArray(response?.roles)
+        ? response.roles.includes("ROLE_COMMUNITY_MEMBER")
+        : true; // If roles not present, proceed
+      if (!hasRequiredRole) {
+        setState(prev => ({ ...prev, isLoading: false, errors: { general: t("Unauthorized access: Invalid user role") } }));
+        await AsyncStorage.clear();
+        return;
       }
-      await Promise.all([
-        AsyncStorage.setItem("RememberMe", state.isChecked.toString()),
-        AsyncStorage.setItem("userEmail", state.email),
-        AsyncStorage.setItem("userId", response.id),
-        AsyncStorage.setItem("USER_REFRESH", response.refreshToken),
-        AsyncStorage.setItem("USER_ACCESS", response.token),
-        AsyncStorage.setItem("lastLoginTimestamp", Date.now().toString())
-      ]);
-
+      await UserStorage.saveAuth({
+        rememberMe: state.isChecked,
+        email: state.email,
+        userId: response.id,
+        refreshToken: response.refreshToken,
+        token: response.token,
+      });
+      // Stop loading and navigate immediately
+      setState(prev => ({ ...prev, isLoading: false }));
       navigation.navigate("TABBAR");
+
+      // Fire-and-forget: fetch resident profile in background (do not block UI)
+      ProfileService.GetProfileData({ userId: response.id, token: response.token })
+        .then(async (profile) => {
+          const username = profile?.fullName || profile?.username || '';
+          const image = profile?.profilephoto || '';
+          await UserStorage.saveProfileBasics({ username, image });
+        })
+        .catch((e) => {
+          console.log('Failed to fetch/store resident profile after login', e);
+        })
+        .finally(async () => {
+          try {
+            const stored = await UserStorage.getAll();
+            console.log('Stored user info after login:', stored);
+          } catch (e) {
+            console.log('Failed to read stored user info', e);
+          }
+        });
     } catch (error) {
       handleLoginError(error);
     } finally {
+      // isLoading already turned off above on success; ensure it turns off on errors too
       setState(prev => ({ ...prev, isLoading: false }));
     }
   };

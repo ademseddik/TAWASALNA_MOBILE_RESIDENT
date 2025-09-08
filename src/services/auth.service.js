@@ -1,4 +1,4 @@
-import Axios from 'axios';
+import http from './http';
 import { APP_ENV } from '../utils/BaseUrl';
 
 export const AuthService = {
@@ -8,8 +8,9 @@ export const AuthService = {
   /////////////////////////////////////////////LOGIN////////////////////////////////////////////////////
 
   login: async (credentials) => {
+    console.log(credentials)
     try {
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/signin`,
         credentials
       );
@@ -23,7 +24,7 @@ export const AuthService = {
 
   forgetPassWord: async (credentials) => {
     try {
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/forgotPassword`,
         credentials
       );
@@ -36,7 +37,7 @@ export const AuthService = {
 
   verifyCode: async (credentials) => {
     try {
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/verifyCode`,
         credentials
       );
@@ -50,7 +51,7 @@ export const AuthService = {
 
   resetcode: async (credentials) => {
     try {
-      const response = await Axios.patch(
+      const response = await http.patch(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/reset-code`,
         credentials
       );
@@ -64,7 +65,7 @@ export const AuthService = {
 
   resetPassword: async (credentials) => {
     try {
-      const response = await Axios.patch(
+      const response = await http.patch(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/resetPassword`,
         credentials
       );
@@ -79,7 +80,7 @@ export const AuthService = {
 
   signUp: async (credentials) => {
     try {
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/signup`,
         credentials
       );
@@ -94,7 +95,7 @@ export const AuthService = {
   VerifyEmail: async (credentials) => {
     console.log(credentials)
     try {
-      const response = await Axios.patch(
+      const response = await http.patch(
         `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/verifyAccount`,
         credentials
       );
@@ -107,7 +108,7 @@ export const AuthService = {
 
     ResendCode: async (credentials) => {
       try {
-        const response = await Axios.patch(
+        const response = await http.patch(
           `${APP_ENV.AUTH_PORT}/tawasalna-user/auth/reset-code`,
           credentials
         );
@@ -121,7 +122,7 @@ export const AuthService = {
  ChangePassword: async (credentials) => {
   
   try {
-    const response = await Axios.patch(
+    const response = await http.patch(
       `${APP_ENV.AUTH_PORT}/tawasalna-user/residentmanagement/updatepassword/${credentials.userId}`,
       credentials,
       {
@@ -138,9 +139,9 @@ export const AuthService = {
 },
 ///////////////////////////////////get user id by email 
 getUserByEmail: async (email) => {
-  return Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
+  return http.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/auth/users/email/${email}`);
 },
 getUserbyId: async (id) => {
-  return Axios.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/user/${id}`);
+  return http.get(`${APP_ENV.AUTH_PORT}/tawasalna-user/user/${id}`);
 }
 };

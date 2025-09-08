@@ -21,6 +21,7 @@ import ChangePassword from './src/screens/profile/ChangePassword';
 import SearchScreen from './src/screens/tabs/SearchScreen';
 import ShowGroup from './src/screens/groups/ShowGroup';
 import GroupDetails from './src/screens/groups/GroupDetails';
+import GroupChatScreen from './src/screens/groups/GroupChatScreen';
 import ConversationScreen from './src/screens/messaging/ConversationScreen';
 import PostDetail from './src/components/PostDetail';
 import MarketplaceNav from './src/marketplace/navigation/MarketplaceNav';
@@ -116,6 +117,11 @@ const App = () => {
                                    <Stack.Screen
               name="GroupDetails"
               component={GroupDetails}
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="GroupChat"
+              component={GroupChatScreen}
               options={{ headerShown: false }}
             />
                                   <Stack.Screen

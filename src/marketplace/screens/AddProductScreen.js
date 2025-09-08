@@ -263,7 +263,7 @@ export default function AddProductScreen({ navigation }) {
           Filling in Category, Brand, and Model helps other users find your product more easily! Brand and Model are optional.
         </Text>
       </View>
-      <Text style={styles.label}>Category</Text>
+      <Text style={styles.label}>Category (Optional)</Text>
       {loadingCategories ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />

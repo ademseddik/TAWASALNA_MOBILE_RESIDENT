@@ -1,4 +1,4 @@
-import Axios from 'axios';
+import http from './http';
 import { APP_ENV } from '../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -14,7 +14,7 @@ export const FollowService = {
     try {
 
         const userId = await AsyncStorage.getItem("userId");
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/followUser/${userId}/${userIdToFollow}`
       );
       return response.data;
@@ -27,7 +27,7 @@ export const FollowService = {
     try {
 
         const userId = await AsyncStorage.getItem("userId");
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/AcceptfollowUser/${userIdToAccept}/${userId}`
       );
       return response.data;
@@ -40,7 +40,7 @@ export const FollowService = {
     try {
 
         const userId = await AsyncStorage.getItem("userId");
-      const response = await Axios.post(
+      const response = await http.post(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/rejectFollowUser/${userIdToAccept}/${userId}`
       );
       return response.data;
@@ -53,7 +53,7 @@ export const FollowService = {
     try {
 
         const userId = await AsyncStorage.getItem("userId");
-      const response = await Axios.delete(
+      const response = await http.delete(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/unfollowuser/${userId}/${userIdToFollow}`
       );
       return response.data;
@@ -67,7 +67,7 @@ export const FollowService = {
     try {
 
         const userId = await AsyncStorage.getItem("userId");
-      const response = await Axios.delete(
+      const response = await http.delete(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/CancelFollowRequest/${userId}/${userIdToFollow}`
       );
       return response.data;

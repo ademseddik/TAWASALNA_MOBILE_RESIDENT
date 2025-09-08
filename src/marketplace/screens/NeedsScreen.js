@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StyleSheet, ScrollView, Image, Animated, Modal, TouchableWithoutFeedback, TextInput } from 'react-native';
-import { getNeedsByCommunity, checkForMatchingServices } from '../../services/marketplaceNeed.service';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useRef } from 'react';
+import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StyleSheet, ScrollView, Image, Animated, Modal, TouchableWithoutFeedback, TextInput, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import useNeedsViewModel from '../../viewmodels/useNeedsViewModel';
 import Colors from '../../../assets/Colors';
 import { BlurView } from 'expo-blur';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -13,219 +13,71 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export default function NeedsScreen() {
   const navigation = useNavigation();
-  const [needs, setNeeds] = useState([]);
-  const [loading, setLoading] = useState(false);
-  
-  // User and pagination states
-  const [userId, setUserId] = useState(null);
-  const [page, setPage] = useState(0); // backend pages are 0-indexed
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  
-  // Filter states
-
-  const [searchTitle, setSearchTitle] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
-
+  const {
+    needs,
+    loading,
+    loadingMore,
+    onRefresh,
+    loadMoreNeeds,
+    hasMore,
+    userId,
+    searchTitle,
+    setSearchTitle,
+    selectedNeed,
+    setSelectedNeed,
+    modalVisible,
+    setModalVisible,
+    matchingServices,
+    showMatchingServices,
+    setShowMatchingServices,
+    pickerVisibleFor,
+    setPickerVisibleFor,
+    pickerNeed,
+    setPickerNeed,
+    tempDate,
+    setTempDate,
+    showDatePicker,
+    setShowDatePicker,
+    showTimePicker,
+    setShowTimePicker,
+    archivingId,
+    extendingId,
+    fetchNeeds,
+    fetchMatchingServicesVM,
+    extendNeed,
+    archiveNeedVM,
+  } = useNeedsViewModel();
+  const [showSearch, setShowSearch] = React.useState(false);
 
   // Animation states
-  const [selectedNeed, setSelectedNeed] = useState(null);
-  
   const animation = useRef(new Animated.Value(0)).current;
   const blurAnim = useRef(new Animated.Value(0)).current;
-  const [modalVisible, setModalVisible] = useState(false);
-  
-  // Matching services states
-  const [matchingServices, setMatchingServices] = useState([]);
-  const [showMatchingServices, setShowMatchingServices] = useState(false);
 
-  const handleSendMessagePress = async (userId,needID,fullName,profilePic) => {
+  const handleSendMessagePress = (otherUserId, needID, fullName, profilePic) => {
     try {
-      const currentUserId = await AsyncStorage.getItem("userId");
-      if (!currentUserId) {
-        return;
-      }
-      
-      const otherUserId = userId;
-
-      // Create chatId by sorting user IDs and joining with underscore
-      const ids = [currentUserId, otherUserId].sort();
+      if (!userId) return;
+      const ids = [String(userId), String(otherUserId)].sort();
       const chatId = ids.join('_');
-      
-      // Extract user IDs for the conversation screen
       const user1ID = ids[0];
       const user2ID = ids[1];
-
-      console.log('🚀 service screen navigation to conversation:', {
+      navigation.navigate('Conversation', {
         chatId,
+        userName: fullName,
+        userImage: profilePic,
         user1ID,
         user2ID,
         needId: needID,
-        userName: fullName
       });
-
-      navigation.navigate('Conversation', {
-        chatId: chatId,
-        userName: fullName,
-        userImage: profilePic,
-        user1ID: user1ID,
-        user2ID: user2ID,
-        needId: needID,
-      });
-    } catch (error) {
-      console.error("Failed to navigate to conversation:", error);
-    }
+    } catch (error) {}
   };
 
-  // Load user ID on component mount
-  useEffect(() => {
-    const loadUserId = async () => {
-      try {
-        const id = await AsyncStorage.getItem('userId');
-        setUserId(id);
-      } catch (err) {
-        console.error('Failed to load user ID:', err);
-      }
-    };
-    loadUserId();
-  }, []);
+  // ViewModel handles userId and initial fetch
 
-  useEffect(() => {
-    if (userId) {
-      const timer = setTimeout(() => {
-        fetchNeeds(true);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [userId]);
+  // ViewModel fetches needs
 
-  const fetchNeeds = async (resetPage = true) => {
-    // Prevent multiple simultaneous calls
-    if (loading && resetPage) return;
-    if (!userId) return;
-    if (resetPage) {
-      setLoading(true);
-      setPage(0);
-      setHasMore(true);
-    }
-    
-    
-    try {
-      const pageToFetch = resetPage ? 0 : page;
-      
-      // Add timeout to prevent hanging API calls
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Request timeout')), 10000)
-      );
-      
-      const resp = await Promise.race([
-        getNeedsByCommunity(userId, pageToFetch, 10),
-        timeoutPromise
-      ]);
-      
-      // Check if response has the expected structure
-      if (resp && resp.data) {
-        const needsData = resp.data.content || [];
-        
-        if (resetPage) {
-          setNeeds(needsData);
-        } else {
-          setNeeds(prev => [...prev, ...needsData]);
-        }
-        
-        // Check if there are more pages
-        const isLastPage = resp.data.last === true || needsData.length === 0;
-        setHasMore(!isLastPage);
-      } else {
-        // If no data structure, treat as empty
-        if (resetPage) {
-          setNeeds([]);
-        }
-        setHasMore(false);
-      }
-    } catch (err) {
-      console.error('Error fetching needs:', err);
-      
-      // For testing purposes, add some mock data if API fails
-      if (resetPage) {
-        const mockNeeds = [
-          {
-            id: 1,
-            title: 'House Cleaning Service Needed',
-            description: 'Looking for a reliable house cleaning service for a 3-bedroom apartment. Need deep cleaning including kitchen, bathrooms, and living areas.',
-            budget: 150,
-            priority: 'medium',
-            status: 'open',
-            timeline: 'within_week',
-            location: 'Downtown Area',
-            createdAt: new Date().toISOString(),
-            images: ['https://via.placeholder.com/300x200?text=Cleaning']
-          },
-          {
-            id: 2,
-            title: 'IT Support for Small Business',
-            description: 'Need IT support for setting up network infrastructure and computer systems for a new office.',
-            budget: 500,
-            priority: 'high',
-            status: 'open',
-            timeline: 'asap',
-            location: 'Business District',
-            createdAt: new Date().toISOString(),
-            images: ['https://via.placeholder.com/300x200?text=IT+Support']
-          },
-          {
-            id: 3,
-            title: 'Event Planning for Wedding',
-            description: 'Looking for an experienced event planner to help organize our wedding ceremony and reception.',
-            budget: 2000,
-            priority: 'medium',
-            status: 'open',
-            timeline: 'within_month',
-            location: 'City Center',
-            createdAt: new Date().toISOString(),
-            images: ['https://via.placeholder.com/300x200?text=Wedding']
-          }
-        ];
-        setNeeds(mockNeeds);
-        setHasMore(false);
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
+  // ViewModel handles pagination
 
-  const loadMoreNeeds = async () => {
-    if (!hasMore || loadingMore || loading) return;
-    if (!userId) return;
-    
-    setLoadingMore(true);
-    try {
-      const nextPage = page + 1;
-      const resp = await getNeedsByCommunity(userId, nextPage, 10);
-      
-      if (resp && resp.data) {
-        const needsData = resp.data.content || [];
-        setNeeds(prev => [...prev, ...needsData]);
-        setPage(nextPage);
-        
-        // Check if there are more pages
-        const isLastPage = resp.data.last === true || needsData.length === 0;
-        setHasMore(!isLastPage);
-      } else {
-        setHasMore(false);
-      }
-    } catch (err) {
-      console.error('Error loading more needs:', err);
-      setHasMore(false);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  const onRefresh = () => {
-    fetchNeeds(true);
-  };
+  // ViewModel onRefresh
 
   const getNeedImages = (need) => {
     // Backend example does not include images; return placeholder
@@ -256,6 +108,7 @@ export default function NeedsScreen() {
 
   const renderNeedItem = ({ item }) => {
     const statusColor = getStatusColor(item.status);
+    const isOwner = String(item?.publisher?.publisherId) === String(userId);
     return (
       <View style={styles.needCard}>
         {/* Header: Publisher info */}
@@ -269,6 +122,11 @@ export default function NeedsScreen() {
           <View style={styles.contentContainer}>
             <View style={styles.headerRow}>
               <Text style={styles.publisherName}>{item.publisher?.name || 'Unknown'}</Text>
+              {isOwner && (
+                <View style={styles.ownerBadgeSmall}>
+                  <Text style={styles.ownerBadgeSmallText}>Yours</Text>
+                </View>
+              )}
               <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
                 <Text style={styles.statusBadgeText}>{String(item.status || '').toUpperCase()}</Text>
               </View>
@@ -326,30 +184,78 @@ export default function NeedsScreen() {
 
         {/* Actions */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.primaryButton}
-            onPress={() => handleSendMessagePress(item.publisher.publisherId, item.id, item.publisher.name, item.publisher.image)} 
-          >
-            
-            <AntDesign name="message1" size={16} color={Colors.WHITE} />
-            <Text style={styles.primaryButtonText}>Send Offer To {item.publisher?.name}</Text>
-          </TouchableOpacity>
-          
-       
+          {isOwner ? (
+            <>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => navigation.navigate('EditNeed', { Need: item })}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="pencil" size={16} color={Colors.WHITE} />
+                <Text style={styles.primaryButtonText}>Edit</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                activeOpacity={0.7}
+                disabled={extendingId === item.id || archivingId === item.id}
+                onPress={() => {
+                  setPickerVisibleFor('extend');
+                  setPickerNeed(item);
+                  const initial = (() => {
+                    const candidate = item?.needDayEnd || item?.NeedDayEnd;
+                    const d = candidate ? new Date(candidate) : new Date();
+                    return d.getTime() > Date.now() ? d : new Date(Date.now() + 5 * 60 * 1000);
+                  })();
+                  setTempDate(initial);
+                  setShowDatePicker(true);
+                }}
+              >
+                {extendingId === item.id ? (
+                  <ActivityIndicator size="small" color="#6B7280" />
+                ) : (
+                  <MaterialCommunityIcons name="calendar-plus" size={16} color="#6B7280" />
+                )}
+                <Text style={styles.secondaryButtonText}>Extend</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.dangerButton}
+                activeOpacity={0.7}
+                disabled={archivingId === item.id || extendingId === item.id}
+                onPress={async () => {
+                  try {
+                    setArchivingId(item.id);
+                    await archiveNeed(item.id);
+                    // Remove from list or mark inactive
+                    setNeeds(prev => prev.map(n => n.id === item.id ? { ...n, isActive: false } : n));
+                  } catch (e) {}
+                  finally { setArchivingId(null); }
+                }}
+              >
+                {archivingId === item.id ? (
+                  <ActivityIndicator size="small" color={Colors.WHITE} />
+                ) : (
+                  <MaterialCommunityIcons name="archive" size={16} color={Colors.WHITE} />
+                )}
+                <Text style={styles.dangerButtonText}>Archive</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity 
+              style={styles.primaryButton}
+              onPress={() => handleSendMessagePress(item.publisher.publisherId, item.id, item.publisher.name, item.publisher.image)} 
+            >
+              <AntDesign name="message1" size={16} color={Colors.WHITE} />
+              <Text style={styles.primaryButtonText}>Send Offer To {item.publisher?.name}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
   };
 
-  const fetchMatchingServices = async (needId) => {
-    try {
-      const resp = await checkForMatchingServices(userId, needId);
-      setMatchingServices(resp.data || []);
-    } catch (err) {
-      console.error('Error fetching matching services:', err);
-      setMatchingServices([]);
-    }
-  };
+  // ViewModel handles matching services
 
   
 
@@ -385,7 +291,14 @@ export default function NeedsScreen() {
                 {selectedNeed && (
                   <>
                     <View style={styles.detailHeader}>
-                      <Text style={styles.detailTitle}>{selectedNeed.needTitle || 'Need'}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <Text style={styles.detailTitle} numberOfLines={1}>{selectedNeed.needTitle || 'Need'}</Text>
+                        {String(selectedNeed?.publisher?.publisherId) === String(userId) && (
+                          <View style={styles.ownerBadgeSmall}>
+                            <Text style={styles.ownerBadgeSmallText}>Yours</Text>
+                          </View>
+                        )}
+                      </View>
                       <TouchableOpacity onPress={() => setModalVisible(false)}>
                         <FontAwesome name="times" size={20} color={Colors.text} />
                       </TouchableOpacity>
@@ -451,20 +364,77 @@ export default function NeedsScreen() {
                     </ScrollView>
                     
                     <View style={styles.detailActions}>
-                      <TouchableOpacity 
-                        style={styles.detailQuoteButton}
-                        onPress={() => {
-                          setModalVisible(false);
-                          fetchMatchingServices(selectedNeed.id);
-                          setShowMatchingServices(true);
-                        }}
-                      >
-                        <Text style={styles.detailQuoteButtonText}>Send Quote</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.detailContactButton}>
-                        <MaterialCommunityIcons name="message" size={20} color={Colors.primary} />
-                        <Text style={styles.detailContactButtonText}>Contact Client</Text>
-                      </TouchableOpacity>
+                      {String(selectedNeed?.publisher?.publisherId) === String(userId) ? (
+                        <>
+                          <TouchableOpacity 
+                            style={styles.detailContactButton}
+                            onPress={() => navigation.navigate('EditNeed', { Need: selectedNeed })}
+                          >
+                            <MaterialCommunityIcons name="pencil" size={20} color={Colors.primary} />
+                            <Text style={styles.detailContactButtonText}>Edit</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity 
+                            style={styles.detailContactButton}
+                            disabled={extendingId === selectedNeed.id || archivingId === selectedNeed.id}
+                            onPress={() => {
+                              setPickerVisibleFor('extend');
+                              setPickerNeed(selectedNeed);
+                              const initial = (() => {
+                                const candidate = selectedNeed?.needDayEnd || selectedNeed?.NeedDayEnd;
+                                const d = candidate ? new Date(candidate) : new Date();
+                                return d.getTime() > Date.now() ? d : new Date(Date.now() + 5 * 60 * 1000);
+                              })();
+                              setTempDate(initial);
+                              setShowDatePicker(true);
+                            }}
+                          >
+                            {extendingId === selectedNeed.id ? (
+                              <ActivityIndicator size="small" color={Colors.primary} />
+                            ) : (
+                              <MaterialCommunityIcons name="calendar-plus" size={20} color={Colors.primary} />
+                            )}
+                            <Text style={styles.detailContactButtonText}>Extend</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity 
+                            style={styles.detailContactButton}
+                            onPress={async () => {
+                              try {
+                                setArchivingId(selectedNeed.id);
+                                await archiveNeed(selectedNeed.id);
+                                setNeeds(prev => prev.map(n => n.id === selectedNeed.id ? { ...n, isActive: false } : n));
+                                setModalVisible(false);
+                              } catch (e) {}
+                              finally { setArchivingId(null); }
+                            }}
+                          >
+                            {archivingId === selectedNeed.id ? (
+                              <ActivityIndicator size="small" color={Colors.primary} />
+                            ) : (
+                              <MaterialCommunityIcons name="archive" size={20} color={Colors.primary} />
+                            )}
+                            <Text style={styles.detailContactButtonText}>Archive</Text>
+                          </TouchableOpacity>
+                        </>
+                      ) : (
+                        <>
+                          <TouchableOpacity 
+                            style={styles.detailQuoteButton}
+                            onPress={() => {
+                              setModalVisible(false);
+                              fetchMatchingServicesVM(selectedNeed.id);
+                              setShowMatchingServices(true);
+                            }}
+                          >
+                            <Text style={styles.detailQuoteButtonText}>Send Quote</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.detailContactButton}>
+                            <MaterialCommunityIcons name="message" size={20} color={Colors.primary} />
+                            <Text style={styles.detailContactButtonText}>Contact Client</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
                     </View>
                   </>
                 )}
@@ -644,6 +614,57 @@ export default function NeedsScreen() {
  
       {renderNeedDetailModal()}
       {renderMatchingServicesModal()}
+      {/* Date-Time Pickers for Extend */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={tempDate}
+          mode={Platform.OS === 'ios' ? 'datetime' : 'date'}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(event, selectedDate) => {
+            if (event?.type === 'dismissed') {
+              setShowDatePicker(false);
+              setPickerVisibleFor(null);
+              setPickerNeed(null);
+              return;
+            }
+            if (!selectedDate) return;
+            const merged = new Date(tempDate);
+            merged.setFullYear(selectedDate.getFullYear());
+            merged.setMonth(selectedDate.getMonth());
+            merged.setDate(selectedDate.getDate());
+            setTempDate(merged);
+            setShowDatePicker(false);
+            setShowTimePicker(true);
+          }}
+          minimumDate={new Date()}
+        />
+      )}
+      {showTimePicker && (
+        <DateTimePicker
+          value={tempDate}
+          mode="time"
+          is24Hour
+          display="default"
+          onChange={async (event, selectedTime) => {
+            if (event?.type === 'dismissed') {
+              setShowTimePicker(false);
+              setPickerVisibleFor(null);
+              setPickerNeed(null);
+              return;
+            }
+            if (!selectedTime || !pickerNeed || !pickerVisibleFor) return;
+            const merged = new Date(tempDate);
+            merged.setHours(selectedTime.getHours());
+            merged.setMinutes(selectedTime.getMinutes());
+            merged.setSeconds(0);
+            merged.setMilliseconds(0);
+            await extendNeed(pickerNeed, merged);
+            setShowTimePicker(false);
+            setPickerVisibleFor(null);
+            setPickerNeed(null);
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -1165,6 +1186,19 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     flex: 1,
   },
+  ownerBadgeSmall: {
+    backgroundColor: Colors.LIGHT_PURPLE,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+    alignSelf: 'center',
+  },
+  ownerBadgeSmallText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
   time: {
     fontSize: 11,
     color: '#9CA3AF',
@@ -1216,10 +1250,11 @@ const styles = StyleSheet.create({
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
     backgroundColor: Colors.LIGHT_PURPLE,
+    minHeight: 36,
   },
   primaryButtonText: {
     fontSize: 13,
@@ -1230,15 +1265,33 @@ const styles = StyleSheet.create({
   secondaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius:20,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 36,
   },
   secondaryButtonText: {
     fontSize: 13,
     color: '#6B7280',
     fontWeight: '500',
+    marginLeft: 4,
+  },
+  dangerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: Colors.RED,
+    minHeight: 36,
+  },
+  dangerButtonText: {
+    fontSize: 13,
+    color: Colors.WHITE,
+    fontWeight: '600',
     marginLeft: 4,
   },
   // Action Buttons Styles

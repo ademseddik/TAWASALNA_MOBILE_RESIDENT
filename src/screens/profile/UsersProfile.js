@@ -3,7 +3,6 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  ScrollView,
   ActivityIndicator,
   FlatList,
 } from "react-native";
@@ -11,19 +10,16 @@ import React, { useState, useEffect } from "react";
 import Colors from "../../../assets/Colors";
 import {
   MaterialIcons,
-  Entypo,
   AntDesign,
-  Ionicons,
 } from "@expo/vector-icons";
-import ProfileVideos from "../../components/ProfileVideos";
+ 
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { encode } from "base64-arraybuffer";
-import ProfileStatus from "../../components/ProfileStatus";
+ 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Axios from 'axios';
+ 
 import { APP_ENV } from '../../utils/BaseUrl';
 import Toast from "react-native-toast-message";
-import ProfileSurveys from "../../components/ProfileSurveys";
+ 
 import { FollowService } from '../../services/follow.service';
 import { ProfileService } from '../../services/profile.service';
 import PostCard from "../../components/PostCard";
@@ -32,18 +28,18 @@ import CommentModel from '../../components/pupUps/CommentModel';
 const UsersProfile = () => {
   const route = useRoute();
   const { userId } = route.params;
-  const [selectedButton, setSelectedButton] = useState("Posts");
+  
   const [fullName, setFullName] = useState("");
-  const [ConnectedUserfullName, setFullNameConnectedUser] = useState("");
+  
   const [data, setData] = useState([]);
   const [dataConnectedUser, setDataConnectedUser] = useState([]);
   const [profilePic, setProfilePic] = useState(null);
   const [coverPic, setCoverPic] = useState(null);
   const navigation = useNavigation();
   const [accountType, setAccountType] = useState(null);
-  const [following, setFollowing] = useState([]);
+  
   const [isLoading, setIsLoading] = useState(false);
-  const [followerCount, setFollowerCount] = useState(0);
+  
   const [postsCount, setPostsCount] = useState(0);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
   const [loadingFollow, setLoadingFollow] = useState(false);
@@ -57,9 +53,7 @@ const UsersProfile = () => {
   const PAGE_SIZE = 10;
   
   ///////////////////////////////////////////////////////
-  const handleButtonPress = (buttonName) => {
-    setSelectedButton(buttonName);
-  };
+  
   
   const toggleBio = () => {
     setIsBioExpanded(!isBioExpanded);
@@ -185,8 +179,7 @@ const handleSendMessagePress = async () => {
         const userId = await AsyncStorage.getItem("userId");
         const residentProfile = await ProfileService.GetConnectedUserProfile(userId);
         setDataConnectedUser(residentProfile);
-        setFullNameConnectedUser(residentProfile.fullName);
-        setFollowing(residentProfile.following);
+        
       } catch (error) {
         console.error("Error getting resident profile:", error);
         throw new Error(error);
@@ -274,6 +267,16 @@ const handleSendMessagePress = async () => {
     if (hasMorePosts && !isFetchingPosts) {
       setPostsPage(prev => prev + 1);
     }
+  };
+
+  const handleCommentsCountChange = (updatedPostId, delta) => {
+    setPosts(prevPosts =>
+      prevPosts.map(p =>
+        p.id === updatedPostId
+          ? { ...p, commentsNumber: (p.commentsNumber || 0) + delta }
+          : p
+      )
+    );
   };
 
   if (isLoading) {
@@ -731,159 +734,65 @@ const handleSendMessagePress = async () => {
               </View>
             </TouchableOpacity>
           </View>
-          <View style={{ 
-            flexDirection: "row", 
-            marginTop: "5%", 
-            justifyContent: "center",
-            paddingHorizontal: 20,
-            gap: 20
-          }}>
-            <TouchableOpacity
-              style={{
-                alignItems: "center",
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                borderRadius: 12,
-                backgroundColor: selectedButton === "Posts" ? Colors.LIGHT_PURPLE : "#f8f9fa",
-                borderWidth: 1,
-                borderColor: selectedButton === "Posts" ? Colors.LIGHT_PURPLE : "#e9ecef",
-                minWidth: 80,
-                shadowColor: "#000",
-                shadowOffset: {
-                  width: 0,
-                  height: 2,
-                },
-                shadowOpacity: selectedButton === "Posts" ? 0.25 : 0.1,
-                shadowRadius: 3.84,
-                elevation: selectedButton === "Posts" ? 5 : 2,
-              }}
-              onPress={() => handleButtonPress("Posts")}
-            >
-              <MaterialIcons
-                name="photo-library"
-                size={26}
-                color={
-                  selectedButton === "Posts"
-                    ? Colors.WHITE
-                    : Colors.LIGHT_PURPLE
-                }
-              />
-              <Text style={{
-                fontSize: 13,
-                marginTop: 6,
-                color: selectedButton === "Posts" ? Colors.WHITE : Colors.LIGHT_PURPLE,
-                fontWeight: selectedButton === "Posts" ? "700" : "600"
-              }}>
-                Posts
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={{
-                alignItems: "center",
-                paddingVertical: 12,
-                paddingHorizontal: 20,
-                borderRadius: 12,
-                backgroundColor: selectedButton === "status" ? Colors.LIGHT_PURPLE : "#f8f9fa",
-                borderWidth: 1,
-                borderColor: selectedButton === "status" ? Colors.LIGHT_PURPLE : "#e9ecef",
-                minWidth: 80,
-                shadowColor: "#000",
-                shadowOffset: {
-                  width: 0,
-                  height: 2,
-                },
-                shadowOpacity: selectedButton === "status" ? 0.25 : 0.1,
-                shadowRadius: 3.84,
-                elevation: selectedButton === "status" ? 5 : 2,
-              }}
-              onPress={() => handleButtonPress("status")}
-            >
-              <MaterialIcons
-                name="article"
-                size={26}
-                color={
-                  selectedButton === "status"
-                    ? Colors.WHITE
-                    : Colors.LIGHT_PURPLE
-                }
-              />
-              <Text style={{
-                fontSize: 13,
-                marginTop: 6,
-                color: selectedButton === "status" ? Colors.WHITE : Colors.LIGHT_PURPLE,
-                fontWeight: selectedButton === "status" ? "700" : "600"
-              }}>
-                Status
-              </Text>
-            </TouchableOpacity>
-          </View>
+          
         </>
       )}
     </>
   );
 
-  // 2. Main return: Only FlatList, no ScrollView
+  // 2. Main return: Only Posts FlatList
   return (
-    selectedButton === "Posts" ? (
-      <>
-        <FlatList
-          data={posts}
-          renderItem={({ item: post }) => (
-            <PostCard
-              key={post.id}
-              user={{ name: fullName, image: profilePic }}
-              postDateTime={post.postDateTime}
-              caption={post.caption}
-              photos={post.photos}
-              reactions={post.reactions || []}
-              comments={post.comments || []}
-              commentsNumber={post.commentsNumber || 0}
-              userReaction={post.reactions?.find(r => r.userId === dataConnectedUser.id)?.reactionType}
-              postId={post.id}
-              onComment={() => {
-                setSelectedPostId(post.id);
-                setCommentModalVisible(true);
-              }}
-            />
-          )}
-          keyExtractor={item => item.id}
-          onEndReached={loadMorePosts}
-          onEndReachedThreshold={0.5}
-          ListHeaderComponent={renderProfileHeader}
-          ListFooterComponent={isFetchingPosts && posts.length > 0 ? (
-            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={Colors.PURPLE} />
-            </View>
-          ) : null}
-          ListEmptyComponent={isFetchingPosts ? (
-            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={Colors.PURPLE} />
-            </View>
-          ) : (
-            <View style={{ alignItems: 'center', marginTop: 32 }}>
-              <Text>No posts yet</Text>
-            </View>
-          )}
-          contentContainerStyle={{ paddingBottom: 32 }}
-        />
-        {/* Comment Modal */}
+    <>
+      <FlatList
+        data={posts}
+        renderItem={({ item: post }) => (
+          <PostCard
+            key={post.id}
+            user={{ name: fullName, image: profilePic }}
+            postDateTime={post.postDateTime}
+            caption={post.caption}
+            photos={post.photos}
+            reactions={post.reactions || []}
+            comments={post.comments || []}
+            commentsNumber={post.commentsNumber || 0}
+            userReaction={post.reactions?.find(r => r.userId === dataConnectedUser.id)?.reactionType}
+            postId={post.id}
+            onComment={() => {
+              setSelectedPostId(post.id);
+              setCommentModalVisible(true);
+            }}
+          />
+        )}
+        keyExtractor={item => item.id}
+        onEndReached={loadMorePosts}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={renderProfileHeader}
+        ListFooterComponent={isFetchingPosts && posts.length > 0 ? (
+          <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+            <ActivityIndicator size="small" color={Colors.PURPLE} />
+          </View>
+        ) : null}
+        ListEmptyComponent={isFetchingPosts ? (
+          <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={Colors.PURPLE} />
+          </View>
+        ) : (
+          <View style={{ alignItems: 'center', marginTop: 32 }}>
+            <Text>No posts yet</Text>
+          </View>
+        )}
+        contentContainerStyle={{ paddingBottom: 32 }}
+      />
+      {/* Comment Modal */}
+      {isCommentModalVisible && selectedPostId !== null && (
         <CommentModel
           isVisible={isCommentModalVisible}
           onClose={() => setCommentModalVisible(false)}
           postId={selectedPostId}
+          onCommentsCountChange={handleCommentsCountChange}
         />
-      </>
-    ) : (
-      // For status tab, just render the header and ProfileStatus
-      <>
-        {renderProfileHeader()}
-        <ProfileStatus
-          fullName={fullName}
-          profilePic={profilePic}
-          idfromUsersprofile={userId}
-        />
-      </>
-    )
+      )}
+    </>
   );
 };
 

@@ -1,20 +1,20 @@
 
-const IP_ADDRESS = `192.168.1.13`;
+const IP_ADDRESS = `192.168.1.124`;
 
 export const APP_ENV = {
-  BUSINESS_PORT: `http://157.173.196.161:31195/tawasalna-business`,
-  AUTH_PORT: "http://157.173.196.161:30265",
-  SOCIAL_PORT: "http://157.173.196.161:31499",
-  EXPO_PUBLIC_ADMIN_SOCKET: "ws://157.173.196.161:31499/tawasalna-community/ws",
-  WS_URL: "http://157.173.196.161:31499/tawasalna-community/ws",
-  NOTIFICATION_WS_URL: "ws://157.173.196.161:31499/tawasalna-community/ws-notif",
-  // IP_ADDRESS,
-  // AUTH_PORT: `http://${IP_ADDRESS}:8070`,
-  // SOCIAL_PORT: `http://${IP_ADDRESS}:8093`,
-  // BUSINESS_PORT: `http://${IP_ADDRESS}:8071/tawasalna-business`,
-  // EXPO_PUBLIC_ADMIN_SOCKET: `ws://${IP_ADDRESS}:8093/tawasalna-community/ws`,
-  // WS_URL: `http://${IP_ADDRESS}:8093/tawasalna-community/ws`,
-  // NOTIFICATION_WS_URL: `ws://${IP_ADDRESS}:8093/tawasalna-community/ws-notif`,
+  // BUSINESS_PORT: `http://157.173.196.161:31195/tawasalna-business`,
+  // AUTH_PORT: "http://157.173.196.161:30265",
+  // SOCIAL_PORT: "http://157.173.196.161:31499",
+  // EXPO_PUBLIC_ADMIN_SOCKET: "ws://157.173.196.161:31499/tawasalna-community/ws",
+  // WS_URL: "http://157.173.196.161:31499/tawasalna-community/ws",
+  // NOTIFICATION_WS_URL: "ws://157.173.196.161:31499/tawasalna-community/ws-notif",
+  IP_ADDRESS,
+  BUSINESS_PORT: `http://${IP_ADDRESS}:8071/tawasalna-business`,
+  AUTH_PORT: `http://${IP_ADDRESS}:8070`,
+  SOCIAL_PORT: `http://${IP_ADDRESS}:8093`,
+  EXPO_PUBLIC_ADMIN_SOCKET: `ws://${IP_ADDRESS}:8093/tawasalna-community/ws`,
+  WS_URL: `http://${IP_ADDRESS}:8093/tawasalna-community/ws`,
+  NOTIFICATION_WS_URL: `ws://${IP_ADDRESS}:8093/tawasalna-community/ws-notif`,
   HOST: process.env.EXPO_PUBLIC_HOST,
 };
 

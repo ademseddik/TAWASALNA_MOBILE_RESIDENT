@@ -8,14 +8,15 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
   FlatList,
+  Modal,
+  TextInput,
 } from "react-native";
-import React, { useState, useEffect, useCallback,useRef } from "react";
-import { Modal } from "react-native";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import PropTypes from 'prop-types';
 import { FontAwesome } from "@expo/vector-icons";
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
 import Colors from "../../../assets/Colors";
-import { TextInput } from "react-native";
 import {
   UserInfo,
   UserImgWrapper,
@@ -31,7 +32,6 @@ import {
   ActionContainer,
   ActionButton,
   CancelButton,
-  ReactionSummary,
   ActionButtonText,
   ReactionPickerContainer,
 } from "../../utils/Styles/MessageStyles";
@@ -55,6 +55,7 @@ const CommentModel = ({
   onClose,
   postId,
   refreshPosts,
+  onCommentsCountChange,
 }) => {
   // State variables
   const [commentText, setCommentText] = useState("");
@@ -63,8 +64,7 @@ const CommentModel = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingComment, setIsAddingComment] = useState(false);
   const [replyText, setReplyText] = useState("");
-  const [replyingToCommentId, setReplyingToCommentId] = useState(null);
-  const [replyingToUserName, setReplyingToUserName] = useState("");
+  // Removed unused reply tracking states
   const [showReplyOverlay, setShowReplyOverlay] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [editingComment, setEditingComment] = useState(null);
@@ -74,7 +74,6 @@ const CommentModel = ({
   const [showActionDialog, setShowActionDialog] = useState(false);
   const [selectedComment, setSelectedComment] = useState(null);
   const [userFullname, setFullName] = useState("");
-  const [userimage, setimage] = useState("");
   const [userprofilePic, setUserProfilePic] = useState(null);
   const [showReplyInput, setShowReplyInput] = useState(null); // Added back missing state
   const [replies, setReplies] = useState({}); // Added back for replies
@@ -227,7 +226,6 @@ const CommentModel = ({
             `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
           );
           setFullName(response.data.fullName);
-          setimage(response.data.profilephoto);
         } catch (error) {
           console.error("Error getting resident profile:", error);
         }
@@ -260,22 +258,16 @@ const CommentModel = ({
   const handleModalClose = useCallback(() => {
     onClose();
     setPagedData({ content: [], last: true, number: 0, totalPages: 1 });
-    setReplyingToCommentId(null);
     setExpandedComments({});
     resetEditState();
     setShowReplyInput(null); // Reset reply inputs
   }, [onClose]);
 
-  const handleTextInputFocus = () => {
-    setIsTyping(true);
-  };
-
-  const handleTextInputBlur = () => {
-    setIsTyping(false);
-  };
+  // Removed unused focus/blur handlers
 
   // Toggle comment expansion
   const toggleCommentExpansion = (commentId) => {
+    console.log('[Comments] toggleCommentExpansion', { commentId, wasExpanded: !!expandedComments[commentId] });
     fetchRepliesForComment(commentId);
     setExpandedComments(prev => ({
       ...prev,
@@ -372,6 +364,13 @@ const CommentModel = ({
       success = true;
       // Option 1: Refetch all comments (ensures correct order and data)
       refetchCommentsPost();
+      // Notify parent to refresh post list so comment count updates
+      if (typeof refreshPosts === 'function') {
+        refreshPosts();
+      }
+      if (typeof onCommentsCountChange === 'function' && postId) {
+        onCommentsCountChange(postId, 1);
+      }
       // Option 2: If API returns the new comment, replace temp with real one here
     } catch (error) {
       console.error("Error adding comment:", error);
@@ -430,14 +429,12 @@ const CommentModel = ({
     }
   };
 
-  const handleReplyButtonPress = (commentId, userName) => {
+  const handleReplyButtonPress = (commentId) => {
     if (showReplyInput === commentId) {
       setShowReplyInput(null);
       setShowReplyOverlay(false);
     } else {
       setShowReplyInput(commentId);
-      setReplyingToCommentId(commentId);
-      setReplyingToUserName(userName);
       setReplyText("");
       setShowReplyOverlay(true);
     }
@@ -452,6 +449,7 @@ const CommentModel = ({
   const fetchRepliesForComment = async (commentId) => {
     try {
       const repliesData = await PostService.getReplies(commentId);
+      console.log('[Comments] fetchRepliesForComment: fetched', { commentId, count: Array.isArray(repliesData) ? repliesData.length : 0 });
       if (repliesData && repliesData !== "No replies found for the specified comment") {
         setReplies(prevReplies => ({
           ...prevReplies,
@@ -472,6 +470,7 @@ const CommentModel = ({
           ...prev,
           ...profilePicMap,
         }));
+        console.log('[Comments] fetchRepliesForComment: profile pics mapped', { keys: Object.keys(profilePicMap).length });
       } else {
         setReplies(prevReplies => ({
           ...prevReplies,
@@ -615,6 +614,13 @@ const CommentModel = ({
       const userId = await AsyncStorage.getItem("userId");
       await PostService.deleteComment(commentId, userId, postId, Token);
       refetchCommentsPost();
+      // Notify parent to refresh post list so comment count updates
+      if (typeof refreshPosts === 'function') {
+        refreshPosts();
+      }
+      if (typeof onCommentsCountChange === 'function' && postId) {
+        onCommentsCountChange(postId, -1);
+      }
       Toast.show({ type: 'success', text1: 'Comment deleted successfully' });
     } catch (error) {
       console.error('Error deleting comment:', error);
@@ -802,7 +808,7 @@ const renderSuggestions = () => (
                                 </Text>
                               </TouchableOpacity>
                               <TouchableOpacity onPress={() =>
-                                handleReplyButtonPress(comment.commentId, comment.userName)
+                                handleReplyButtonPress(comment.commentId)
                               }>
                                 <Replytext>Reply</Replytext>
                               </TouchableOpacity>
@@ -833,11 +839,14 @@ const renderSuggestions = () => (
                           )}
                           {showReplies && replies[comment.commentId] && (
                             <View style={styles.repliesContainer}>
-                              {replies[comment.commentId].map((reply, index) => (
+                              {replies[comment.commentId].map((reply, index) => {
+                                const avatarUri = replyprofilePic[reply.residentId];
+                                const replyAvatarSource = avatarUri ? { uri: avatarUri } : require("../../../assets/default-avatar.jpg");
+                                return (
                                 <View key={`${comment.commentId}-${index}`} style={styles.replyItem}>
                                   <View style={styles.replyLine} />
                                   <Image
-                                    source={{ uri: replyprofilePic[reply.residentId] || require("../../../assets/default-avatar.jpg") }}
+                                    source={replyAvatarSource}
                                     style={styles.replyAvatar}
                                   />
                                   <View style={styles.replyContent}>
@@ -848,7 +857,7 @@ const renderSuggestions = () => (
                                     </Text>
                                   </View>
                                 </View>
-                              ))}
+                              );})}
                             </View>
                           )}
                           {/* Reply overlay */}
@@ -1012,6 +1021,14 @@ const renderSuggestions = () => (
       </View>
     </Modal>
   );
+};
+
+CommentModel.propTypes = {
+  isVisible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  postId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  refreshPosts: PropTypes.func,
+  onCommentsCountChange: PropTypes.func,
 };
 
 const styles = StyleSheet.create({

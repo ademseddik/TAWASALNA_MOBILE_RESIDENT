@@ -11,14 +11,13 @@ import {
   Modal,
   FlatList,
   Dimensions,
-  Platform,
   ImageBackground
 } from 'react-native';
-import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons} from '@expo/vector-icons';
 import Colors from '../../assets/Colors';
 import { useLogin } from '../hooks/useLogin';
 import i18n from '../../i18n';
-import { Picker } from '@react-native-picker/picker';
+
 import { useTranslation } from 'react-i18next';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';

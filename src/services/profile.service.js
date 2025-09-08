@@ -1,4 +1,4 @@
-import Axios from 'axios';
+import http from './http';
 import { APP_ENV } from '../utils/BaseUrl';
 
 export const ProfileService = {
@@ -6,12 +6,11 @@ export const ProfileService = {
   GetProfileData: async (credentials) => {
   
     try {
-      const response = await Axios.get(
+      const response = await http.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${credentials.userId}`,
-        credentials,
         {
           headers: {
-            Authorization: `Bearer ${credentials.token}`, // Include token in headers
+            Authorization: `Bearer ${credentials.token}`,
           },
         });
     
@@ -25,12 +24,12 @@ export const ProfileService = {
   Updateprivacy: async (credentials) => {
   
     try {
-      const response = await Axios.put(
+      const response = await http.put(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/updatePrivacy/${credentials.userId}/${credentials.privacy}`,
         credentials,
         {
           headers: {
-            Authorization: `Bearer ${credentials.token}`, // Include token in headers
+            Authorization: `Bearer ${credentials.token}`,
           },
         });
     
@@ -43,7 +42,7 @@ export const ProfileService = {
 
   GetProfilePhoto: async (userId) => {
     try {
-      const response = await Axios.get(
+      const response = await http.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getprofilephoto/${userId}`,
         { responseType: 'arraybuffer' }
       );
@@ -55,7 +54,7 @@ export const ProfileService = {
 
   GetCoverPhoto: async (userId) => {
     try {
-      const response = await Axios.get(
+      const response = await http.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getcoverphoto/${userId}`,
         { responseType: 'arraybuffer' }
       );
@@ -67,7 +66,7 @@ export const ProfileService = {
 
   GetUserProfileById: async (userId) => {
     try {
-      const response = await Axios.get(
+      const response = await http.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
       );
       return response.data;
@@ -78,7 +77,7 @@ export const ProfileService = {
 
   GetConnectedUserProfile: async (userId) => {
     try {
-      const response = await Axios.get(
+      const response = await http.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentprofile/${userId}`
       );
       return response.data;
@@ -89,7 +88,7 @@ export const ProfileService = {
 
   GetUserPostsCount: async (userId) => {
     try {
-      const response = await Axios.get(
+      const response = await http.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentposts/${userId}/${userId}`
       );
       return response.data;

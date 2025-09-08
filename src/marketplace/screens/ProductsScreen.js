@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StyleSheet, ScrollView, Image, Animated, Modal, Dimensions, TouchableWithoutFeedback, TextInput } from 'react-native';
-import { getProductsByCommunityWithFilters, getAllProductCategories } from '../../services/marketplaceProduct.service';
+import { getProductsByCommunityWithFilters, getAllProductCategories, markProductAsSold, markProductAsAvailable, archiveProduct, aiSearchProducts } from '../../services/marketplaceProduct.service';
 import { PRODUCT_CATEGORIES } from '../data/productOptions';
 import Colors from '../../../assets/Colors';
 import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
 import ImageViewing from 'react-native-image-viewing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AntDesign } from 'react-native-vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
+import SuccessAlert from '../../components/pupUps/SuccessAlert';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
 import { useNavigation } from '@react-navigation/native';
 
@@ -17,8 +19,10 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 export default function ProductsScreen() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [aiMode, setAiMode] = useState(false);
   
   // Pagination states
   const [page, setPage] = useState(0); // Backend uses 0-indexed pages
@@ -50,7 +54,8 @@ export default function ProductsScreen() {
   const animation = useRef(new Animated.Value(0)).current;
   const blurAnim = useRef(new Animated.Value(0)).current;
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(5);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef(null);
   
   // Image gallery states
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -61,6 +66,10 @@ export default function ProductsScreen() {
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
   const navigation = useNavigation();
+
+  // Success alert states
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Load user ID on component mount
   useEffect(() => {
@@ -87,6 +96,45 @@ export default function ProductsScreen() {
     }
     fetchCategories();
   }, []);
+
+  // Pulse animation for AI loader
+  const startPulseAnimation = () => {
+    if (pulseLoopRef.current) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoopRef.current = loop;
+    loop.start();
+  };
+
+  useEffect(() => {
+    if (aiLoading) {
+      startPulseAnimation();
+    } else {
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+      pulseAnim.setValue(1);
+    }
+    return () => {
+      if (pulseLoopRef.current) {
+        pulseLoopRef.current.stop();
+        pulseLoopRef.current = null;
+      }
+    };
+  }, [aiLoading, pulseAnim]);
 
   // Fetch all products by default
   const fetchAllProducts = async (resetPage = true) => {
@@ -139,7 +187,7 @@ export default function ProductsScreen() {
 
   // Load more products function
   const loadMoreProducts = async () => {
-    if (loadingMore || !hasMore || !userId) return;
+    if (aiMode || loadingMore || !hasMore || !userId) return;
     
     setLoadingMore(true);
     try {
@@ -174,12 +222,46 @@ export default function ProductsScreen() {
 
   // Refresh function for pull-to-refresh
   const onRefresh = () => {
-    fetchAllProducts(true);
+    if (aiMode) {
+      runAiSearch();
+    } else {
+      fetchAllProducts(true);
+    }
+  };
+
+  // AI search
+  const runAiSearch = async () => {
+    const query = (searchTitle || '').trim();
+    if (!query) {
+      setAiMode(false);
+      fetchAllProducts(true);
+      return;
+    }
+    setError(null);
+    setAiLoading(true);
+    setAiMode(true);
+    try {
+      const resp = await aiSearchProducts(query);
+      const data = Array.isArray(resp.data) ? resp.data : (resp.data?.content || []);
+      setProducts(data || []);
+      setHasMore(false);
+      setPage(0);
+    } catch (err) {
+      console.error('AI search failed:', err);
+      setError('AI search failed');
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   // Apply filters and search
   const applyFilters = () => {
-    fetchAllProducts(true);
+    if ((searchTitle || '').trim()) {
+      runAiSearch();
+    } else {
+      setAiMode(false);
+      fetchAllProducts(true);
+    }
   };
 
   // Helper functions for filter options
@@ -309,6 +391,7 @@ export default function ProductsScreen() {
   const renderProductItem = ({ item }) => {
     const productImages = getProductImages(item);
     const imageCount = productImages.length;
+    const isOwner = String(item?.publisher?.publisherId) === String(userId);
     
     return (
       <View style={styles.cardWrapper}>
@@ -340,6 +423,12 @@ export default function ProductsScreen() {
             {imageCount > 1 && (
               <View style={styles.imageCountBadge}>
                 <Text style={styles.imageCountText}>{imageCount}</Text>
+              </View>
+            )}
+            {/* Owner badge */}
+            {isOwner && (
+              <View style={styles.ownerBadge}>
+                <Text style={styles.ownerBadgeText}>Yours</Text>
               </View>
             )}
             {/* Status badge */}
@@ -401,15 +490,7 @@ export default function ProductsScreen() {
       }
     : {};
 
-  // Handle image swipe
-  const handleImageSwipe = (direction) => {
-    const productImages = getProductImages(selectedProduct);
-    if (direction === 'left' && currentImageIndex < productImages.length - 1) {
-      setCurrentImageIndex(currentImageIndex + 1);
-    } else if (direction === 'right' && currentImageIndex > 0) {
-      setCurrentImageIndex(currentImageIndex - 1);
-    }
-  };
+  // Handle image swipe - handled via ScrollView momentum
 
   // Open image viewer
   const openImageViewer = () => {
@@ -807,32 +888,53 @@ export default function ProductsScreen() {
           )}
           {/* Search UI */}
           {showSearch && (
-            <View style={{ flexDirection: 'row', paddingHorizontal: 12, marginTop: 4, alignItems: 'center', marginBottom: 4 }}>
-              <TextInput
-                placeholder="Search title or description"
-                value={searchTitle}
-                onChangeText={setSearchTitle}
-                style={{ flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#eee' }}
-              />
-              <TouchableOpacity
-                onPress={applyFilters}
-                style={{ marginLeft: 8, backgroundColor: Colors.LIGHT_PURPLE, borderRadius: 8, padding: 8 }}
-              >
-                <FontAwesome name="search" size={18} color="#fff" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowSearch(false);
-                  setSearchTitle('');
-                  applyFilters();
-                }}
-                style={{ marginLeft: 4, padding: 8 }}
-              >
-                <FontAwesome name="close" size={18} color={Colors.LIGHT_PURPLE} />
-              </TouchableOpacity>
+            <View style={{ paddingHorizontal: 12, marginTop: 4, marginBottom: 4 }}>
+              <View style={styles.aiSearchContainer}>
+                <FontAwesome name="magic" size={18} color={Colors.LIGHT_PURPLE} style={{ marginHorizontal: 8 }} />
+                <TextInput
+                  placeholder="Example: I want a big television that ..."
+                  value={searchTitle}
+                  onChangeText={setSearchTitle}
+                  onSubmitEditing={applyFilters}
+                  style={styles.aiSearchInput}
+                  placeholderTextColor="#9aa0a6"
+                />
+                <TouchableOpacity onPress={applyFilters} style={styles.aiSearchButton} activeOpacity={0.7}>
+                  <FontAwesome name="search" size={18} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowSearch(false);
+                    setSearchTitle('');
+                    setAiMode(false);
+                    fetchAllProducts(true);
+                  }}
+                  style={styles.aiSearchClear}
+                  activeOpacity={0.7}
+                >
+                  <FontAwesome name="close" size={18} color={Colors.LIGHT_PURPLE} />
+                </TouchableOpacity>
+              </View>
+              {aiMode && !aiLoading && (
+                <Text style={{ marginTop: 6, marginLeft: 8, color: Colors.LIGHT_PURPLE, fontSize: 12 }}>
+                  AI results for: "{searchTitle}"
+                </Text>
+              )}
             </View>
           )}
-          {loading ? (
+          {aiLoading ? (
+            <View style={styles.center}>
+              <Animated.View style={[{ transform: [{ scale: pulseAnim }] }, styles.aiLottieShadow]}> 
+                <LottieView
+                  source={require('../../../assets/animations/AI_Loading_Animation.json')}
+                  autoPlay
+                  loop
+                  style={{ width: 200, height: 200 }}
+                />
+              </Animated.View>
+              <Text style={{ marginTop: 8, color: Colors.LIGHT_PURPLE, fontSize: 14 }}>Searching with AI...</Text>
+            </View>
+          ) : loading ? (
             <View style={styles.center}><ActivityIndicator size="large" /></View>
           ) : error ? (
             <View style={styles.center}><Text>{error}</Text></View>
@@ -988,25 +1090,86 @@ export default function ProductsScreen() {
 
                 {/* Action Buttons */}
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[styles.modalActionButton, { backgroundColor: Colors.LIGHT_PURPLE }]}
-                    activeOpacity={0.7}
-                    onPress={() => {}}
-                  >
-                    <FontAwesome name="phone" size={16} color="#fff" />
-                    <Text style={styles.modalActionText}>Contact Owner</Text>
-                  </TouchableOpacity>
+                  {String(selectedProduct?.publisher?.publisherId) === String(userId) ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.modalActionButton, { backgroundColor: Colors.LIGHT_PURPLE }]}
+                        activeOpacity={0.7}
+                        onPress={() => navigation.navigate('EditProduct', { product: selectedProduct })}
+                      >
+                        <FontAwesome name="edit" size={16} color="#fff" />
+                        <Text style={styles.modalActionText}>Edit</Text>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity 
-               style={[styles.modalActionButton, { backgroundColor: Colors.LIGHT_PURPLE }]}
-                    activeOpacity={0.7}
-                    onPress={() => handleSendMessagePress(selectedProduct.publisher.publisherId, selectedProduct.id, selectedProduct.publisher.name, selectedProduct.publisher.image)}          
-          >
-            <AntDesign name="message1" size={16} color={Colors.WHITE} />
-            <Text style={styles.modalActionText}>Send Message</Text>
-          </TouchableOpacity>
-          
-                 
+                      {String(selectedProduct.status).toUpperCase() === 'FOR_SALE' ? (
+                        <TouchableOpacity
+                          style={[styles.modalActionButton, { backgroundColor: '#27ae60' }]}
+                          activeOpacity={0.7}
+                          onPress={async () => {
+                            try {
+                              await markProductAsSold(selectedProduct.id);
+                              setSuccessMessage(`"${selectedProduct.productName}" marked as sold successfully!`);
+                              setShowSuccessAlert(true);
+                              // Update local state
+                              setSelectedProduct(prev => ({ ...prev, status: 'SOLD' }));
+                              // Refresh list
+                              fetchAllProducts(true);
+                            } catch (e) {}
+                          }}
+                        >
+                          <FontAwesome name="check" size={16} color="#fff" />
+                          <Text style={styles.modalActionText}>Mark Sold</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          style={[styles.modalActionButton, { backgroundColor: '#f39c12' }]}
+                          activeOpacity={0.7}
+                          onPress={async () => {
+                            try {
+                              await markProductAsAvailable(selectedProduct.id);
+                              setSuccessMessage(`"${selectedProduct.productName}" marked as available successfully!`);
+                              setShowSuccessAlert(true);
+                              setSelectedProduct(prev => ({ ...prev, status: 'FOR_SALE' }));
+                              fetchAllProducts(true);
+                            } catch (e) {}
+                          }}
+                        >
+                          <FontAwesome name="refresh" size={16} color="#fff" />
+                          <Text style={styles.modalActionText}>Mark Available</Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={[styles.modalActionButton, { backgroundColor: '#888' }]}
+                        activeOpacity={0.7}
+                        onPress={async () => {
+                          try {
+                            await archiveProduct(selectedProduct.id);
+                            setSuccessMessage(`"${selectedProduct.productName}" archived successfully!`);
+                            setShowSuccessAlert(true);
+                            fetchAllProducts(true);
+                          } catch (e) {}
+                        }}
+                      >
+                        <FontAwesome name="archive" size={16} color="#fff" />
+                        <Text style={styles.modalActionText}>Archive</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                     
+
+                      <TouchableOpacity 
+                        style={[styles.modalActionButton, { backgroundColor: Colors.LIGHT_PURPLE }]}
+                        activeOpacity={0.7}
+                        onPress={() => handleSendMessagePress(selectedProduct.publisher.publisherId, selectedProduct.id, selectedProduct.publisher.name, selectedProduct.publisher.image)}          
+                      >
+                        <AntDesign name="message1" size={16} color={Colors.WHITE} />
+                        <Text style={styles.modalActionText}>Send Message</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                  
                 </View>
                 <TouchableOpacity
                   style={{ position: 'absolute', top: 10, right: 10, zIndex: 10 }}
@@ -1051,6 +1214,13 @@ export default function ProductsScreen() {
           )}
         />
       )}
+      {/* Success alert for owner actions */}
+      <SuccessAlert
+        visible={showSuccessAlert}
+        title="Success!"
+        message={successMessage}
+        onClose={() => setShowSuccessAlert(false)}
+      />
     </View>
   );
 }
@@ -1258,6 +1428,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  ownerBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: Colors.PURPLE,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    zIndex: 10,
+  },
+  ownerBadgeText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 10,
   },
   statusBadge: {
     position: 'absolute',
@@ -1517,6 +1702,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+  
   },
   modalActionButton: {
     flexDirection: 'row',
@@ -1524,8 +1710,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
-    minWidth: 90,
+    minWidth: 80,
+  
     justifyContent: 'center',
+    marginRight: 3,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1535,7 +1723,7 @@ const styles = StyleSheet.create({
   modalActionText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 11,
     marginLeft: 6,
   },
   infoTag: {
@@ -1606,7 +1794,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  statusBadge: {
+  aiLottieShadow: {
+    shadowColor: Colors.LIGHT_PURPLE,
+    shadowOffset: { width: 8, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+    borderRadius: 120,
+    backgroundColor: 'transparent',
+  },
+  aiSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    paddingVertical: 6,
+    paddingRight: 6,
+    borderWidth: 1,
+    borderColor: Colors.LIGHT_PURPLE,
+  },
+  aiSearchInput: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    fontSize: 14,
+    color: '#222',
+  },
+  aiSearchButton: {
+    backgroundColor: Colors.LIGHT_PURPLE,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginLeft: 6,
+  },
+  aiSearchClear: {
+    padding: 8,
+    marginLeft: 2,
+  },
+  statusBadgeBottom: {
     position: 'absolute',
     bottom: 10,
     left: 10,
@@ -1616,7 +1841,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     zIndex: 10,
   },
-  statusText: {
+  statusTextBottom: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 10,

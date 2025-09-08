@@ -1,16 +1,16 @@
-import Axios from 'axios';
+import http from './http';
 import { APP_ENV } from '../utils/BaseUrl';
 
 export const PostService = {
   async getProfilePostsWithPhotos(userId) {
-    const response = await Axios.get(
+    const response = await http.get(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getresidentpostsWithPhotos/${userId}`
     );
     return response.data;
   },
 
   async getImage(photoId) {
-    const response = await Axios.get(
+    const response = await http.get(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/images?fileUrl=${encodeURIComponent(photoId)}`,
       { responseType: 'arraybuffer' }
     );
@@ -18,28 +18,28 @@ export const PostService = {
   },
 
   async getAllUserRelatedPosts(userId, page, pageSize) {
-    const response = await Axios.get(
+    const response = await http.get(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserRelatedPost/${userId}/${page}/${pageSize}`
     );
     return response.data;
   },
 
   async getAllComments(postId) {
-    const response = await Axios.get(
+    const response = await http.get(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcomments/${postId}`
     );
     return response.data;
   },
 
   async getAllCommentsPaged(postId, page = 0, size = 12) {
-    const response = await Axios.get(
+    const response = await http.get(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getallcommentspaged/${postId}/${page}/${size}`
     );
     return response.data;
   },
 
   async addComment(postId, userId, commentText, mentionedUserIds, token) {
-    const response = await Axios.post(
+    const response = await http.post(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addcomment/${postId}/${userId}`,
       { commentText, mentionedUserIds },
       { headers: { Authorization: `Bearer ${token}` } }
@@ -48,7 +48,7 @@ export const PostService = {
   },
 
   async addReplyToComment(userId, commentId, postId, image, Name, replyText, token) {
-    const response = await Axios.post(
+    const response = await http.post(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/replytocomment/${userId}/${commentId}/${postId}`,
       { image, Name, replyText },
       { headers: { Authorization: `Bearer ${token}` } }
@@ -57,14 +57,14 @@ export const PostService = {
   },
 
   async getReplies(commentId) {
-    const response = await Axios.get(
+    const response = await http.get(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getreplies/${commentId}`
     );
     return response.data;
   },
 
   async addReactionToPost(postId, userId, reactionType) {
-    const response = await Axios.post(
+    const response = await http.post(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addReactionToPost/${postId}/${userId}/${reactionType}`,
       {},
       { headers: { 'Content-Type': 'application/json' } }
@@ -73,7 +73,7 @@ export const PostService = {
   },
 
   async addReactionToComment(commentId, userId, reactionType) {
-    const response = await Axios.post(
+    const response = await http.post(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/addReactionToComment/${commentId}/${userId}/${reactionType}`,
       {},
       { headers: { 'Content-Type': 'application/json' } }
@@ -82,7 +82,7 @@ export const PostService = {
   },
 
   async removeReactionFromComment(commentId, userId) {
-    const response = await Axios.delete(
+    const response = await http.delete(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/removeReaction/${commentId}/${userId}`,
       { headers: { 'Content-Type': 'application/json' } }
     );
@@ -90,7 +90,7 @@ export const PostService = {
   },
 
   async editComment(commentId, userId, newText, token) {
-    const response = await Axios.put(
+    const response = await http.put(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/edit/${commentId}/${userId}`,
       { newText },
       { headers: { Authorization: `Bearer ${token}` } }
@@ -99,7 +99,7 @@ export const PostService = {
   },
 
   async deleteComment(commentId, userId, postId, token) {
-    const response = await Axios.delete(
+    const response = await http.delete(
       `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/delete/${commentId}/${userId}/${postId}`,
       { headers: { Authorization: `Bearer ${token}` } }
     );

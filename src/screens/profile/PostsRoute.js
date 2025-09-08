@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, Animated } from 'react-native';
-import { ScrollView, FlatList } from 'react-native-gesture-handler';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, TouchableOpacity } from 'react-native';
+import { FlatList } from 'react-native-gesture-handler';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
 import PostCard from '../../components/PostCard';
 import CommentModel from '../../components/pupUps/CommentModel';
+import ConfirmActionModel from '../../components/pupUps/ConfirmActionModel';
+import Axios from 'axios';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../../../assets/Colors';
 
@@ -20,6 +22,7 @@ function PostsRoute({ userId }) {
 
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState(null);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -108,26 +111,58 @@ function PostsRoute({ userId }) {
         transform: [{ translateY: slideAnim }],
       }}
     >
-      <PostCard
-        key={item.id}
-        user={item.user}
-        postDateTime={item.postDateTime}
-        postId={item.id}
-        caption={item.caption}
-        photos={item.photos}
-        reactions={item.reactions || []}
-        comments={item.comments || []}
-        commentsNumber={item.commentsNumber || 0}
-        userReaction={item.userReaction}
-        onLike={() => {}}
-        onLongPressLike={() => {}}
-        onComment={() => {
-          setSelectedPostId(item.id);
-          setCommentModalVisible(true);
-        }}
-      />
+      <View style={{ position: 'relative' }}>
+        <PostCard
+          key={item.id}
+          user={item.user}
+          postDateTime={item.postDateTime}
+          postId={item.id}
+          caption={item.caption}
+          photos={item.photos}
+          reactions={item.reactions || []}
+          comments={item.comments || []}
+          commentsNumber={item.commentsNumber || 0}
+          userReaction={item.userReaction}
+          onLike={() => {}}
+          onLongPressLike={() => {}}
+          onComment={() => {
+            setSelectedPostId(item.id);
+            setCommentModalVisible(true);
+          }}
+          hideUserGroupBadge
+        />
+
+        {/* Close icon for delete - only in PostsRoute */}
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 6 }}
+          onPress={() => {
+            setSelectedPostId(item.id);
+            setIsDeleteModalVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="close" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
+
+  const deleteResidentPost = async () => {
+    if (!selectedPostId) return;
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) return;
+      await Axios.delete(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/deleteresidentpost/${userId}/${selectedPostId}`);
+      setIsDeleteModalVisible(false);
+      setSelectedPostId(null);
+      // refresh list: re-fetch from first page for consistency
+      setPage(0);
+      await fetchPosts(true);
+    } catch (e) {
+      // console.error('Failed to delete resident post:', e);
+      setIsDeleteModalVisible(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -157,10 +192,21 @@ function PostsRoute({ userId }) {
       )}
       
       {/* Comment Modal */}
-      <CommentModel
-        isVisible={isCommentModalVisible}
-        onClose={() => setCommentModalVisible(false)}
-        postId={selectedPostId}
+      {isCommentModalVisible && selectedPostId !== null && (
+        <CommentModel
+          isVisible={isCommentModalVisible}
+          onClose={() => setCommentModalVisible(false)}
+          postId={selectedPostId}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      <ConfirmActionModel
+        isVisible={isDeleteModalVisible}
+        onClose={() => setIsDeleteModalVisible(false)}
+        message1={"Delete confirmation"}
+        message2={"Do you want to delete this post?"}
+        onConfirm={deleteResidentPost}
       />
     </View>
   );

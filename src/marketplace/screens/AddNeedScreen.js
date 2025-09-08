@@ -26,7 +26,6 @@ export default function AddNeedScreen() {
   // Form fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [targetPrice, setTargetPrice] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [startTime, setStartTime] = useState(new Date());
@@ -71,9 +70,7 @@ export default function AddNeedScreen() {
     }
 
     // Price validation
-    if (targetPrice && isNaN(parseFloat(targetPrice))) {
-      newErrors.targetPrice = 'Target price must be a valid number';
-    }
+
     if (minPrice && isNaN(parseFloat(minPrice))) {
       newErrors.minPrice = 'Minimum price must be a valid number';
     }
@@ -112,13 +109,14 @@ export default function AddNeedScreen() {
       const needData = {
         title: title.trim(),
         description: description.trim(),
-        TargetPrice: targetPrice ? parseFloat(targetPrice) : null,
         minPrice: minPrice ? parseFloat(minPrice) : null,
         maxPrice: maxPrice ? parseFloat(maxPrice) : null,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         clientId: userId,
       };
+     
+      
 
       // Call the API service
       await addNeed(needData);
@@ -282,25 +280,7 @@ export default function AddNeedScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Pricing</Text>
             
-            {/* Target Price */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Target Price (Optional)</Text>
-              <View style={styles.priceInputContainer}>
-                <Text style={styles.currencySymbol}>$</Text>
-                <TextInput
-                  style={[styles.priceInput, errors.targetPrice && styles.inputError]}
-                  value={targetPrice}
-                  onChangeText={(text) => {
-                    setTargetPrice(text);
-                    clearErrors('targetPrice');
-                  }}
-                  placeholder="0.00"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="numeric"
-                />
-              </View>
-              {errors.targetPrice && <Text style={styles.errorText}>{errors.targetPrice}</Text>}
-            </View>
+       
 
             {/* Price Range */}
             <View style={styles.priceRangeContainer}>

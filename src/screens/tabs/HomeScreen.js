@@ -4,17 +4,16 @@ import React, { useEffect, useState, useRef } from 'react';
 import {
   View, Text, Image, StyleSheet, TouchableOpacity, RefreshControl, Animated, FlatList, ActivityIndicator, Easing, SafeAreaView, StatusBar, Dimensions
 } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
-import { APP_ENV } from '../../utils/BaseUrl';
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import Colors from '../../../assets/Colors';
+import useHomeViewModel from '../../viewmodels/useHomeViewModel';
 import LottieView from 'lottie-react-native';
 import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json';
-import Colors from '../../../assets/Colors';
-import { MaterialIcons, AntDesign, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from '@react-navigation/native';
+// Refactored to MVVM: View-only. Logic moved to src/viewmodels/useHomeViewModel
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import PostCard from '../../components/PostCard';
-import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+// Removed delete confirmation and axios here; delete is handled in PostsRoute only
 
 const { width } = Dimensions.get('window');
 
@@ -26,22 +25,28 @@ export default function HomeScreen() {
   const [translateAnim] = useState(new Animated.Value(0));
   const [pulseAnim] = useState(new Animated.Value(1));
   const [glowAnim] = useState(new Animated.Value(0));
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
-  const [selectedPostId, setSelectedPostId] = useState(null);
-  const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [userName, setUserName] = useState('');
-  const [userProfilePic, setUserProfilePic] = useState(null);
+  const {
+    isModalVisible,
+    setIsModalVisible,
+    isCommentModalVisible,
+    selectedPostId,
+    posts,
+    loading,
+    refreshing,
+    onRefresh,
+    loadMore,
+    handleCommentPress,
+    handleCloseCommentModal,
+    refreshPosts,
+    handleCommentsCountChange,
+  } = useHomeViewModel();
+  // Removed unused user info state
 
   // Animation values for header and content
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
-  const PAGE_SIZE = 10;
+  
 
   // Initialize animations
   useEffect(() => {
@@ -98,98 +103,19 @@ export default function HomeScreen() {
     startGlowAnimation();
   }, []);
 
-  const fetchPosts = async (nextPage = 0, refreshing = false) => {
-    const userId = await AsyncStorage.getItem("userId");
-    if (!userId) return;
-    if (refreshing) setRefreshing(true);
-    else setLoading(true);
-    try {
-      const response = await fetch(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/residentprofile/getAllUserRelatedPost/${userId}/${nextPage}/${PAGE_SIZE}`
-      );
-      console.log('Response status:', response.status);
-      const responseText = await response.text();
-      console.log('Response text:', responseText);
-      const data = JSON.parse(responseText);
-      if (refreshing || nextPage === 0) {
-        setPosts(data.content);
-      } else {
-        setPosts(prev => [...prev, ...data.content]);
-      }
-      setHasMore(!data.last);
-      setPage(nextPage);
-    } catch (error) {
-      console.error('Failed to fetch posts:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  // Data fetching handled by ViewModel
 
-  const onRefresh = () => {
-    fetchPosts(0, true);
-  };
+  // Removed unused user info effect
 
-  useEffect(() => {
-    fetchPosts(0);
-  }, []);
+  // loadMore handled by ViewModel
 
-  useEffect(() => {
-    const fetchUserInfo = async () => {
-      try {
-        const name = await AsyncStorage.getItem('userFullName');
-        setUserName(name || '');
-        // Try to get profile photo if available
-        const photo = await AsyncStorage.getItem('userProfilePhoto');
-        setUserProfilePic(photo);
-      } catch (e) {
-        // ignore
-      }
-    };
-    fetchUserInfo();
-  }, []);
+  // Removed unused time formatting helper
 
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      fetchPosts(page + 1);
-    }
-  };
+  
 
-  const formatPostTime = (timestamp) => {
-    const date = new Date(timestamp);
-    if (isNaN(date)) return 'Just now';
-    const now = new Date();
-    const diff = now - date;
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    if (days > 7) {
-      return new Intl.DateTimeFormat('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-      }).format(date);
-    }
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'Just now';
-  };
+  // Delete flow removed from HomeScreen
 
-  const handleCommentPress = (postId) => {
-    setSelectedPostId(postId);
-    setIsCommentModalVisible(true);
-  };
-
-  const handleCloseCommentModal = () => {
-    setIsCommentModalVisible(false);
-    setSelectedPostId(null);
-  };
-
-  const refreshPosts = () => {
-    fetchPosts(0, true);
-  };
+  
 
   const handleAddButtonPress = () => {
     // Beautiful press animation sequence
@@ -281,21 +207,25 @@ export default function HomeScreen() {
         transform: [{ translateY: slideAnim }],
       }}
     >
-      <PostCard
-        postId={item.id}
-        user={item.user}
-        group={item.group}
-        postDateTime={item.postDateTime}
-        caption={item.caption}
-        photos={item.photos}
-        reactions={item.reactions || []}
-        comments={item.comments || []}
-        commentsNumber={item.commentsNumber || 0}
-        userReaction={item.userReaction}
-        onLike={() => {}}
-        onLongPressLike={() => {}}
-        onComment={() => handleCommentPress(item.id)}
-      />
+      <View style={{ position: 'relative' }}>
+        <PostCard
+          postId={item.id}
+          user={item.user}
+          group={item.group}
+          postDateTime={item.postDateTime}
+          caption={item.caption}
+          photos={item.photos}
+          reactions={item.reactions || []}
+          comments={item.comments || []}
+          commentsNumber={item.commentsNumber || 0}
+          userReaction={item.userReaction}
+          onLike={() => {}}
+          onLongPressLike={() => {}}
+          onComment={() => handleCommentPress(item.id)}
+        />
+
+        {/* Delete icon removed from HomeScreen */}
+      </View>
     </Animated.View>
   );
 
@@ -350,15 +280,15 @@ export default function HomeScreen() {
             />
             <Text style={styles.loadingText}>Loading your feed...</Text>
           </View>
-        ) : posts.length === 0 ? (
-          renderEmptyState()
         ) : (
           <FlatList
             data={posts}
             renderItem={renderItem}
-            keyExtractor={(_, idx) => idx.toString()}
+            keyExtractor={(item) => item.id?.toString?.() ?? String(item?.id ?? Math.random())}
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
+            bounces
+            alwaysBounceVertical
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -367,6 +297,7 @@ export default function HomeScreen() {
                 tintColor={Colors.LIGHT_PURPLE}
               />
             }
+            ListEmptyComponent={renderEmptyState()}
             ListFooterComponent={loading && posts.length > 0 ? renderLoadingMore() : null}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -466,13 +397,17 @@ export default function HomeScreen() {
             ]).start();
           });
         }}
+        onPostAdded={refreshPosts}
       />
-      <CommentModel
-        isVisible={isCommentModalVisible}
-        onClose={handleCloseCommentModal}
-        postId={selectedPostId}
-        refreshPosts={refreshPosts}
-      />
+      {isCommentModalVisible && selectedPostId !== null && (
+        <CommentModel
+          isVisible={isCommentModalVisible}
+          onClose={handleCloseCommentModal}
+          postId={selectedPostId}
+          refreshPosts={refreshPosts}
+          onCommentsCountChange={handleCommentsCountChange}
+        />
+      )}
     </SafeAreaView>
   );
 }

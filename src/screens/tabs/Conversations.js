@@ -156,30 +156,45 @@ const Conversations = () => {
       lastMsgContent = item.lastMessage;
     }
     
-    // Use isSeen field from the new API response
-    const hasNewMessages = !item.isSeen;
+    // Use 'seen' from new API, fallback to legacy 'isSeen'
+    const hasNewMessages = item.seen === undefined ? !item.isSeen : !item.seen;
 
-    // Extract user IDs from chatId (format: user1ID_user2ID)
-    const userIds = item.chatId.split('_');
+    // Detect group vs private
+    const isGroup = item.type === 'GROUP' || (typeof item.chatId === 'string' && item.chatId.startsWith('group_'));
+
+    // Extract user IDs from chatId (format: user1ID_user2ID) for private
+    const userIds = !isGroup && typeof item.chatId === 'string' ? item.chatId.split('_') : [];
     const user1ID = userIds[0];
     const user2ID = userIds[1];
+
+    // For groups, derive groupId from chatId like 'group_<groupId>'
+    const groupId = isGroup && typeof item.chatId === 'string' && item.chatId.startsWith('group_')
+      ? item.chatId.slice(6)
+      : null;
 
     return (
       <TouchableOpacity
         key={item.chatId}
         style={styles.conversationCard}
-        onPress={() =>
-          navigation.navigate('Conversation', {
-            chatId: item.chatId,
-            userName: item.userName,
-            userImage: item.userImage,
-            user1ID: user1ID,
-            user2ID: user2ID,
-            productId: item.productId || [],
-            serviceId: item.serviceId || [],
-            needId: item.needId || [],
-          })
-        }
+        onPress={() => {
+          if (isGroup) {
+            navigation.navigate('GroupChat', {
+              groupId: groupId || item.chatId,
+              groupName: item.userName,
+            });
+          } else {
+            navigation.navigate('Conversation', {
+              chatId: item.chatId,
+              userName: item.userName,
+              userImage: item.userImage,
+              user1ID: user1ID,
+              user2ID: user2ID,
+              productId: item.productId || [],
+              serviceId: item.serviceId || [],
+              needId: item.needId || [],
+            });
+          }
+        }}
         activeOpacity={0.9}
       >
         {/* Avatar */}

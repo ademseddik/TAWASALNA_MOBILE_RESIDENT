@@ -33,6 +33,7 @@ const PostCard = ({
   onImagePress,
   imageUris,
   postId,
+  hideUserGroupBadge = false,
 }) => {
   const [showReactionDialog, setShowReactionDialog] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -263,10 +264,12 @@ const PostCard = ({
                 <View style={styles.contentContainer}>
                   <View style={styles.headerRow}>
                     <Text style={styles.groupName}>{group.name}</Text>
-                    <View style={styles.groupBadge}>
-                      <MaterialCommunityIcons name="account-group" size={12} color={Colors.LIGHT_PURPLE} />
-                      <Text style={styles.groupBadgeText}>Group</Text>
-                    </View>
+                    {!hideUserGroupBadge && (
+                      <View style={styles.groupBadge}>
+                        <MaterialCommunityIcons name="account-group" size={12} color={Colors.LIGHT_PURPLE} />
+                        <Text style={styles.groupBadgeText}>Group</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.userInfo}>
                     <Image
@@ -289,10 +292,12 @@ const PostCard = ({
                 <View style={styles.contentContainer}>
                   <View style={styles.headerRow}>
                     <Text style={styles.username}>{user?.name || user?.fullName}</Text>
-                    <View style={styles.userBadge}>
-                      <MaterialCommunityIcons name="account" size={12} color="#EC4899" />
-                      <Text style={styles.userBadgeText}>User</Text>
-                    </View>
+                    {!hideUserGroupBadge && (
+                      <View style={styles.userBadge}>
+                        <MaterialCommunityIcons name="account" size={12} color="#EC4899" />
+                        <Text style={styles.userBadgeText}>User</Text>
+                      </View>
+                    )}
                   </View>
                   <Text style={styles.time}>{formatDateTime(postDateTime)}</Text>
                 </View>

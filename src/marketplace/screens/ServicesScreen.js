@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome } from '@expo/vector-icons';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
 import { useNavigation } from '@react-navigation/native';
+import { AntDesign } from 'react-native-vector-icons';
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -51,6 +52,13 @@ export default function ServicesScreen() {
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+  // Truncate helper for card descriptions
+  const truncateText = (text, max = 30) => {
+    if (!text) return '';
+    const str = String(text);
+    return str.length > max ? str.slice(0, max) + '..' : str;
+  };
 
   // Load user ID on component mount
   useEffect(() => {
@@ -393,27 +401,10 @@ export default function ServicesScreen() {
           </View>
           <View style={styles.cardContent}>
             <Text style={styles.title} numberOfLines={1}>{item.serviceName}</Text>
-            <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
+            <Text style={styles.desc}>{truncateText(item.description, 25)}</Text>
             
             {/* Service owner info */}
-            {Boolean(item.owner) && (
-              <View style={styles.ownerInfo}>
-                <Image
-                  source={{ uri: item.owner.image }}
-                  style={styles.ownerAvatar}
-                  defaultSource={require('../../../assets/default-avatar.jpg')}
-                />
-                <Text style={styles.ownerName}>{item.owner.name}</Text>
-              </View>
-            )}
-            
-            {/* Delivery time */}
-            {Boolean(item.deliveryTimeInHours) && (
-              <View style={styles.deliveryInfo}>
-                <FontAwesome name="clock-o" size={12} color={Colors.LIGHT_PURPLE} />
-                <Text style={styles.deliveryText}>{item.deliveryTimeInHours.toString()}h delivery</Text>
-              </View>
-            )}
+        
           </View>
         </TouchableOpacity>
       </View>
@@ -1026,7 +1017,7 @@ export default function ServicesScreen() {
                     <TouchableOpacity 
                     onPress={() => handleSendMessagePress(selectedService.owner.OwnerId, selectedService.id, selectedService.owner.name, selectedService.owner.image)} 
                     style={[styles.modalActionButton, { backgroundColor: Colors.LIGHT_PURPLE }]} activeOpacity={0.7}>
-                      <FontAwesome name="phone" size={16} color="#fff" />
+                      <AntDesign name="message1" size={16} color={Colors.WHITE} />
                       <Text style={styles.modalActionText}>Contact</Text>
                     </TouchableOpacity>
                   </View>
@@ -1125,7 +1116,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.10,
     shadowRadius: 6,
     marginBottom: 4,
-    height: 240, // Slightly taller for services
+    height: 220, // Slightly taller for services
     overflow: 'hidden',
   },
   cardPressed: {

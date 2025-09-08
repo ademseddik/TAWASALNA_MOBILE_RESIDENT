@@ -27,6 +27,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Toast from "react-native-toast-message";
 import { Card, Title, Paragraph } from "react-native-paper";
 import { Dimensions } from "react-native";
+import { useNavigation } from '@react-navigation/native';
 import LottieView from 'lottie-react-native';
 
 import GroupMembersModal from "../../components/pupUps/GroupMembersModal";
@@ -38,6 +39,7 @@ import PostOptionsModel from "../../components/pupUps/PostOptionsModel";
 import PostCard from "../../components/PostCard";
 
 const GroupDetails = ({ route }) => {
+  const navigation = useNavigation();
   const { groupId } = route.params;
   const { width } = Dimensions.get("window");
   
@@ -692,6 +694,32 @@ const GroupDetails = ({ route }) => {
           />
           <Text style={{ fontSize: 17, color: "white" }}>Invite</Text>
         </TouchableOpacity>
+
+        {/* Group Chat Button - visible for members */}
+        {isMember && (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('GroupChat', { groupId, groupName: groupInfo?.name })}
+            style={{
+              height: 35,
+              width: "40%",
+              borderColor: Colors.LIGHT_PURPLE,
+              borderWidth: 1,
+              borderRadius: 10,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: Colors.LIGHT_PURPLE,
+              flexDirection: "row",
+            }}
+          >
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              color="white"
+              size={15}
+              style={{ marginRight: 5 }}
+            />
+            <Text style={{ fontSize: 17, color: "white" }}>Group Chat</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Create Post Section - Only for members */}

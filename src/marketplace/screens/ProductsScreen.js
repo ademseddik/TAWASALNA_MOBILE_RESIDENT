@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StyleSheet, ScrollView, Image, Animated, Modal, Dimensions, TouchableWithoutFeedback, TextInput } from 'react-native';
 import { getProductsByCommunityWithFilters, getAllProductCategories, markProductAsSold, markProductAsAvailable, archiveProduct, aiSearchProducts } from '../../services/marketplaceProduct.service';
 import { PRODUCT_CATEGORIES } from '../data/productOptions';
@@ -11,7 +11,7 @@ import { AntDesign } from 'react-native-vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import SuccessAlert from '../../components/pupUps/SuccessAlert';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -135,6 +135,27 @@ export default function ProductsScreen() {
       }
     };
   }, [aiLoading, pulseAnim]);
+
+  // Auto-refresh when returning from AddProduct screen
+  useFocusEffect(
+    useCallback(() => {
+      const checkAndRefresh = async () => {
+        try {
+          const shouldRefresh = await AsyncStorage.getItem('shouldRefreshProducts');
+          if (shouldRefresh === 'true') {
+            await AsyncStorage.removeItem('shouldRefreshProducts');
+            if (userId) {
+              fetchAllProducts(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking refresh flag:', error);
+        }
+      };
+      
+      checkAndRefresh();
+    }, [userId, fetchAllProducts])
+  );
 
   // Fetch all products by default
   const fetchAllProducts = async (resetPage = true) => {
@@ -1112,8 +1133,10 @@ export default function ProductsScreen() {
                               setShowSuccessAlert(true);
                               // Update local state
                               setSelectedProduct(prev => ({ ...prev, status: 'SOLD' }));
-                              // Refresh list
-                              fetchAllProducts(true);
+                              // Update the product in the list
+                              setProducts(prev => prev.map(p => 
+                                p.id === selectedProduct.id ? { ...p, status: 'SOLD' } : p
+                              ));
                             } catch (e) {}
                           }}
                         >
@@ -1130,7 +1153,10 @@ export default function ProductsScreen() {
                               setSuccessMessage(`"${selectedProduct.productName}" marked as available successfully!`);
                               setShowSuccessAlert(true);
                               setSelectedProduct(prev => ({ ...prev, status: 'FOR_SALE' }));
-                              fetchAllProducts(true);
+                              // Update the product in the list
+                              setProducts(prev => prev.map(p => 
+                                p.id === selectedProduct.id ? { ...p, status: 'FOR_SALE' } : p
+                              ));
                             } catch (e) {}
                           }}
                         >
@@ -1147,7 +1173,12 @@ export default function ProductsScreen() {
                             await archiveProduct(selectedProduct.id);
                             setSuccessMessage(`"${selectedProduct.productName}" archived successfully!`);
                             setShowSuccessAlert(true);
-                            fetchAllProducts(true);
+                            // Update local state
+                            setSelectedProduct(prev => ({ ...prev, isArchived: true }));
+                            // Update the product in the list
+                            setProducts(prev => prev.map(p => 
+                              p.id === selectedProduct.id ? { ...p, isArchived: true } : p
+                            ));
                           } catch (e) {}
                         }}
                       >

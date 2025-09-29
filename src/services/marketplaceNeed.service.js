@@ -26,8 +26,9 @@ export const getAllNeeds = () => {
 }; 
 
 // New community-based endpoints
-export const getNeedsByCommunity = (userId, page, size) => {
-  return http.get(`${BASE_URL}/need/community/${userId}/${page}/${size}`);
+export const getNeedsByCommunity = (userId, page, size, searchWord = '') => {
+  const params = searchWord ? `?searchWord=${encodeURIComponent(searchWord)}` : '';
+  return http.get(`${BASE_URL}/need/community/${userId}/${page}/${size}${params}`);
 };
 
 export const getNeedsByUser = (userId, page, size) => {

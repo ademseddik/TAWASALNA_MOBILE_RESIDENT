@@ -24,7 +24,7 @@ const Termsofservices = ({ isVisible, onClose }) => {
             backgroundColor: "white",
             padding: 20,
             borderRadius: 20,
-            borderColor:Colors.PURPLE,
+            borderColor:Colors.LIGHT_PURPLE,
             width: "80%",
             marginTop: "20%", 
             marginBottom: "20%", 

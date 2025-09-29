@@ -99,7 +99,7 @@ const App = () => {
             <Stack.Screen
               name="Edit profile"
               component={EditProfile}
-              options={{ headerShown: true  }}
+              options={{ headerShown: false  }}
             />
           
                        <Stack.Screen
@@ -141,7 +141,7 @@ const App = () => {
         options={{ headerShown: false }}
       />
 
-     <Stack.Screen name="PostDetail" component={PostDetail} />
+     <Stack.Screen name="Post Detail" component={PostDetail} options={{ headerShown: false }}/>
          <Stack.Screen
            name="Marketplace"
            component={MarketplaceNav}

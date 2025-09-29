@@ -659,6 +659,7 @@ export const useConversation = (routeParams) => {
   }, [currentUserId, otherUserId, chatId, isSocketConnected]);
 
   const handleTextInputChange = useCallback((text) => {
+    console.log(text)
     setMessageInput(text);
     
     if (!text.trim()) {

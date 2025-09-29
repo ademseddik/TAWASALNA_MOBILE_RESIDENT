@@ -57,7 +57,7 @@ export default function useNeedsViewModel() {
     }
     try {
       const pageToFetch = resetPage ? 0 : page;
-      const resp = await getNeedsByCommunity(userId, pageToFetch, 10);
+      const resp = await getNeedsByCommunity(userId, pageToFetch, 10, searchTitle);
       if (resp && resp.data) {
         const needsData = resp.data.content || [];
         setNeeds(resetPage ? needsData : (prev) => [...prev, ...needsData]);
@@ -80,7 +80,7 @@ export default function useNeedsViewModel() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const resp = await getNeedsByCommunity(userId, nextPage, 10);
+      const resp = await getNeedsByCommunity(userId, nextPage, 10, searchTitle);
       if (resp && resp.data) {
         const needsData = resp.data.content || [];
         setNeeds(prev => [...prev, ...needsData]);

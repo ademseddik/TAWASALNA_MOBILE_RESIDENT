@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { ProfileService } from '../../../services/profile.service';  // Import the Updateprivacy function
+import Colors from '../../../../assets/Colors';
 
 const SettingsScreen = ({ navigation }) => {
     const [isPublic, setIsPublic] = useState(true);
@@ -59,7 +60,20 @@ const SettingsScreen = ({ navigation }) => {
     };
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f5f5' }}>
+            {/* Header with back arrow */}
+            <View style={styles.header}>
+                <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <MaterialIcons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>profile</Text>
+                <View style={styles.placeholder} />
+            </View>
+            
+            <View style={styles.container}>
                {!isSocialAuth && (
             <TouchableOpacity
                 style={styles.section}
@@ -94,22 +108,47 @@ const SettingsScreen = ({ navigation }) => {
                 />
             </View>
 
-            {/* Change Email Section */}
-            <TouchableOpacity
-                style={styles.section}
-                onPress={() => navigation.navigate('ChangeEmail')}
-            >
-                <View style={styles.sectionContent}>
-                    <Ionicons name="mail" size={24} color="#333" />
-                    <Text style={styles.sectionTitle}>Change Email Address</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color="#666" />
-            </TouchableOpacity>
         </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: Colors.WHITE,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        flex: 1,
+        textAlign: 'center',
+    },
+    placeholder: {
+        width: 44,
+        height: 44,
+        marginLeft: 16,
+    },
     container: {
         flex: 1,
         padding: 20,

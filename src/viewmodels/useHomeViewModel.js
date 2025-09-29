@@ -25,6 +25,7 @@ export default function useHomeViewModel() {
       const data = await PostService.getAllUserRelatedPosts(userId, nextPage, PAGE_SIZE);
       if (refreshingFlag || nextPage === 0) {
         setPosts(data.content);
+        console.log('Posts fetched:', data.content);
       } else {
         setPosts(prev => [...prev, ...data.content]);
       }

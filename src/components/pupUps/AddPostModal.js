@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import {
   Modal,
@@ -8,21 +8,20 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
-  Switch
+  ActivityIndicator
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import Axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_ENV } from '../../utils/BaseUrl';
-import LottieView from 'lottie-react-native';
 import { Audio } from 'expo-av';
 import Colors from '../../../assets/Colors';
 import * as Haptics from 'expo-haptics';
 
 const MAX_IMAGES = 5;
 
-const AddPostModal = ({ visible, onClose, onPostAdded }) => {
+const AddPostModal = ({ visible, onClose, onPostAdded, onLoadingChange }) => {
   const [caption, setCaption] = useState('');
   const [photos, setPhotos] = useState([]); // changed from single photo to array
   const [isAnnouncement, setIsAnnouncement] = useState(false);
@@ -30,6 +29,14 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [captionError, setCaptionError] = useState('');
+
+  // Notify parent of loading state changes
+  useEffect(() => {
+    if (onLoadingChange) {
+      onLoadingChange(isLoading);
+    }
+  }, [isLoading, onLoadingChange]);
 
   // Reset all fields
   const resetFields = () => {
@@ -40,6 +47,7 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
     setDescription('');
     setCategory('');
     setIsLoading(false);
+    setCaptionError('');
   };
 
   const pickImage = async () => {
@@ -72,6 +80,13 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
   };
 
   const handleAddPost = async () => {
+    // Validate caption
+    if (!caption.trim()) {
+      setCaptionError('Please add a caption before posting');
+      return;
+    }
+    
+    setCaptionError('');
     setIsLoading(true);
     const formData = new FormData();
     formData.append('caption', caption);
@@ -121,6 +136,14 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
     setPhotos((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  // Handle caption change and clear error
+  const handleCaptionChange = (text) => {
+    setCaption(text);
+    if (captionError) {
+      setCaptionError('');
+    }
+  };
+
   return (
     <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
       <View style={styles.modalOverlay}>
@@ -130,10 +153,13 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
           <TextInput
             placeholder="Caption"
             value={caption}
-            onChangeText={setCaption}
-            style={styles.textField}
+            onChangeText={handleCaptionChange}
+            style={[styles.textField, captionError ? styles.textFieldError : null]}
             placeholderTextColor="#888"
           />
+          {captionError ? (
+            <Text style={styles.errorText}>{captionError}</Text>
+          ) : null}
 
           {photos.length > 0 && (
             <View style={styles.imageGrid}>
@@ -164,10 +190,7 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
             </TouchableOpacity>
           )}
 
-          <View style={styles.switchContainer}>
-            <Text>Is Announcement?</Text>
-            <Switch value={isAnnouncement} onValueChange={setIsAnnouncement} />
-          </View>
+      
 
           {isAnnouncement && (
             <>
@@ -202,12 +225,7 @@ const AddPostModal = ({ visible, onClose, onPostAdded }) => {
             <View style={styles.postButtonStyled}>
               {isLoading ? (
                 <View style={styles.loaderButton}>
-                  <LottieView
-                    source={require('../../../assets/animations/loading.json')}
-                    autoPlay
-                    loop
-                    style={styles.loaderAnimation}
-                  />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 </View>
               ) : (
                 <TouchableOpacity style={styles.addPostButtonStyled} onPress={handleAddPost}>
@@ -326,16 +344,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loaderButton: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
+    backgroundColor: Colors.LIGHT_PURPLE,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: '#2196F3',
-    borderRadius: 5
-  },
-  loaderAnimation: {
-    width: 50,
-    height: 50
+    justifyContent: 'center',
+    shadowColor: Colors.LIGHT_PURPLE,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 3,
   },
   imagePickerIcon: {
     alignSelf: 'flex-start',
@@ -420,14 +439,26 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#ececec',
   },
+  textFieldError: {
+    borderColor: '#ff4444',
+    backgroundColor: '#fff5f5',
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 14,
+    marginTop: -8,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   buttonRowStyled: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingHorizontal: 25,
     alignItems: 'center',
     width: '100%',
     marginTop: 18,
     marginBottom: 6,
-    gap: 12,
+    gap: 10,
   },
   cancelButtonStyled: {
     backgroundColor: '#f2f2f2',
@@ -474,5 +505,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 });
+
+AddPostModal.propTypes = {
+  visible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  onPostAdded: PropTypes.func.isRequired,
+  onLoadingChange: PropTypes.func,
+};
 
 export default AddPostModal;

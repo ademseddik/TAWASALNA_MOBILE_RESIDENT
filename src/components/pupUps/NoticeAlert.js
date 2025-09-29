@@ -9,6 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import Colors from '../../../assets/Colors';
 
 const { width, height } = Dimensions.get('window');
@@ -21,6 +22,7 @@ const NoticeAlert = ({
   autoClose = true,
   autoCloseDelay = 3000,
 }) => {
+  const { t } = useTranslation();
   const scaleAnim = new Animated.Value(0);
   const opacityAnim = new Animated.Value(0);
 
@@ -104,7 +106,7 @@ const NoticeAlert = ({
 
           {/* Close Button */}
           <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-            <Text style={styles.closeButtonText}>OK</Text>
+            <Text style={styles.closeButtonText}>{t('OK')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </Animated.View>

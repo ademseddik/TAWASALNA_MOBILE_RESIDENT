@@ -9,10 +9,12 @@ import {
   Image
 } from "react-native";
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useNavigation } from '@react-navigation/native';
 import Colors from "../../../assets/Colors";
 import { useChangePassword } from "../../hooks/useChangePassword";
 
 const ChangePassword = () => {
+  const navigation = useNavigation();
   const {
     t,
     currentpassword,
@@ -48,8 +50,17 @@ const ChangePassword = () => {
 
   return (
     <SafeAreaView style={{ backgroundColor: Colors.WHITE, flex: 1 }}>
-      <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
+        </TouchableOpacity>
         <Text style={styles.title}>{t("Change your password")}</Text>
+        <View style={styles.placeholder} />
+      </View>
+      <View style={styles.container}>
 
         {generalError && (
           <Text style={styles.generalError}>{generalError}</Text>
@@ -103,7 +114,7 @@ const ChangePassword = () => {
           {newPasswordError && (
             <View style={styles.errorContainer}>
               {newPasswordError.split('\n').map((line, index) => (
-                line && <Text key={index} style={styles.errorText}>{line}</Text>
+                line && <Text key={index} style={styles.errorText}>{line.trim()}</Text>
               ))}
             </View>
           )}
@@ -164,15 +175,44 @@ const styles = {
         fontSize: 16,
         color: Colors.DARK_GREY,
       },
-  container: {
-    marginTop: "20%",
-    paddingHorizontal: 20
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: Colors.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    marginBottom: 20,
-    marginLeft: 15
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  placeholder: {
+    width: 44,
+    height: 44,
+    marginLeft: 16,
+  },
+  container: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   inputContainer: {
     marginBottom: 20,
@@ -195,25 +235,40 @@ const styles = {
   input: {
     flex: 1
   },
+  errorContainer: {
+    marginTop: 5,
+  },
   errorText: {
     color: "red",
     marginLeft: 20,
-    marginTop: 5
+    marginTop: 2,
+    fontSize: 14,
+    lineHeight: 18,
+    marginBottom: 2
   },
   submitButton: {
     flexDirection: "row",
     borderColor: "gray",
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 13,
-    marginHorizontal: 15,
+    borderRadius: 15,
+    padding: 18,
+    marginHorizontal: 20,
+    marginTop: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.PURPLE
+    backgroundColor: Colors.LIGHT_PURPLE,
+    minHeight: 60,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonText: {
     color: Colors.WHITE,
-    marginLeft: 5
+    marginLeft: 8,
+    fontSize: 18,
+    fontWeight: '600',
   },
   loadingOverlay: {
     position: "absolute",

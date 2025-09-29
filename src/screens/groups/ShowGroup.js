@@ -7,11 +7,16 @@ import {
     Dimensions,
     ActivityIndicator,
     ScrollView,
+    SafeAreaView,
+    TouchableOpacity,
 } from "react-native";
 import { TabView, SceneMap, TabBar } from "react-native-tab-view";
 import Axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { APP_ENV } from "../../../src/utils/BaseUrl";
+import { useNavigation } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
+import Colors from '../../../assets/Colors';
 import InfoRoute from './InfoGroup';
 import GroupMembers from "./GroupMembers";
 import PostsRoute from './PostGroup';
@@ -19,6 +24,7 @@ import PostsRoute from './PostGroup';
 const initialLayout = { width: Dimensions.get("window").width };
 
 const ShowGroup = ({ route }) => {
+    const navigation = useNavigation();
     const { userId } = route.params; // Get selected user's ID
     const [index, setIndex] = useState(0);
     const [routes] = useState([
@@ -67,7 +73,20 @@ const ShowGroup = ({ route }) => {
     });
 
     return (
-        <ScrollView contentContainerStyle={styles.container}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            {/* Header with back arrow */}
+            <View style={styles.header}>
+                <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <MaterialIcons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Group Profile</Text>
+                <View style={styles.placeholder} />
+            </View>
+            
+            <ScrollView contentContainerStyle={styles.container}>
             <View style={styles.profileHeaderWrapper}>
                 <Image source={{ uri: profileData?.coverphoto || "https://placeholder.com/avatar" }} style={styles.coverImage} />
                 <Image source={{ uri: profileData?.profilephoto || "https://placeholder.com/avatar" }} style={styles.avatar} />
@@ -109,10 +128,46 @@ const ShowGroup = ({ route }) => {
             </View>
 
         </ScrollView>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: Colors.WHITE,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        flex: 1,
+        textAlign: 'center',
+    },
+    placeholder: {
+        width: 44,
+        height: 44,
+        marginLeft: 16,
+    },
     container: { padding: 10 },
     profileHeaderWrapper: { alignItems: "center", marginBottom: 20 },
     coverImage: { width: "100%", height: 180, borderRadius: 30 },

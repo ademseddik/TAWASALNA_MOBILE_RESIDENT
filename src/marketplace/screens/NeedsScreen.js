@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, TouchableOpacity, StyleSheet, ScrollView, Image, Animated, Modal, TouchableWithoutFeedback, TextInput, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import useNeedsViewModel from '../../viewmodels/useNeedsViewModel';
@@ -7,7 +7,8 @@ import { BlurView } from 'expo-blur';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AntDesign } from 'react-native-vector-icons';
 import MultiSlider from '@ptomasroos/react-native-multi-slider';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -48,6 +49,53 @@ export default function NeedsScreen() {
     archiveNeedVM,
   } = useNeedsViewModel();
   const [showSearch, setShowSearch] = React.useState(false);
+
+  // Debounce search to avoid too many API calls
+  const searchTimeoutRef = useRef(null);
+  
+  const handleSearchChange = useCallback((text) => {
+    setSearchTitle(text);
+    
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Set new timeout for search
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchNeeds(true);
+    }, 500); // 500ms debounce
+  }, [setSearchTitle, fetchNeeds]);
+  
+  // Clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Auto-refresh when returning from AddNeed screen
+  useFocusEffect(
+    useCallback(() => {
+      const checkAndRefresh = async () => {
+        try {
+          const shouldRefresh = await AsyncStorage.getItem('shouldRefreshNeeds');
+          if (shouldRefresh === 'true') {
+            await AsyncStorage.removeItem('shouldRefreshNeeds');
+            if (userId) {
+              fetchNeeds(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking refresh flag:', error);
+        }
+      };
+      
+      checkAndRefresh();
+    }, [userId, fetchNeeds])
+  );
 
   // Animation states
   const animation = useRef(new Animated.Value(0)).current;
@@ -558,22 +606,16 @@ export default function NeedsScreen() {
             <TextInput
               placeholder="Search needs..."
               value={searchTitle}
-              onChangeText={setSearchTitle}
+              onChangeText={handleSearchChange}
               style={{ flex: 1, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#eee' }}
             />
-            <TouchableOpacity
-              onPress={() => fetchNeeds(true)}
-              style={{ marginLeft: 8, backgroundColor: Colors.LIGHT_PURPLE, borderRadius: 8, padding: 8 }}
-            >
-              <FontAwesome name="search" size={18} color="#fff" />
-            </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
                 setShowSearch(false);
                 setSearchTitle('');
                 fetchNeeds(true);
               }}
-              style={{ marginLeft: 4, padding: 8 }}
+              style={{ marginLeft: 8, padding: 8 }}
             >
               <FontAwesome name="close" size={18} color={Colors.LIGHT_PURPLE} />
             </TouchableOpacity>

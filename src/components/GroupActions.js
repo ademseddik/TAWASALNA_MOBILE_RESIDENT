@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { FontAwesome5, Ionicons } from 'react-native-vector-icons';
 import Colors from '../../assets/Colors';
 
@@ -17,6 +17,8 @@ const GroupActions = ({
   onReject,
   onCancelRequest,
   onToggleMembers,
+  loadingActions = {}, // Add loading actions prop
+  groupId, // Add groupId prop for unique loading keys
 }) => {
   // Private group - not a member
   if (!isMember && groupType === "PRIVATE") {
@@ -49,10 +51,14 @@ const GroupActions = ({
 
   // Private group - invited
   if (isInvited && groupType === "PRIVATE") {
+    const acceptLoading = loadingActions[`accept-group-${groupId}`];
+    const rejectLoading = loadingActions[`reject-group-${groupId}`];
+    
     return (
       <View style={{ flexDirection: "row", marginTop: 25 }}>
         <TouchableOpacity
           onPress={onAccept}
+          disabled={acceptLoading || rejectLoading}
           style={{
             height: 30,
             width: "40%",
@@ -62,12 +68,19 @@ const GroupActions = ({
             marginLeft: 10,
             alignItems: "center",
             flexDirection: "row",
+            justifyContent: "center",
+            opacity: (acceptLoading || rejectLoading) ? 0.7 : 1,
           }}
         >
-          <Text style={{ fontSize: 17, marginLeft: 5 }}>Accept</Text>
+          {acceptLoading ? (
+            <ActivityIndicator size="small" color="#666" />
+          ) : (
+            <Text style={{ fontSize: 17, marginLeft: 5 }}>Accept</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onReject}
+          disabled={acceptLoading || rejectLoading}
           style={{
             height: 30,
             width: "40%",
@@ -77,9 +90,15 @@ const GroupActions = ({
             marginLeft: 10,
             alignItems: "center",
             flexDirection: "row",
+            justifyContent: "center",
+            opacity: (acceptLoading || rejectLoading) ? 0.7 : 1,
           }}
         >
-          <Text style={{ fontSize: 17, marginLeft: 5 }}>Reject</Text>
+          {rejectLoading ? (
+            <ActivityIndicator size="small" color="#666" />
+          ) : (
+            <Text style={{ fontSize: 17, marginLeft: 5 }}>Reject</Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -116,10 +135,14 @@ const GroupActions = ({
 
   // Public group - invited
   if (isInvited && groupType === "PUBLIC") {
+    const acceptLoading = loadingActions[`accept-group-${groupId}`];
+    const rejectLoading = loadingActions[`reject-group-${groupId}`];
+    
     return (
       <View style={{ flexDirection: "row", marginTop: 25, justifyContent: "center" }}>
         <TouchableOpacity
           onPress={onAccept}
+          disabled={acceptLoading || rejectLoading}
           style={{
             height: 30,
             width: "40%",
@@ -130,12 +153,18 @@ const GroupActions = ({
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
+            opacity: (acceptLoading || rejectLoading) ? 0.7 : 1,
           }}
         >
-          <Text style={{ fontSize: 17, marginLeft: 5, color: Colors.WHITE, fontWeight: "bold" }}>Accept</Text>
+          {acceptLoading ? (
+            <ActivityIndicator size="small" color={Colors.WHITE} />
+          ) : (
+            <Text style={{ fontSize: 17, marginLeft: 5, color: Colors.WHITE, fontWeight: "bold" }}>Accept</Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onReject}
+          disabled={acceptLoading || rejectLoading}
           style={{
             height: 30,
             width: "40%",
@@ -146,9 +175,14 @@ const GroupActions = ({
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
+            opacity: (acceptLoading || rejectLoading) ? 0.7 : 1,
           }}
         >
-          <Text style={{ fontSize: 17, marginLeft: 5, fontWeight: "bold" }}>Reject</Text>
+          {rejectLoading ? (
+            <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+          ) : (
+            <Text style={{ fontSize: 17, marginLeft: 5, fontWeight: "bold" }}>Reject</Text>
+          )}
         </TouchableOpacity>
       </View>
     );

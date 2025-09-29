@@ -13,11 +13,13 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import PostCard from '../../components/PostCard';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 // Removed delete confirmation and axios here; delete is handled in PostsRoute only
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
 
   const [buttonAnim] = useState(new Animated.Value(100));
   const [scaleAnim] = useState(new Animated.Value(1));
@@ -25,6 +27,7 @@ export default function HomeScreen() {
   const [translateAnim] = useState(new Animated.Value(0));
   const [pulseAnim] = useState(new Animated.Value(1));
   const [glowAnim] = useState(new Animated.Value(0));
+  const [isModalLoading, setIsModalLoading] = useState(false);
   const {
     isModalVisible,
     setIsModalVisible,
@@ -160,8 +163,8 @@ export default function HomeScreen() {
           <Image source={require('../../../assets/Icons/logo.png')} style={styles.headerLogo} resizeMode="contain" />
         </View>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Home Feed</Text>
-          <Text style={styles.headerSubtitle}>Stay connected with your community</Text>
+          <Text style={styles.headerTitle}>{t('Home Feed')}</Text>
+          <Text style={styles.headerSubtitle}>{t('Stay connected with your community')}</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity 
@@ -177,18 +180,16 @@ export default function HomeScreen() {
 
   const renderEmptyState = () => (
     <Animated.View style={[styles.emptyContainer, { opacity: fadeAnim }]}>
-      <View style={styles.emptyIconContainer}>
-        <MaterialCommunityIcons name="post-outline" size={48} color={Colors.LIGHT_PURPLE} />
-      </View>
-      <Text style={styles.emptyTitle}>No posts yet</Text>
+      <Image source={require('../../../assets/Icons/postiCOn.png')} style={styles.emptyLogo} resizeMode="contain" />
+      <Text style={styles.emptyTitle}>{t('No posts yet')}</Text>
       <Text style={styles.emptySubtitle}>
-        Be the first to share something with your community
+        {t('Be the first to share something with your community')}
       </Text>
       <TouchableOpacity 
         style={styles.createPostButton}
         onPress={handleAddButtonPress}
       >
-        <Text style={styles.createPostButtonText}>Create Post</Text>
+        <Text style={styles.createPostButtonText}>{t('Create Post')}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -196,7 +197,7 @@ export default function HomeScreen() {
   const renderLoadingMore = () => (
     <View style={styles.loadingMore}>
       <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
-      <Text style={styles.loadingMoreText}>Loading more posts...</Text>
+      <Text style={styles.loadingMoreText}>{t('Loading more posts...')}</Text>
     </View>
   );
 
@@ -278,7 +279,7 @@ export default function HomeScreen() {
               loop
               style={styles.loadingAnimation}
             />
-            <Text style={styles.loadingText}>Loading your feed...</Text>
+            <Text style={styles.loadingText}>{t('Loading your feed...')}</Text>
           </View>
         ) : (
           <FlatList
@@ -299,7 +300,7 @@ export default function HomeScreen() {
             }
             ListEmptyComponent={renderEmptyState()}
             ListFooterComponent={loading && posts.length > 0 ? renderLoadingMore() : null}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[styles.listContent, posts.length === 0 && styles.listContentEmpty]}
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -356,7 +357,11 @@ export default function HomeScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.addText}>＋</Text>
+            {isModalLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.addText}>＋</Text>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
@@ -366,6 +371,7 @@ export default function HomeScreen() {
         visible={isModalVisible}
         onClose={() => {
           setIsModalVisible(false);
+          setIsModalLoading(false);
           // Beautiful reverse animation
           Animated.parallel([
             Animated.timing(translateAnim, {
@@ -398,6 +404,7 @@ export default function HomeScreen() {
           });
         }}
         onPostAdded={refreshPosts}
+        onLoadingChange={setIsModalLoading}
       />
       {isCommentModalVisible && selectedPostId !== null && (
         <CommentModel
@@ -475,6 +482,10 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
     paddingHorizontal: 0,
   },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -496,14 +507,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 40,
   },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
+  emptyLogo: {
+    width: 90,
+    height: 90,
+    marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 20,
@@ -585,5 +592,11 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+ 
+  },
+  addIcon: {
+    width: 28,
+    height: 28,
+    tintColor: '#fff',
   },
 });

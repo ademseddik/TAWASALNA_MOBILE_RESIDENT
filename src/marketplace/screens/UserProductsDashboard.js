@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -29,7 +29,7 @@ import { BlurView } from 'expo-blur';
 import ImageViewing from 'react-native-image-viewing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
@@ -115,6 +115,27 @@ export default function UserProductsDashboard() {
       fetchUserProducts(true);
     }
   }, [userId]);
+  
+  // Auto-refresh when returning from AddProduct screen
+  useFocusEffect(
+    useCallback(() => {
+      const checkAndRefresh = async () => {
+        try {
+          const shouldRefresh = await AsyncStorage.getItem('shouldRefreshProducts');
+          if (shouldRefresh === 'true') {
+            await AsyncStorage.removeItem('shouldRefreshProducts');
+            if (userId) {
+              fetchUserProducts(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking refresh flag:', error);
+        }
+      };
+      
+      checkAndRefresh();
+    }, [userId, fetchUserProducts])
+  );
 
   // Load more products function
   const loadMoreProducts = async () => {
@@ -187,7 +208,16 @@ export default function UserProductsDashboard() {
       await markProductAsSold(product.id);
       setSuccessMessage(`"${product.productName}" marked as sold successfully!`);
       setShowSuccessAlert(true);
-      fetchUserProducts(true); // Refresh the list
+      
+      // Update the product in the list
+      setProducts(prev => prev.map(p => 
+        p.id === product.id ? { ...p, status: 'SOLD' } : p
+      ));
+      
+      // Update the selected product in modal if it's the same product
+      if (selectedProduct && selectedProduct.id === product.id) {
+        setSelectedProduct(prev => ({ ...prev, status: 'SOLD' }));
+      }
     } catch (error) {
       console.error('Error marking product as sold:', error);
       Alert.alert('Error', 'Failed to mark product as sold. Please try again.');
@@ -199,7 +229,16 @@ export default function UserProductsDashboard() {
       await markProductAsAvailable(product.id);
       setSuccessMessage(`"${product.productName}" marked as available successfully!`);
       setShowSuccessAlert(true);
-      fetchUserProducts(true); // Refresh the list
+      
+      // Update the product in the list
+      setProducts(prev => prev.map(p => 
+        p.id === product.id ? { ...p, status: 'FOR_SALE' } : p
+      ));
+      
+      // Update the selected product in modal if it's the same product
+      if (selectedProduct && selectedProduct.id === product.id) {
+        setSelectedProduct(prev => ({ ...prev, status: 'FOR_SALE' }));
+      }
     } catch (error) {
       console.error('Error marking product as available:', error);
       Alert.alert('Error', 'Failed to mark product as available. Please try again.');
@@ -211,7 +250,16 @@ export default function UserProductsDashboard() {
       await archiveProduct(product.id);
       setSuccessMessage(`"${product.productName}" archived successfully!`);
       setShowSuccessAlert(true);
-      fetchUserProducts(true); // Refresh the list
+      
+      // Update the product in the list
+      setProducts(prev => prev.map(p => 
+        p.id === product.id ? { ...p, isArchived: true } : p
+      ));
+      
+      // Update the selected product in modal if it's the same product
+      if (selectedProduct && selectedProduct.id === product.id) {
+        setSelectedProduct(prev => ({ ...prev, isArchived: true }));
+      }
     } catch (error) {
       console.error('Error archiving product:', error);
       Alert.alert('Error', 'Failed to archive product. Please try again.');
@@ -223,7 +271,16 @@ export default function UserProductsDashboard() {
       await unarchiveProduct(product.id);
       setSuccessMessage(`"${product.productName}" unarchived successfully!`);
       setShowSuccessAlert(true);
-      fetchUserProducts(true); // Refresh the list
+      
+      // Update the product in the list
+      setProducts(prev => prev.map(p => 
+        p.id === product.id ? { ...p, isArchived: false } : p
+      ));
+      
+      // Update the selected product in modal if it's the same product
+      if (selectedProduct && selectedProduct.id === product.id) {
+        setSelectedProduct(prev => ({ ...prev, isArchived: false }));
+      }
     } catch (error) {
       console.error('Error unarchiving product:', error);
       Alert.alert('Error', 'Failed to unarchive product. Please try again.');
@@ -314,7 +371,7 @@ export default function UserProductsDashboard() {
           </View>
           <View style={styles.cardContent}>
             <Text style={styles.title} numberOfLines={1}>{item.productName}</Text>
-            <Text style={styles.desc} numberOfLines={2}>{item.description}</Text>
+            <Text style={styles.desc} numberOfLines={1}>{item.description}</Text>
             
             {/* Quick action buttons */}
             <View style={styles.quickActions}>
@@ -357,7 +414,7 @@ export default function UserProductsDashboard() {
                   onPress={() => handleUnarchiveProduct(item)}
                   activeOpacity={0.7}
                 >
-                  <FontAwesome name="unarchive" size={12} color="#3498db" />
+                  <FontAwesome name="archive" size={12} color="#3498db" />
                 </TouchableOpacity>
               )}
             </View>
@@ -424,6 +481,12 @@ export default function UserProductsDashboard() {
         <>
           {/* Dashboard Header */}
           <View style={styles.dashboardHeader}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <FontAwesome name="arrow-left" size={20} color={Colors.LIGHT_PURPLE} />
+            </TouchableOpacity>
             <View style={styles.headerContent}>
               <View style={styles.headerLeft}>
                 <Text style={styles.headerTitle}>My Products Dashboard</Text>
@@ -589,6 +652,16 @@ export default function UserProductsDashboard() {
                       </Text>
                     </View>
                   )}
+                  
+                  {/* Status badge */}
+                  {(() => {
+                    const statusInfo = getStatusInfo(selectedProduct);
+                    return (
+                      <View style={[styles.modalStatusBadge, { backgroundColor: statusInfo.backgroundColor }]}>
+                        <Text style={[styles.modalStatusText, { color: statusInfo.color }]}>{statusInfo.text}</Text>
+                      </View>
+                    );
+                  })()}
                 </View>
                 
                 <View style={[styles.cardContent, { paddingHorizontal: 20, paddingTop: 16 }]}>
@@ -754,8 +827,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa',
+    marginRight: 12,
   },
   headerContent: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1057,6 +1139,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  modalStatusBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    zIndex: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalStatusText: {
+    fontWeight: 'bold',
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   modalActions: {
     flexDirection: 'row',

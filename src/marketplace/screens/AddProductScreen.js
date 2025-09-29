@@ -10,6 +10,7 @@ import { getAllProductCategories } from '../../services/marketplaceProduct.servi
 import Colors from '../../../assets/Colors';
 import { APP_ENV } from '../../utils/BaseUrl';
 import SuccessAlert from '../../components/pupUps/SuccessAlert';
+import { useFocusEffect } from '@react-navigation/native';
 
 const MAX_IMAGES = 5;
 
@@ -21,6 +22,8 @@ export default function AddProductScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [error, setError] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+  const [imageError, setImageError] = useState('');
   const [photos, setPhotos] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -58,6 +61,10 @@ export default function AddProductScreen({ navigation }) {
     setModel(null);
     setShowCategoryDropdown(false);
     setCategorySearch('');
+    // Clear category error when user selects a category
+    if (categoryError) {
+      setCategoryError('');
+    }
   };
 
   // Close dropdown when tapping outside
@@ -80,6 +87,10 @@ export default function AddProductScreen({ navigation }) {
         const uris = new Set(prev.map(img => img.uri));
         const newAssets = result.assets.filter(img => !uris.has(img.uri));
         const combined = [...prev, ...newAssets].slice(0, MAX_IMAGES);
+        // Clear image error when user adds images
+        if (imageError && combined.length > 0) {
+          setImageError('');
+        }
         return combined;
       });
     }
@@ -87,7 +98,14 @@ export default function AddProductScreen({ navigation }) {
 
   // Remove image handler
   const removeImage = (idx) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== idx));
+    setPhotos((prev) => {
+      const newPhotos = prev.filter((_, i) => i !== idx);
+      // Show error if user removes all images
+      if (newPhotos.length === 0 && !imageError) {
+        // Don't set error immediately, only when they try to submit
+      }
+      return newPhotos;
+    });
   };
 
   // Filter functions for search
@@ -99,8 +117,30 @@ export default function AddProductScreen({ navigation }) {
   const filteredModels = []; // Models will be free text input for now
 
   const handleSubmit = async () => {
+    // Reset previous errors
+    setError('');
+    setCategoryError('');
+    setImageError('');
+    
+    // Validate required fields
+    let hasError = false;
+    
     if (!title || !description || !price) {
       setError('Please fill all required fields (Title, Description, and Price).');
+      hasError = true;
+    }
+    
+    if (!category) {
+      setCategoryError('Please select a category.');
+      hasError = true;
+    }
+    
+    if (photos.length === 0) {
+      setImageError('Please add at least one product image.');
+      hasError = true;
+    }
+    
+    if (hasError) {
       return;
     }
 
@@ -162,6 +202,9 @@ export default function AddProductScreen({ navigation }) {
 
       console.log('Product published successfully:', response.data);
       setShowSuccessAlert(true);
+      
+      // Set refresh flag for when returning to products screen
+      await AsyncStorage.setItem('shouldRefreshProducts', 'true');
       
     } catch (error) {
       console.error('Error publishing product:', error);
@@ -226,7 +269,7 @@ export default function AddProductScreen({ navigation }) {
             {error ? <Text style={styles.error}>{error}</Text> : null}
       
       {/* Image Picker */}
-      <Text style={styles.label}>Product Images</Text>
+      <Text style={styles.label}>Product Images *</Text>
       {photos.length > 0 && (
         <View style={styles.imageGrid}>
           {photos.map((img, idx) => (
@@ -256,14 +299,17 @@ export default function AddProductScreen({ navigation }) {
         </TouchableOpacity>
       )}
       
+      {/* Image Error Message */}
+      {imageError ? <Text style={styles.fieldError}>{imageError}</Text> : null}
+      
       {/* Helpful Message */}
       <View style={styles.helpMessage}>
         <FontAwesome name="info-circle" size={17}width={20} height={20} color={Colors.LIGHT_PURPLE} style={{ marginRight: 8 }} />
         <Text style={styles.helpText}>
-          Filling in Category, Brand, and Model helps other users find your product more easily! Brand and Model are optional.
+          Adding product images and selecting a category helps other users find your product more easily! Brand and Model are optional.
         </Text>
       </View>
-      <Text style={styles.label}>Category (Optional)</Text>
+      <Text style={styles.label}>Category *</Text>
       {loadingCategories ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
@@ -316,6 +362,10 @@ export default function AddProductScreen({ navigation }) {
           </ScrollView>
         </View>
       )}
+      
+      {/* Category Error Message */}
+      {categoryError ? <Text style={styles.fieldError}>{categoryError}</Text> : null}
+      
       {/* Brand Selection */}
       <Text style={styles.label}>Brand (Optional)</Text>
       <TextInput
@@ -336,20 +386,20 @@ export default function AddProductScreen({ navigation }) {
   
       
    
-      <TouchableOpacity 
-        style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]} 
-        onPress={handleSubmit}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#fff" />
-            <Text style={styles.submitBtnText}>Publishing...</Text>
-          </View>
-        ) : (
-          <Text style={styles.submitBtnText}>Add Product</Text>
-        )}
-      </TouchableOpacity>
+    <TouchableOpacity 
+  style={[styles.submitBtn, isLoading && styles.submitBtnDisabled]} 
+  onPress={handleSubmit}
+  disabled={isLoading}
+>
+  {isLoading ? (
+    <>
+      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
+      <Text style={styles.submitBtnText}>Publishing...</Text>
+    </>
+  ) : (
+    <Text style={styles.submitBtnText}>Add Product</Text>
+  )}
+</TouchableOpacity>
       </ScrollView>
       
       {/* Success Alert */}
@@ -582,13 +632,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 2,
   },
-  submitBtn: {
-    backgroundColor: Colors.PURPLE,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 18,
+  fieldError: {
+    color: 'red',
+    fontSize: 14,
+    marginTop: 4,
+    marginBottom: 8,
   },
+submitBtn: {
+  backgroundColor: Colors.PURPLE,
+  borderRadius: 8,
+  paddingVertical: 14,
+  alignItems: 'center',
+  marginTop: 18,
+  flexDirection: 'row', // Add this line
+  justifyContent: 'center', // Add this line
+},
   submitBtnText: {
     color: '#fff',
     fontWeight: 'bold',
@@ -597,15 +655,7 @@ const styles = StyleSheet.create({
   submitBtnDisabled: {
     opacity: 0.7,
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#f7f7f7',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
+
   loadingText: {
     marginLeft: 8,
     color: Colors.LIGHT_PURPLE,

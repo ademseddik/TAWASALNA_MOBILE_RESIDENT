@@ -27,6 +27,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useUser } from '@clerk/clerk-expo';
 import { Picker } from '@react-native-picker/picker';
 import { ScrollView } from 'react-native-gesture-handler';
+import { MaterialIcons } from '@expo/vector-icons';
 
 
 
@@ -525,6 +526,17 @@ const EditProfile = () => {
 
   return (
     <View style={styles.lastCont}>
+      {/* Header with back arrow */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <View style={styles.placeholder} />
+      </View>
         <View style={styles.bigContainer}>
           <View style={styles.profileHeaderWrapper}>
             <View style={{ marginBottom: 20 }}>
@@ -976,9 +988,43 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   lastCont: {
-
     backgroundColor: "white",
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: Colors.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  placeholder: {
+    width: 44,
+    height: 44,
+    marginLeft: 16,
   },
   bigContainer: {
 

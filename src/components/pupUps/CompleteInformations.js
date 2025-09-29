@@ -160,7 +160,7 @@ console.log(userId+"  and  "+APP_ENV.AUTH_PORT )
             <TouchableOpacity
               onPress={handleSignUp}
               style={{
-                backgroundColor: Colors.PURPLE,
+                backgroundColor: Colors.LIGHT_PURPLE,
                 padding: 16,
                 borderRadius: 8,
                 alignItems: "center",

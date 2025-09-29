@@ -121,6 +121,9 @@ export default function AddNeedScreen() {
       // Call the API service
       await addNeed(needData);
       
+      // Set refresh flag for when returning to needs screen
+      await AsyncStorage.setItem('shouldRefreshNeeds', 'true');
+      
       Alert.alert(
         'Success',
         'Need added successfully!',

@@ -13,8 +13,11 @@ import {
 import Colors from '../../../assets/Colors';
 import { useVerifyAccount } from '../../hooks/useVerifyAccount';
 import { useTranslation } from 'react-i18next';
+import { useNavigation } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const VerifyAccount = () => {
+  const navigation = useNavigation();
   const {
     t,
     isConnected,
@@ -65,11 +68,28 @@ const VerifyAccount = () => {
             backgroundColor: Colors.LIGHT_PURPLE,
             paddingLeft: width * 0.040,
             justifyContent: 'center',
+            flexDirection: 'row',
+            alignItems: 'center',
             top: 0
           }}>
+            <TouchableOpacity 
+              style={{
+                position: 'absolute',
+                left: width * 0.040,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialIcons name="arrow-back" size={24} color={Colors.WHITE} />
+            </TouchableOpacity>
             <Image
               source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
-              style={{ width: width * 0.4, height: height * 0.06, marginRight: width * 0.02 }}
+              style={{ width: width * 0.4, height: height * 0.06 }}
               resizeMode="contain"
             />
           </View>
@@ -122,10 +142,10 @@ const VerifyAccount = () => {
                   textAlign: "center",
                   fontSize: 18,
                   fontWeight: 'bold',
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  backgroundColor: isExpired ? 'rgba(200, 200, 200, 0.5)' : 'rgba(255, 255, 255, 0.95)',
                   borderRadius: 8,
                   padding: 8,
-                  color: Colors.BLACK,
+                  color: isExpired ? '#999' : Colors.BLACK,
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.1,
@@ -145,6 +165,8 @@ const VerifyAccount = () => {
                 selectTextOnFocus={true}
                 autoComplete="one-time-code"
                 textContentType="oneTimeCode"
+                editable={!isExpired}
+                pointerEvents={isExpired ? 'none' : 'auto'}
               />
             ))}
           </View>
@@ -157,17 +179,45 @@ const VerifyAccount = () => {
             alignItems: "center",
             marginTop: 20
           }}>
-            <Text style={{ color: Colors.WHITE, fontSize: width * 0.04 }}>{t("Did not receive a code?")}</Text>
-            <TouchableOpacity onPress={handleResendCode}>
-              <Text style={{ 
-                color: Colors.WHITE, 
-                marginLeft: 5, 
-                fontSize: width * 0.04,
-                textShadowColor: Colors.LIGHT_PURPLE,
-                textShadowOffset: { width: 1, height: 1 },
-                textShadowRadius: 3,
-              }}>{t("Resend")}</Text>
-            </TouchableOpacity>
+            {isExpired ? (
+              <TouchableOpacity 
+                onPress={handleResendCode}
+                style={{
+                  backgroundColor: Colors.LIGHT_PURPLE,
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: 4,
+                }}
+                disabled={isLoading}
+              >
+                <Text style={{ 
+                  color: Colors.WHITE, 
+                  fontSize: width * 0.045,
+                  fontWeight: 'bold',
+                  textAlign: 'center'
+                }}>{isLoading ? t('Sending...') : t('Resend Code')}</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <Text style={{ color: Colors.WHITE, fontSize: width * 0.04 }}>{t("Did not receive a code?")}</Text>
+                <TouchableOpacity onPress={handleResendCode} disabled={isLoading}>
+                  <Text style={{ 
+                    color: Colors.WHITE, 
+                    marginLeft: 5, 
+                    fontSize: width * 0.04,
+                    textShadowColor: Colors.LIGHT_PURPLE,
+                    textShadowOffset: { width: 1, height: 1 },
+                    textShadowRadius: 3,
+                    opacity: isLoading ? 0.6 : 1
+                  }}>{isLoading ? t('Sending...') : t('Resend')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
           
           <View style={{

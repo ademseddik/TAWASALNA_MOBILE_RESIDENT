@@ -11,7 +11,8 @@ import {
   Modal,
   FlatList,
   Dimensions,
-  ImageBackground
+  ImageBackground,
+  Platform
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons} from '@expo/vector-icons';
 import Colors from '../../assets/Colors';
@@ -396,7 +397,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
             }}
           >
             <TextInput
-              placeholder="*********"
+              placeholder={t('Password')}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               value={password}
@@ -418,6 +419,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
 
           <TouchableOpacity
             onPress={handleLogin}
+            disabled={isLoading}
             style={{
               borderRadius: width * 0.03,
               padding: width * 0.03,
@@ -435,7 +437,11 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
               elevation: 4,
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: width * 0.05, fontWeight: 'bold' }}>{t('Continue')}</Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={{ color: '#FFFFFF', fontSize: width * 0.05, fontWeight: 'bold' }}>{t('Continue')}</Text>
+            )}
           </TouchableOpacity>
 
           <View
@@ -496,9 +502,14 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
               marginTop: height * 0.03,
             }}
           >
-            <SocialLoginButton strategy="google" />
-            <SocialLoginButton strategy="apple" />
-            <SocialLoginButton strategy="facebook" />
+            {Platform.OS === 'ios' ? (
+              <SocialLoginButton strategy="apple" />
+            ) : (
+              <>
+                <SocialLoginButton strategy="google" />
+                <SocialLoginButton strategy="facebook" />
+              </>
+            )}
           </View>
 
           <View
@@ -531,22 +542,7 @@ const [role, setRole] = useState("65d6717f31baa16064d291dc");
           </View>
         </View>
 
-        {isLoading && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              bottom: 0,
-              right: 0,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            }}
-          >
-            <ActivityIndicator size="large" color={Colors.PURPLE} />
-          </View>
-        )}
+   
       </SafeAreaView>
     </ImageBackground>
   );

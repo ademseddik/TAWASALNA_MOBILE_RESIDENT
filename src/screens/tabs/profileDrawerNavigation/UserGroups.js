@@ -33,6 +33,7 @@ const UserGroups = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [groupData, setGroupData] = useState({
     name: '',
     description: '',
@@ -67,6 +68,11 @@ const UserGroups = ({ navigation }) => {
   };
 
   const handleCreateGroup = async () => {
+    if (isCreatingGroup || !groupData.name.trim()) {
+      return; // Prevent multiple submissions or empty group name
+    }
+
+    setIsCreatingGroup(true);
     try {
       const userId = await AsyncStorage.getItem('userId');
       const response = await fetch(
@@ -94,6 +100,8 @@ const UserGroups = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error creating group:', error);
+    } finally {
+      setIsCreatingGroup(false);
     }
   };
 
@@ -372,8 +380,19 @@ const UserGroups = ({ navigation }) => {
                   </View>
                 </View>
               </View>
-              <TouchableOpacity style={styles.createButton} onPress={handleCreateGroup}>
-                <Text style={styles.buttonText}>Create</Text>
+              <TouchableOpacity 
+                style={[styles.createButton, isCreatingGroup && styles.createButtonDisabled]} 
+                onPress={handleCreateGroup}
+                disabled={isCreatingGroup || !groupData.name.trim()}
+              >
+                {isCreatingGroup ? (
+                  <View style={styles.loadingButtonContent}>
+                    <ActivityIndicator size="small" color="#fff" style={styles.buttonLoader} />
+                    <Text style={styles.buttonText}>Creating...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.buttonText}>Create</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -626,6 +645,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
+  },
+  createButtonDisabled: {
+    backgroundColor: '#B8B8B8',
+    opacity: 0.7,
+  },
+  loadingButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonLoader: {
+    marginRight: 8,
   },
   buttonText: {
     color: '#fff',

@@ -4,7 +4,7 @@ import { DrawerContentScrollView, DrawerItemList } from "@react-navigation/drawe
 import { CommonActions } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ProfileScreen from "./UserProfile"; 
-import HelpScreen from "./HelpScreen";
+
 import UserGroups from "./UserGroups";
 import SettingsScreen from "./SettingsScreen";
 import Colors from "../../../../assets/Colors";
@@ -77,7 +77,7 @@ function DrawerNavigation() {
       }}
     >
       <Drawer.Screen name="Profile" component={ProfileScreen} />
-      <Drawer.Screen name="Help" component={HelpScreen} />
+
       <Drawer.Screen name="Groups" component={UserGroups} />
       <Drawer.Screen name="Settings" component={SettingsScreen} />
     </Drawer.Navigator>

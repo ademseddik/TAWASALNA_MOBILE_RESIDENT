@@ -11,10 +11,12 @@ import {
   Modal,
   TextInput,
 } from "react-native";
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import PropTypes from 'prop-types';
 import { FontAwesome } from "@expo/vector-icons";
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useTranslation } from 'react-i18next';
 
 import Colors from "../../../assets/Colors";
 import {
@@ -57,6 +59,7 @@ const CommentModel = ({
   refreshPosts,
   onCommentsCountChange,
 }) => {
+  const { t } = useTranslation();
   // State variables
   const [commentText, setCommentText] = useState("");
   const [isTyping, setIsTyping] = useState(false); // Added back missing state
@@ -94,6 +97,7 @@ const CommentModel = ({
   const editInputOpacity = useSharedValue(0);
   const actionDialogHeight = useSharedValue(0);
   const actionDialogOpacity = useSharedValue(1);
+  const translateY = useSharedValue(0);
 
   const animatedEditInputStyle = useAnimatedStyle(() => ({
     height: withSpring(editInputHeight.value, { damping: 15 }),
@@ -103,6 +107,10 @@ const CommentModel = ({
   const animatedActionDialogStyle = useAnimatedStyle(() => ({
     height: withSpring(actionDialogHeight.value, { damping: 15 }),
     opacity: withTiming(actionDialogOpacity.value, { duration: 300 }),
+  }));
+
+  const animatedModalStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
   }));
   const getCurrentUserReaction = useCallback((comment) => {
     if (!comment.reactions || !currentUserId) return null;
@@ -256,12 +264,35 @@ const CommentModel = ({
 
   // Modal close handler
   const handleModalClose = useCallback(() => {
+    translateY.value = withSpring(0);
     onClose();
     setPagedData({ content: [], last: true, number: 0, totalPages: 1 });
     setExpandedComments({});
     resetEditState();
     setShowReplyInput(null); // Reset reply inputs
   }, [onClose]);
+
+  // Handle swipe gesture
+  const onGestureEvent = useCallback((event) => {
+    const { translationY } = event.nativeEvent;
+    if (translationY > 0) {
+      translateY.value = translationY;
+    }
+  }, []);
+
+  const onHandlerStateChange = useCallback((event) => {
+    const { state, translationY, velocityY } = event.nativeEvent;
+    
+    if (state === State.END) {
+      // If swiped down more than 100px or with high velocity, close modal
+      if (translationY > 100 || velocityY > 500) {
+        handleModalClose();
+      } else {
+        // Snap back to original position
+        translateY.value = withSpring(0);
+      }
+    }
+  }, [handleModalClose]);
 
   // Removed unused focus/blur handlers
 
@@ -331,7 +362,7 @@ const CommentModel = ({
   // Add comment to post
  const addCommentToPost = async () => {
     if (!commentText.trim()) {
-      Toast.show({ type: "info", text1: "Please write a comment" });
+      Toast.show({ type: "info", text1: t("Please write a comment") });
       return;
     }
     setIsAddingComment(true);
@@ -360,7 +391,7 @@ const CommentModel = ({
       const Token = await AsyncStorage.getItem("USER_ACCESS");
       const mentionedUserIds = mentionedUsers.map(u => u.id);
       await PostService.addComment(postId, userId, tempComment.text, mentionedUserIds, Token);
-      Toast.show({ type: "success", text1: "Comment added" });
+      Toast.show({ type: "success", text1: t("Comment added") });
       success = true;
       // Option 1: Refetch all comments (ensures correct order and data)
       refetchCommentsPost();
@@ -374,7 +405,7 @@ const CommentModel = ({
       // Option 2: If API returns the new comment, replace temp with real one here
     } catch (error) {
       console.error("Error adding comment:", error);
-      Toast.show({ type: "error", text1: "Failed to add comment" });
+      Toast.show({ type: "error", text1: t("Failed to add comment") });
       // Remove temp comment on failure
       setPagedData(prev => ({
         ...prev,
@@ -388,7 +419,7 @@ const CommentModel = ({
   // Add reply to comment
  const addReplyToComment = async (commentId, text) => {
     if (!text.trim()) {
-      Toast.show({ type: "info", text1: "Please write a reply", visibilityTime: 3000 });
+      Toast.show({ type: "info", text1: t("Please write a reply"), visibilityTime: 3000 });
       return;
     }
     setAddingReply(commentId);
@@ -589,7 +620,7 @@ const CommentModel = ({
 
   const updateComment = async () => {
     if (!editCommentText.trim()) {
-      Toast.show({ type: "info", text1: "Comment cannot be empty", visibilityTime: 3000 });
+      Toast.show({ type: "info", text1: t("Comment cannot be empty"), visibilityTime: 3000 });
       return;
     }
     setIsUpdating(true);
@@ -597,12 +628,12 @@ const CommentModel = ({
       const Token = await AsyncStorage.getItem("USER_ACCESS");
       const userId = await AsyncStorage.getItem("userId");
       await PostService.editComment(editingComment.commentId, userId, editCommentText, Token);
-      Toast.show({ type: "success", text1: "Comment updated successfully", visibilityTime: 3000 });
+      Toast.show({ type: "success", text1: t("Comment updated successfully"), visibilityTime: 3000 });
       refetchCommentsPost();
       resetEditState();
     } catch (error) {
       console.error('Error updating comment:', error);
-      Toast.show({ type: "error", text1: "Failed to update comment", visibilityTime: 3000 });
+      Toast.show({ type: "error", text1: t("Failed to update comment"), visibilityTime: 3000 });
     } finally {
       setIsUpdating(false);
     }
@@ -621,7 +652,7 @@ const CommentModel = ({
       if (typeof onCommentsCountChange === 'function' && postId) {
         onCommentsCountChange(postId, -1);
       }
-      Toast.show({ type: 'success', text1: 'Comment deleted successfully' });
+      Toast.show({ type: 'success', text1: t('Comment deleted successfully') });
     } catch (error) {
       console.error('Error deleting comment:', error);
     }
@@ -656,7 +687,7 @@ const CommentModel = ({
 const renderSuggestions = () => (
     <View style={styles.suggestionsContainer}>
       {isFetchingMentions ? (
-        <ActivityIndicator style={{ padding: 10 }} color={Colors.PURPLE} />
+        <ActivityIndicator style={{ padding: 10 }} color={Colors.LIGHT_PURPLE} />
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled">
           {mentionSuggestions.map(user => (
@@ -682,15 +713,28 @@ const renderSuggestions = () => (
       transparent={true}
       visible={isVisible}
       onRequestClose={handleModalClose}
-      onSwipeComplete={handleModalClose}
-      swipeDirection="down"
     >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
+      <TouchableWithoutFeedback onPress={handleModalClose}>
+        <View style={styles.modalContainer}>
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <PanGestureHandler
+              onGestureEvent={onGestureEvent}
+              onHandlerStateChange={onHandlerStateChange}
+            >
+              <Animated.View style={[styles.modalContent, animatedModalStyle]}>
           {/* Header and separator */}
           <View>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Comments</Text>
+            <TouchableOpacity 
+              style={styles.modalHandleContainer}
+              onPress={() => {
+                // Add haptic feedback when tapping the handle
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.modalHandle} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('Comments')}</Text>
             <View style={styles.separator} />
           </View>
 
@@ -747,17 +791,17 @@ const renderSuggestions = () => (
                                   multiline
                                   style={styles.editInput}
                                   autoFocus
-                                  placeholder="Edit your comment..."
+                                  placeholder={t('Edit your comment...')}
                                 />
                                 <View style={styles.editButtons}>
                                   <TouchableOpacity onPress={cancelEdit} disabled={isUpdating}>
-                                    <Text style={styles.cancelEditButton}>Cancel</Text>
+                                    <Text style={styles.cancelEditButton}>{t('Cancel')}</Text>
                                   </TouchableOpacity>
                                   <TouchableOpacity onPress={updateComment} disabled={isUpdating}>
                                     {isUpdating ? (
-                                      <ActivityIndicator size="small" color={Colors.PURPLE} />
+                                      <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
                                     ) : (
-                                      <Text style={styles.saveEditButton}>Save</Text>
+                                      <Text style={styles.saveEditButton}>{t('Save')}</Text>
                                     )}
                                   </TouchableOpacity>
                                 </View>
@@ -810,7 +854,7 @@ const renderSuggestions = () => (
                               <TouchableOpacity onPress={() =>
                                 handleReplyButtonPress(comment.commentId)
                               }>
-                                <Replytext>Reply</Replytext>
+                                <Replytext>{t('Reply')}</Replytext>
                               </TouchableOpacity>
 
                               
@@ -825,12 +869,12 @@ const renderSuggestions = () => (
                                   }}
                                 >
                                   <Text style={styles.repliesText}>
-                                    {parseInt(comment.numberOfReplies)} replies
+                                    {parseInt(comment.numberOfReplies)} {t('replies')}
                                   </Text>
                                   <FontAwesome
                                     name={isExpanded ? "chevron-up" : "chevron-down"}
                                     size={12}
-                                    color={Colors.PURPLE}
+                                    color={Colors.LIGHT_PURPLE}
                                   />
                                 </TouchableOpacity>
                               )}
@@ -877,12 +921,17 @@ const renderSuggestions = () => (
     />
     <TextInput
       style={styles.replyInput}
-      placeholder={`Reply to ${comment.userName}...`}
+      placeholder={`${t('Reply to')} ${comment.userName}...`}
       value={replyText}
       onChangeText={setReplyText}
       autoFocus
       multiline
       editable={addingReply !== comment.commentId}
+      keyboardShouldPersistTaps="handled"
+      returnKeyType="default"
+      blurOnSubmit={false}
+      autoCorrect={true}
+      autoCapitalize="sentences"
     />
     <TouchableOpacity
       onPress={() => addReplyToComment(comment.commentId, replyText)}
@@ -895,7 +944,7 @@ const renderSuggestions = () => (
         <FontAwesome
           name="send"
           size={18}
-          color={replyText.trim() ? Colors.PURPLE : Colors.GRAY}
+          color={replyText.trim() ? Colors.LIGHT_PURPLE : Colors.GRAY}
         />
       )}
     </TouchableOpacity>
@@ -925,7 +974,7 @@ const renderSuggestions = () => (
                                 onPress={() => handleCommentAction("edit", selectedComment)}
                               >
 
-                                <ActionButtonText>Edit</ActionButtonText>
+                                <ActionButtonText>{t('Edit')}</ActionButtonText>
 
                               </ActionButton>
                               <ActionButton
@@ -933,7 +982,7 @@ const renderSuggestions = () => (
                                 onPress={() => handleCommentAction("delete", selectedComment)}
                               >
 
-                                 <ActionButtonText>Delete </ActionButtonText>
+                                 <ActionButtonText>{t('Delete')}</ActionButtonText>
                               </ActionButton>
                             </>
                           ) : (
@@ -942,13 +991,13 @@ const renderSuggestions = () => (
                                 onPress={() => handleCommentAction("report", selectedComment)}
                               >
 
-                                <ActionButtonText>Report</ActionButtonText>
+                                <ActionButtonText>{t('Report')}</ActionButtonText>
                               </ActionButton>
                               <ActionButton
                                 onPress={() => handleCommentAction("block", selectedComment)}
                               >
 
-                                <ActionButtonText>Block</ActionButtonText>
+                                <ActionButtonText>{t('Block')}</ActionButtonText>
                               </ActionButton>
                             </>
                           )}
@@ -956,7 +1005,7 @@ const renderSuggestions = () => (
                             onPress={() => setShowActionDialog(false)}
                           >
 
-                            <ActionButtonText>Cancel</ActionButtonText>
+                            <ActionButtonText>{t('Cancel')}</ActionButtonText>
                           </CancelButton>
                         </ActionContainer>
                       </ActionDialog>
@@ -974,13 +1023,13 @@ const renderSuggestions = () => (
               ListFooterComponent={
                 isFetchingMore ? (
                   <View style={{ paddingVertical: 16, alignItems: 'center', justifyContent: 'center' }}>
-                    <ActivityIndicator size="small" color={Colors.PURPLE} />
+                    <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE } />
                   </View>
                 ) : null
               }
               ListEmptyComponent={!isLoading && (
                 <View style={styles.noCommentsContainer}>
-                  <Text>No comments yet</Text>
+                  <Text>{t('No comments yet')}</Text>
                 </View>
               )}
             />
@@ -998,7 +1047,7 @@ const renderSuggestions = () => (
             <TextInput
               ref={commentInputRef}
               style={styles.commentInput}
-              placeholder={`Add a comment as ${userFullname}`}
+              placeholder={`${t('Add a comment as')} ${userFullname}`}
               multiline
               value={commentText}
               onChangeText={handleCommentChange}
@@ -1012,13 +1061,16 @@ const renderSuggestions = () => (
                 <FontAwesome
                   name="send"
                   size={24}
-                  color={isTyping || commentText ? Colors.PURPLE : Colors.PLATINUM}
+                  color={isTyping || commentText ? Colors.LIGHT_PURPLE : Colors.PLATINUM}
                 />
               )}
             </TouchableOpacity>
           </View>
+              </Animated.View>
+            </PanGestureHandler>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -1112,13 +1164,17 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  modalHandleContainer: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignSelf: 'center',
+  },
   modalHandle: {
     width: 40,
     height: 5,
     backgroundColor: Colors.GRAY,
     borderRadius: 3,
     alignSelf: 'center',
-    marginBottom: 10,
   },
   modalTitle: {
     fontSize: 19,
@@ -1154,13 +1210,14 @@ const styles = StyleSheet.create({
   replyInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 20,
+    marginLeft: 0,
     marginTop: 10,
     marginBottom: 15,
+    width: 250,
     backgroundColor: '#f0f0f0',
     borderRadius: 25,
     padding: 8,
-    paddingRight: 15,
+    paddingRight: 20,
     zIndex: 10,
   },
   smallProfileImage: {
@@ -1217,7 +1274,7 @@ const styles = StyleSheet.create({
   reactionSummary: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.LIGHT_PURPLE_OPACITY,
+    backgroundColor: Colors.LIGHT_PURPLE,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1227,7 +1284,7 @@ const styles = StyleSheet.create({
   reactionSummaryBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.LIGHT_PURPLE_OPACITY,
+    backgroundColor: Colors.LIGHT_PURPLE,
     borderRadius: 16,
     paddingHorizontal: 8,
     paddingVertical: 4,

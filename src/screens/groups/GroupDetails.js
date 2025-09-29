@@ -8,8 +8,13 @@ import {
   ActivityIndicator,
   RefreshControl,
   FlatList,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Axios from 'axios';
 import { APP_ENV } from '../../utils/BaseUrl';
 import {
@@ -81,6 +86,7 @@ const GroupDetails = ({ route }) => {
   // State for group image
   const [selectedGroupImage, setSelectedGroupImage] = useState(null);
   const [isUpdatingGroupImage, setIsUpdatingGroupImage] = useState(false);
+  const [isJoiningLeaving, setIsJoiningLeaving] = useState(false);
 
   // Get current user ID on component mount
   useEffect(() => {
@@ -94,6 +100,458 @@ const GroupDetails = ({ route }) => {
     };
     getCurrentUserId();
   }, []);
+
+  // Memoized caption handler to prevent keyboard closing
+  const handleCaptionChange = useCallback((text) => {
+    setCaption(text);
+  }, []);
+
+  // Handle media selection for posts
+  const handleMediaSelection = useCallback(async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: false,
+      aspect: [4, 4],
+      quality: 1,
+      allowsMultipleSelection: true,
+    });
+
+    if (!result.canceled) {
+      const selectedAssets = result.assets;
+      const hasVideo = selectedAssets.some((asset) =>
+        asset.type.toLowerCase().includes("video")
+      );
+
+      if (hasVideo) {
+        const videoAsset = selectedAssets.find((asset) =>
+          asset.type.toLowerCase().includes("video")
+        );
+        setSelectedVideo(videoAsset.uri);
+        setSelectedPhotos([]);
+      } else {
+        setSelectedPhotos(selectedAssets.map(asset => asset.uri));
+        setSelectedVideo("");
+      }
+    }
+  }, []);
+
+  // Create post
+  const createPost = useCallback(async () => {
+    if (!caption.trim() && selectedPhotos.length === 0 && !selectedVideo) {
+      Toast.show({
+        type: "info",
+        text1: "Please add content to your post",
+        visibilityTime: 3000,
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingPost(true);
+      const formData = new FormData();
+      
+      if (caption.trim()) {
+        formData.append("caption", caption.trim());
+      }
+      
+      if (selectedPhotos.length > 0) {
+        selectedPhotos.forEach((photo, index) => {
+          formData.append(`photos[${index}]`, {
+            uri: photo,
+            name: `photo${index}.jpg`,
+            type: "image/jpeg",
+          });
+        });
+      }
+
+      if (selectedVideo) {
+        const videoResponse = await fetch(selectedVideo);
+        const videoBlob = await videoResponse.blob();
+        formData.append("video", {
+          uri: selectedVideo,
+          name: "video.mp4",
+          type: videoBlob.type,
+        });
+      }
+
+      await Axios.post(
+        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/addpost/${groupId}/${currentUserId}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      Toast.show({
+        type: "success",
+        text1: "Post created successfully",
+        visibilityTime: 3000,
+      });
+
+      // Clear form and refresh posts
+      setCaption("");
+      setSelectedPhotos([]);
+      setSelectedVideo("");
+      fetchGroupPosts(0, true);
+    } catch (error) {
+      console.error("Error creating post:", error);
+      Toast.show({
+        type: "error",
+        text1: "Error creating post",
+        visibilityTime: 3000,
+      });
+    } finally {
+      setIsCreatingPost(false);
+    }
+  }, [caption, selectedPhotos, selectedVideo, groupId, currentUserId]);
+
+  // Modal toggle functions
+  const toggleGroupMembersModal = useCallback(() => setGroupMembersModalVisible(!groupMembersModalVisible), [groupMembersModalVisible]);
+  const toggleInviteToGroupModal = useCallback(() => setInviteToGroupModalVisible(!inviteToGroupModalVisible), [inviteToGroupModalVisible]);
+  const toggleCommentModal = useCallback((postId) => {
+    setSelectedPostCommentId(postId);
+    setCommentModalVisible(!commentModalVisible);
+  }, [commentModalVisible]);
+  const toggleOptionsPostModal = useCallback((postId) => {
+    setSelectedPostId(postId);
+    setOptionsPostModalVisible(!optionsPostModalVisible);
+  }, [optionsPostModalVisible]);
+  const toggleSendModal = useCallback(() => setSendModalVisible(!sendModalVisible), [sendModalVisible]);
+  const toggleShareModal = useCallback(() => setShareModalVisible(!shareModalVisible), [shareModalVisible]);
+
+  // Join/Leave group functions
+  const joinGroup = useCallback(async () => {
+    // Add join group logic here
+    console.log('Join group functionality');
+  }, []);
+
+  const leaveGroup = useCallback(async () => {
+    // Add leave group logic here
+    console.log('Leave group functionality');
+  }, []);
+
+  // Handle group image selection (only for creator)
+  const handleGroupImageSelection = useCallback(async () => {
+    if (!isCreator) return;
+    
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 4],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      setSelectedGroupImage(result.assets[0].uri);
+      // updateGroupImage(result.assets[0].uri);
+    }
+  }, [isCreator]);
+
+  // Render group header (Memoized to prevent re-renders)
+  const renderGroupHeader = useMemo(() => (
+    <View>
+      {/* Group Header */}
+      <TouchableOpacity onPress={handleGroupImageSelection} disabled={!isCreator}>
+        <View>
+          <Image
+            source={{ uri: groupInfo?.image }}
+            style={{ width: width, height: 200, borderRadius: 10 }}
+            resizeMode="cover"
+          />
+          {isCreator && (
+            <MaterialIcons 
+              name="edit" 
+              size={30} 
+              color={Colors.LIGHT_PURPLE} 
+              style={{ position: "absolute", bottom: 10, right: 10 }} 
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+
+      {/* Group Info */}
+      <View style={{ flexDirection: "row", marginTop: 15, marginLeft: 15 }}>
+        <Text style={{ color: "black", fontWeight: "bold", fontSize: 20 }}>{groupInfo?.name}</Text>
+      </View>
+
+      <View style={{ flexDirection: "row", marginTop: 10, marginLeft: 15 }}>
+        {groupInfo?.type === "PUBLIC" ? (
+          <>
+            <MaterialIcons name="public" size={20} />
+            <Text style={{ color: "grey" }}> Group (Public) </Text>
+          </>
+        ) : (
+          <Text style={{ color: "grey" }}>Group (private)</Text>
+        )}
+        <Text>{groupInfo?.members?.length || 0} </Text>
+        <TouchableOpacity onPress={toggleGroupMembersModal}>
+          <Text style={{ color: "grey" }}>members</Text>
+        </TouchableOpacity>
+      </View>
+
+      {groupInfo?.description && (
+        <View style={{ marginTop: 10, marginLeft: 15, marginRight: 15 }}>
+          <Text style={{ color: "grey", fontSize: 14 }}>{groupInfo.description}</Text>
+        </View>
+      )}
+
+      {/* Action Buttons */}
+      <View style={{ flexDirection: "row", marginTop: 25, justifyContent: "space-around" }}>
+        <TouchableOpacity
+          onPress={isMember ? leaveGroup : joinGroup}
+          disabled={isJoiningLeaving}
+          style={{
+            height: 35,
+            width: "40%",
+            borderColor: "gray",
+            borderWidth: 0.3,
+            borderRadius: 10,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            backgroundColor: isMember ? Colors.LIGHT_PURPLE : "white",
+            opacity: isJoiningLeaving ? 0.7 : 1,
+          }}
+        >
+          {isJoiningLeaving ? (
+            <ActivityIndicator 
+              size="small" 
+              color={isMember ? "white" : Colors.LIGHT_PURPLE} 
+            />
+          ) : (
+            <>
+              <FontAwesome5
+                name="user-friends"
+                color={isMember ? "white" : "black"}
+                size={15}
+                style={{ marginRight: 5 }}
+              />
+              <Text style={{ fontSize: 17, color: isMember ? "white" : "black" }}>
+                {isMember ? "Member" : "Join"}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Invite Button - only visible for members and admins */}
+        {(isMember || isAdmin) && (
+          <TouchableOpacity
+            onPress={toggleInviteToGroupModal}
+            style={{
+              height: 35,
+              width: "40%",
+              borderColor: Colors.LIGHT_PURPLE,
+              borderWidth: 1,
+              borderRadius: 10,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: Colors.LIGHT_PURPLE,
+              flexDirection: "row",
+            }}
+          >
+            <Ionicons
+              name="person-add-outline"
+              color="white"
+              size={15}
+              style={{ marginRight: 5 }}
+            />
+            <Text style={{ fontSize: 17, color: "white" }}>Invite</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Create Post Section - Only for members */}
+      {isMember && (
+        <View style={{
+          marginTop: 25,
+          marginHorizontal: 15,
+          marginBottom: 20,
+          backgroundColor: '#fff',
+          borderRadius: 15,
+          padding: 20,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 5,
+          borderWidth: 1,
+          borderColor: '#f0f0f0',
+        }}>
+          <Text style={{
+            fontSize: 18,
+            fontWeight: '600',
+            color: Colors.LIGHT_PURPLE,
+            marginBottom: 15,
+            textAlign: 'center'
+          }}>Create New Post</Text>
+          
+          <TextInput
+            placeholder="What's new?"
+            value={caption}
+            onChangeText={handleCaptionChange}
+            multiline
+            textAlignVertical="top"
+            blurOnSubmit={false}
+            style={{
+              minHeight: 80,
+              maxHeight: 120,
+              padding: 15,
+              fontSize: 16,
+              borderWidth: 1.5,
+              borderColor: "#e1e5e9",
+              borderRadius: 12,
+              backgroundColor: '#f8f9fa',
+              color: '#333',
+              lineHeight: 22,
+            }}
+            placeholderTextColor="#9ca3af"
+          />
+          
+          <TouchableOpacity
+            onPress={handleMediaSelection}
+            style={{
+              marginTop: 15,
+              height: 50,
+              borderColor: Colors.LIGHT_PURPLE,
+              borderWidth: 1.5,
+              borderRadius: 12,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: '#f8f9ff',
+              flexDirection: 'row'
+            }}
+          >
+            <MaterialIcons name="add-photo-alternate" size={24} color={Colors.LIGHT_PURPLE} style={{ marginRight: 8 }} />
+            <Text style={{
+              color: Colors.LIGHT_PURPLE,
+              fontSize: 16,
+              fontWeight: '500'
+            }}>Add Photos</Text>
+          </TouchableOpacity>
+
+          {/* Selected Media Preview */}
+          {(selectedPhotos.length > 0 || selectedVideo) && (
+            <View style={{ 
+              marginTop: 15, 
+              padding: 12,
+              backgroundColor: '#f8f9fa',
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: '#e9ecef'
+            }}>
+              <Text style={{
+                fontSize: 14,
+                fontWeight: '600',
+                color: '#495057',
+                marginBottom: 10
+              }}>Selected Media:</Text>
+              {selectedPhotos.length > 0 && (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 5 }}
+                >
+                  {selectedPhotos.map((photo, index) => (
+                    <View key={index} style={{ marginRight: 8 }}>
+                      <Image
+                        source={{ uri: photo }}
+                        style={{
+                          width: 80,
+                          height: 80,
+                          borderRadius: 8,
+                          borderWidth: 2,
+                          borderColor: Colors.LIGHT_PURPLE,
+                        }}
+                      />
+                      <View style={{
+                        position: 'absolute',
+                        top: -5,
+                        right: -5,
+                        backgroundColor: Colors.LIGHT_PURPLE,
+                        borderRadius: 10,
+                        width: 20,
+                        height: 20,
+                        justifyContent: 'center',
+                        alignItems: 'center'
+                      }}>
+                        <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>{index + 1}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+              {selectedVideo && (
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: Colors.LIGHT_PURPLE,
+                  padding: 8,
+                  borderRadius: 8
+                }}>
+                  <MaterialIcons name="videocam" size={20} color="white" style={{ marginRight: 8 }} />
+                  <Text style={{ color: 'white', fontWeight: '500' }}>Video ready to upload</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={createPost}
+            disabled={isCreatingPost || (!caption.trim() && selectedPhotos.length === 0 && !selectedVideo)}
+            style={{
+              marginTop: 20,
+              height: 45,
+              backgroundColor: (isCreatingPost || (!caption.trim() && selectedPhotos.length === 0 && !selectedVideo)) 
+                ? '#d1d5db' 
+                : Colors.LIGHT_PURPLE,
+              justifyContent: "center",
+              alignItems: "center",
+              borderRadius: 12,
+              shadowColor: Colors.LIGHT_PURPLE,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: isCreatingPost ? 0 : 0.2,
+              shadowRadius: 4,
+              elevation: isCreatingPost ? 0 : 3,
+            }}
+          >
+            {isCreatingPost ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="white" style={{ marginRight: 8 }} />
+                <Text style={{ color: "white", fontSize: 16, fontWeight: '600' }}>Publishing...</Text>
+              </View>
+            ) : (
+              <Text style={{ 
+                color: "white", 
+                fontSize: 16, 
+                fontWeight: '600' 
+              }}>Publish Post</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  ), [
+    groupInfo,
+    isCreator,
+    isMember,
+    isAdmin,
+    isJoiningLeaving,
+    caption,
+    selectedPhotos,
+    selectedVideo,
+    isCreatingPost,
+    handleCaptionChange,
+    handleMediaSelection,
+    createPost,
+    toggleGroupMembersModal,
+    toggleInviteToGroupModal,
+    handleGroupImageSelection,
+    leaveGroup,
+    joinGroup,
+    width
+  ]);
 
   // Fetch group information
   const fetchGroupInfo = async (isRefresh = false) => {
@@ -111,18 +569,40 @@ const GroupDetails = ({ route }) => {
       if (!isRefresh) {
         setIsLoading(true);
       }
+      
+      console.log('Fetching group info:', { groupId, currentUserId });
       const response = await Axios.get(
         `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/${groupId}/info`
       );
       
       const groupData = response.data;
+      console.log('Group data received:', {
+        groupId: groupData.id,
+        membersCount: groupData.members?.length,
+        adminsCount: groupData.admins?.length,
+        creator: groupData.creator
+      });
+      
       setGroupInfo(groupData);
       
       // Check user's role in the group
       if (currentUserId) {
-        const isUserMember = groupData.members.includes(currentUserId);
-        const isUserAdmin = groupData.admins.includes(currentUserId);
-        const isUserCreator = groupData.creator === currentUserId;
+        // Convert currentUserId to string for comparison since API might return strings
+        const userIdStr = String(currentUserId);
+        const isUserMember = groupData.members?.some(memberId => String(memberId) === userIdStr) || false;
+        const isUserAdmin = groupData.admins?.some(adminId => String(adminId) === userIdStr) || false;
+        const isUserCreator = String(groupData.creator) === userIdStr;
+        
+        console.log('User role check:', {
+          currentUserId,
+          userIdStr,
+          isUserMember,
+          isUserAdmin,
+          isUserCreator,
+          members: groupData.members,
+          admins: groupData.admins,
+          creator: groupData.creator
+        });
         
         setIsMember(isUserMember);
         setIsAdmin(isUserAdmin);
@@ -133,6 +613,7 @@ const GroupDetails = ({ route }) => {
       Toast.show({
         type: "error",
         text1: "Error loading group information",
+        text2: error.response?.data || "Please try again",
         visibilityTime: 3000,
       });
     } finally {
@@ -216,22 +697,18 @@ const GroupDetails = ({ route }) => {
     }
   }, [currentUserId, groupId]);
 
-  // Handle group image selection (only for creator)
-  const handleGroupImageSelection = async () => {
-    if (!isCreator) return;
-    
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 4],
-      quality: 1,
+  // Debug: Track membership state changes
+  useEffect(() => {
+    console.log('Membership state changed:', {
+      isMember,
+      isAdmin,
+      isCreator,
+      currentUserId,
+      groupId
     });
+  }, [isMember, isAdmin, isCreator, currentUserId, groupId]);
 
-    if (!result.canceled) {
-      setSelectedGroupImage(result.assets[0].uri);
-      updateGroupImage(result.assets[0].uri);
-    }
-  };
+
 
   // Update group image
   const updateGroupImage = async (imageUri) => {
@@ -274,172 +751,10 @@ const GroupDetails = ({ route }) => {
     }
   };
 
-  // Handle media selection for posts
-  const handleMediaSelection = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: false,
-      aspect: [4, 4],
-      quality: 1,
-      allowsMultipleSelection: true,
-    });
 
-    if (!result.canceled) {
-      const selectedAssets = result.assets;
-      const hasVideo = selectedAssets.some((asset) =>
-        asset.type.toLowerCase().includes("video")
-      );
 
-      if (hasVideo) {
-        const videoAsset = selectedAssets.find((asset) =>
-          asset.type.toLowerCase().includes("video")
-        );
-        setSelectedVideo(videoAsset.uri);
-        setSelectedPhotos([]);
-      } else {
-        setSelectedPhotos(selectedAssets.map(asset => asset.uri));
-        setSelectedVideo("");
-      }
-    }
-  };
 
-  // Create post
-  const createPost = async () => {
-    if (!caption.trim() && selectedPhotos.length === 0 && !selectedVideo) {
-      Toast.show({
-        type: "info",
-        text1: "Please add content to your post",
-        visibilityTime: 3000,
-      });
-      return;
-    }
 
-    try {
-      setIsCreatingPost(true);
-      const formData = new FormData();
-      
-      if (caption.trim()) {
-        formData.append("caption", caption.trim());
-      }
-      
-      if (selectedPhotos.length > 0) {
-        selectedPhotos.forEach((photo, index) => {
-          formData.append(`photos[${index}]`, {
-            uri: photo,
-            name: `photo${index}.jpg`,
-            type: "image/jpeg",
-          });
-        });
-      }
-
-      if (selectedVideo) {
-        const videoResponse = await fetch(selectedVideo);
-        const videoBlob = await videoResponse.blob();
-        formData.append("video", {
-          uri: selectedVideo,
-          name: "video.mp4",
-          type: videoBlob.type,
-        });
-      }
-
-      await Axios.post(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/addpost/${groupId}/${currentUserId}`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      Toast.show({
-        type: "success",
-        text1: "Post created successfully",
-        visibilityTime: 3000,
-      });
-
-      // Clear form and refresh posts
-      setCaption("");
-      setSelectedPhotos([]);
-      setSelectedVideo("");
-      fetchGroupPosts(0, true);
-    } catch (error) {
-      console.error("Error creating post:", error);
-      Toast.show({
-        type: "error",
-        text1: "Error creating post",
-        visibilityTime: 3000,
-      });
-    } finally {
-      setIsCreatingPost(false);
-    }
-  };
-
-  // Join group
-  const joinGroup = async () => {
-    try {
-      const response = await Axios.post(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/join/${groupId}/${currentUserId}`
-      );
-      
-      if (response.data === "You joined the group") {
-        Toast.show({
-          type: "success",
-          text1: `You are now a member of ${groupInfo.name}`,
-          visibilityTime: 3000,
-        });
-        setIsMember(true);
-        fetchGroupInfo();
-      } else if (response.data === "Follow request to join group sent") {
-        Toast.show({
-          type: "success",
-          text1: `Join request sent to ${groupInfo.name}`,
-          visibilityTime: 3000,
-        });
-      }
-    } catch (error) {
-      console.error("Error joining group:", error);
-      Toast.show({
-        type: "error",
-        text1: "Error joining group",
-        visibilityTime: 3000,
-      });
-    }
-  };
-
-  // Leave group
-  const leaveGroup = async () => {
-    try {
-      const response = await Axios.delete(
-        `${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/leave/${groupId}/${currentUserId}`
-      );
-      
-      if (response.data === "You have left the group") {
-        Toast.show({
-          type: "success",
-          text1: "You have left the group",
-          visibilityTime: 3000,
-        });
-        setIsMember(false);
-        fetchGroupInfo();
-      }
-    } catch (error) {
-      if (error.response && error.response.status === 403) {
-        Toast.show({
-          type: "error",
-          text1: "Cannot leave the group as the only admin",
-          visibilityTime: 3000,
-        });
-      } else {
-        console.error("Error leaving group:", error);
-        Toast.show({
-          type: "error",
-          text1: "Error leaving group",
-          visibilityTime: 3000,
-        });
-      }
-    }
-  };
 
   // Like/Unlike post
   const toggleLike = async (postId) => {
@@ -486,19 +801,7 @@ const GroupDetails = ({ route }) => {
     }
   };
 
-  // Modal toggle functions
-  const toggleGroupMembersModal = () => setGroupMembersModalVisible(!groupMembersModalVisible);
-  const toggleInviteToGroupModal = () => setInviteToGroupModalVisible(!inviteToGroupModalVisible);
-  const toggleCommentModal = (postId) => {
-    setSelectedPostCommentId(postId);
-    setCommentModalVisible(!commentModalVisible);
-  };
-  const toggleOptionsPostModal = (postId) => {
-    setSelectedPostId(postId);
-    setOptionsPostModalVisible(!optionsPostModalVisible);
-  };
-  const toggleSendModal = () => setSendModalVisible(!sendModalVisible);
-  const toggleShareModal = () => setShareModalVisible(!shareModalVisible);
+
 
   // Loading state
   if (isLoading) {
@@ -549,6 +852,7 @@ const GroupDetails = ({ route }) => {
           <View style={{ flexDirection: "row", marginTop: 25 }}>
             <TouchableOpacity
               onPress={joinGroup}
+              disabled={isJoiningLeaving}
               style={{
                 height: 30,
                 width: "40%",
@@ -557,16 +861,24 @@ const GroupDetails = ({ route }) => {
                 borderRadius: 10,
                 marginLeft: 10,
                 alignItems: "center",
+                justifyContent: "center",
                 flexDirection: "row",
+                opacity: isJoiningLeaving ? 0.7 : 1,
               }}
             >
-              <FontAwesome5
-                name="user-friends"
-                color="black"
-                size={15}
-                style={{ marginLeft: 18 }}
-              />
-              <Text style={{ fontSize: 17, marginLeft: 5 }}>Join</Text>
+              {isJoiningLeaving ? (
+                <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+              ) : (
+                <>
+                  <FontAwesome5
+                    name="user-friends"
+                    color="black"
+                    size={15}
+                    style={{ marginRight: 5 }}
+                  />
+                  <Text style={{ fontSize: 17 }}>Join</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -597,219 +909,6 @@ const GroupDetails = ({ route }) => {
     );
   }
 
-  // Render group header
-  const renderGroupHeader = () => (
-    <View>
-      {/* Group Header */}
-      <TouchableOpacity onPress={handleGroupImageSelection} disabled={!isCreator}>
-        <View>
-          <Image
-            source={{ uri: groupInfo.image }}
-            style={{ width: width, height: 200, borderRadius: 10 }}
-            resizeMode="cover"
-          />
-          {isCreator && (
-            <MaterialIcons 
-              name="edit" 
-              size={30} 
-              color={Colors.LIGHT_PURPLE} 
-              style={{ position: "absolute", bottom: 10, right: 10 }} 
-            />
-          )}
-        </View>
-      </TouchableOpacity>
-
-      {/* Group Info */}
-      <View style={{ flexDirection: "row", marginTop: 15, marginLeft: 15 }}>
-        <Text style={{ color: "black", fontWeight: "bold", fontSize: 20 }}>{groupInfo.name}</Text>
-      </View>
-
-      <View style={{ flexDirection: "row", marginTop: 10, marginLeft: 15 }}>
-        {groupInfo.type === "PUBLIC" ? (
-          <>
-            <MaterialIcons name="public" size={20} />
-            <Text style={{ color: "grey" }}> Group (Public) </Text>
-          </>
-        ) : (
-          <Text style={{ color: "grey" }}>Group (private)</Text>
-        )}
-        <Text>{groupInfo.members.length} </Text>
-        <TouchableOpacity onPress={toggleGroupMembersModal}>
-          <Text style={{ color: "grey" }}>members</Text>
-        </TouchableOpacity>
-      </View>
-
-      {groupInfo.description && (
-        <View style={{ marginTop: 10, marginLeft: 15, marginRight: 15 }}>
-          <Text style={{ color: "grey", fontSize: 14 }}>{groupInfo.description}</Text>
-        </View>
-      )}
-
-      {/* Action Buttons */}
-      <View style={{ flexDirection: "row", marginTop: 25, justifyContent: "space-around" }}>
-        <TouchableOpacity
-          onPress={isMember ? leaveGroup : joinGroup}
-          style={{
-            height: 35,
-            width: "40%",
-            borderColor: "gray",
-            borderWidth: 0.3,
-            borderRadius: 10,
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "row",
-            backgroundColor: isMember ? Colors.LIGHT_PURPLE : "white",
-          }}
-        >
-          <FontAwesome5
-            name="user-friends"
-            color={isMember ? "white" : "black"}
-            size={15}
-            style={{ marginRight: 5 }}
-          />
-          <Text style={{ fontSize: 17, color: isMember ? "white" : "black" }}>
-            {isMember ? "Member" : "Join"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={toggleInviteToGroupModal}
-          style={{
-            height: 35,
-            width: "40%",
-            borderColor: Colors.LIGHT_PURPLE,
-            borderWidth: 1,
-            borderRadius: 10,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: Colors.LIGHT_PURPLE,
-            flexDirection: "row",
-          }}
-        >
-          <Ionicons
-            name="person-add-outline"
-            color="white"
-            size={15}
-            style={{ marginRight: 5 }}
-          />
-          <Text style={{ fontSize: 17, color: "white" }}>Invite</Text>
-        </TouchableOpacity>
-
-        {/* Group Chat Button - visible for members */}
-        {isMember && (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('GroupChat', { groupId, groupName: groupInfo?.name })}
-            style={{
-              height: 35,
-              width: "40%",
-              borderColor: Colors.LIGHT_PURPLE,
-              borderWidth: 1,
-              borderRadius: 10,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: Colors.LIGHT_PURPLE,
-              flexDirection: "row",
-            }}
-          >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              color="white"
-              size={15}
-              style={{ marginRight: 5 }}
-            />
-            <Text style={{ fontSize: 17, color: "white" }}>Group Chat</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Create Post Section - Only for members */}
-      {isMember && (
-        <View style={{ marginTop: 25, alignItems: "center" }}>
-          <TextInput
-            placeholder="What's new?"
-            value={caption}
-            onChangeText={setCaption}
-            multiline
-            style={{
-              height: 60,
-              padding: 10,
-              fontSize: 16,
-              borderWidth: 0.5,
-              borderColor: "grey",
-              borderRadius: 10,
-              width: "80%",
-            }}
-          />
-          
-          <TouchableOpacity
-            onPress={handleMediaSelection}
-            style={{ marginTop: 15, width: "80%" }}
-          >
-            <View
-              style={{
-                height: 50,
-                borderColor: "grey",
-                borderWidth: 0.5,
-                borderRadius: 10,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text>Pick a media</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Selected Media Preview */}
-          {(selectedPhotos.length > 0 || selectedVideo) && (
-            <View style={{ marginTop: 15, width: "80%" }}>
-              {selectedPhotos.length > 0 && (
-                <ScrollView horizontal>
-                  {selectedPhotos.map((photo, index) => (
-                    <Image
-                      key={index}
-                      source={{ uri: photo }}
-                      style={{
-                        width: 80,
-                        height: 80,
-                        margin: 5,
-                        borderRadius: 5,
-                      }}
-                    />
-                  ))}
-                </ScrollView>
-              )}
-              {selectedVideo && (
-                <View style={{ margin: 5 }}>
-                  <Text style={{ color: Colors.LIGHT_PURPLE }}>Video selected</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          <TouchableOpacity
-            onPress={createPost}
-            disabled={isCreatingPost}
-            style={{ marginTop: 15, width: "50%" }}
-          >
-            <View
-              style={{
-                height: 35,
-                backgroundColor: Colors.LIGHT_PURPLE,
-                justifyContent: "center",
-                alignItems: "center",
-                borderRadius: 10,
-                opacity: isCreatingPost ? 0.7 : 1,
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 16 }}>
-                {isCreatingPost ? "Publishing..." : "Publish"}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
 
   // Render post item
   const renderPostItem = ({ item: post }) => (
@@ -831,58 +930,86 @@ const GroupDetails = ({ route }) => {
 
   // Main group view
   return (
-    <View style={{ flex: 1, backgroundColor: "white" }}>
-      {isLoadingPosts && posts.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <LottieView
-            source={require('../../../assets/animations/LoadingPublications.json')}
-            autoPlay
-            loop
-            style={{ width: 200, height: 200 }}
-          />
-        </View>
-      ) : (
-        <FlatList
-          data={posts}
-          renderItem={renderPostItem}
-          keyExtractor={item => item.id}
-          onEndReached={loadMorePosts}
-          onEndReachedThreshold={0.5}
-          ListHeaderComponent={renderGroupHeader}
-          ListFooterComponent={isLoadingPosts && posts.length > 0 ? (
-            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={{ flex: 1 }}>
+            {/* Header with back arrow */}
+            <View style={styles.header}>
+              <TouchableOpacity 
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+              >
+                <MaterialIcons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Group</Text>
+              <View style={styles.placeholder} />
             </View>
-          ) : null}
-          ListEmptyComponent={isLoadingPosts ? (
-            <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} />
+            
+            <View style={{ flex: 1, backgroundColor: "white" }}>
+            {isLoadingPosts && posts.length === 0 ? (
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                <LottieView
+                  source={require('../../../assets/animations/LoadingPublications.json')}
+                  autoPlay
+                  loop
+                  style={{ width: 200, height: 200 }}
+                />
+              </View>
+            ) : (
+              <FlatList
+                data={posts}
+                renderItem={renderPostItem}
+                keyExtractor={item => item.id}
+                onEndReached={loadMorePosts}
+                onEndReachedThreshold={0.5}
+                ListHeaderComponent={renderGroupHeader}
+                ListFooterComponent={isLoadingPosts && posts.length > 0 ? (
+                  <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={Colors.LIGHT_PURPLE} />
+                  </View>
+                ) : null}
+                ListEmptyComponent={isLoadingPosts ? (
+                  <View style={{ paddingVertical: 16, alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={Colors.LIGHT_PURPLE} />
+                  </View>
+                ) : (
+                  <View style={{ alignItems: "center", marginTop: "50%" }}>
+                    <Text>No posts in this group yet</Text>
+                  </View>
+                )}
+                refreshControl={
+                  <RefreshControl 
+                    refreshing={isRefreshing} 
+                    onRefresh={onRefresh}
+                    colors={[Colors.LIGHT_PURPLE]}
+                    tintColor={Colors.LIGHT_PURPLE}
+                    progressBackgroundColor="#ffffff"
+                  />
+                }
+                contentContainerStyle={{ paddingBottom: 20 }}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+              />
+            )}
             </View>
-          ) : (
-            <View style={{ alignItems: "center", marginTop: "50%" }}>
-              <Text>No posts in this group yet</Text>
-            </View>
-          )}
-          refreshControl={
-            <RefreshControl 
-              refreshing={isRefreshing} 
-              onRefresh={onRefresh}
-              colors={[Colors.LIGHT_PURPLE]}
-              tintColor={Colors.LIGHT_PURPLE}
-              progressBackgroundColor="#ffffff"
-            />
-          }
-          contentContainerStyle={{ paddingBottom: 20 }}
-        />
-      )}
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
       {/* Modals */}
-      <CommentModel
-        isVisible={commentModalVisible}
-        onClose={toggleCommentModal}
-        postId={selectedPostCommentId}
-        refreshPosts={() => fetchGroupPosts(0, true)}
-      />
+      {selectedPostCommentId && (
+        <CommentModel
+          isVisible={commentModalVisible}
+          onClose={toggleCommentModal}
+          postId={selectedPostCommentId}
+          refreshPosts={() => fetchGroupPosts(0, true)}
+        />
+      )}
       <SendModel isVisible={sendModalVisible} onClose={toggleSendModal} />
       <ShareModel isVisible={shareModalVisible} onClose={toggleShareModal} />
       <PostOptionsModel
@@ -900,8 +1027,47 @@ const GroupDetails = ({ route }) => {
         onClose={toggleInviteToGroupModal}
         groupId={groupId}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
 export default GroupDetails;
+
+// Basic header styles for GroupDetails
+const styles = {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: Colors.WHITE,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
+    textAlign: 'center',
+  },
+  placeholder: {
+    width: 44,
+    height: 44,
+    marginLeft: 16,
+  },
+};

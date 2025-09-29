@@ -41,7 +41,7 @@ const GroupMembersModal = ({ isVisible, onClose, members }) => {
             backgroundColor: "white",
             padding: 20,
             borderRadius: 20,
-            borderColor: Colors.PURPLE,
+            borderColor: Colors.LIGHT_PURPLE,
             width: "80%",
             height: "60%",
           }}

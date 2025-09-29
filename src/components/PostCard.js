@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, TouchableWithoutFeedback, Animated } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import Colors from '../../assets/Colors';
 import { EvilIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { View as RNView } from 'react-native';
@@ -35,6 +37,8 @@ const PostCard = ({
   postId,
   hideUserGroupBadge = false,
 }) => {
+  const navigation = useNavigation();
+  const { t } = useTranslation();
   const [showReactionDialog, setShowReactionDialog] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
@@ -95,10 +99,23 @@ const PostCard = ({
     const date = new Date(dateTime);
     const now = new Date();
     const diff = Math.floor((now - date) / 1000);
-    if (diff < 60) return 'Just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 60) return t('Just now');
+    if (diff < 3600) return `${Math.floor(diff / 60)}${t('m ago')}`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}${t('h ago')}`;
     return date.toLocaleDateString();
+  };
+
+  // Navigation functions
+  const handleUserPress = () => {
+    if (user?.userId && user.userId !== userId) {
+      navigation.navigate('UsersProfile', { userId: user.userId });
+    }
+  };
+
+  const handleGroupPress = () => {
+    if (group?.groupId) {
+      navigation.navigate('GroupDetails', { groupId: group.groupId });
+    }
   };
 
   // Image rendering logic (gallery)
@@ -169,7 +186,7 @@ const PostCard = ({
           }}
         />
         <View style={styles.imageCountOverlay}>
-          <Text style={styles.imageCountText}>{photos.length} photos</Text>
+          <Text style={styles.imageCountText}>{photos.length} {t('photos')}</Text>
         </View>
         {renderReactionOverlay()}
         {/* Dots indicator */}
@@ -255,47 +272,63 @@ const PostCard = ({
           <View style={styles.header}>
             {group && group.name && group.image ? (
               <>
-                <View style={styles.avatarContainer}>
+                <TouchableOpacity
+                  style={styles.avatarContainer}
+                  onPress={handleGroupPress}
+                  activeOpacity={0.7}
+                >
                   <Image
                     source={{ uri: group.image }}
                     style={styles.avatar}
                   />
-                </View>
+                </TouchableOpacity>
                 <View style={styles.contentContainer}>
                   <View style={styles.headerRow}>
-                    <Text style={styles.groupName}>{group.name}</Text>
+                    <TouchableOpacity onPress={handleGroupPress} activeOpacity={0.7}>
+                      <Text style={styles.groupName}>{group.name}</Text>
+                    </TouchableOpacity>
                     {!hideUserGroupBadge && (
                       <View style={styles.groupBadge}>
                         <MaterialCommunityIcons name="account-group" size={12} color={Colors.LIGHT_PURPLE} />
-                        <Text style={styles.groupBadgeText}>Group</Text>
+                        <Text style={styles.groupBadgeText}>{t('Group')}</Text>
                       </View>
                     )}
                   </View>
-                  <View style={styles.userInfo}>
+                  <TouchableOpacity
+                    style={styles.userInfo}
+                    onPress={handleUserPress}
+                    activeOpacity={0.7}
+                  >
                     <Image
                       source={{ uri: user?.image || user?.profilephoto || 'https://placeholder.com/avatar' }}
                       style={styles.userMiniAvatar}
                     />
                     <Text style={styles.userMiniName}>{user?.name || user?.fullName}</Text>
-                  </View>
+                  </TouchableOpacity>
                   <Text style={styles.time}>{formatDateTime(postDateTime)}</Text>
                 </View>
               </>
             ) : (
               <>
-                <View style={styles.avatarContainer}>
+                <TouchableOpacity
+                  style={styles.avatarContainer}
+                  onPress={handleUserPress}
+                  activeOpacity={0.7}
+                >
                   <Image
                     source={{ uri: user?.image || user?.profilephoto || 'https://placeholder.com/avatar' }}
                     style={styles.avatar}
                   />
-                </View>
+                </TouchableOpacity>
                 <View style={styles.contentContainer}>
                   <View style={styles.headerRow}>
-                    <Text style={styles.username}>{user?.name || user?.fullName}</Text>
+                    <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+                      <Text style={styles.username}>{user?.name || user?.fullName}</Text>
+                    </TouchableOpacity>
                     {!hideUserGroupBadge && (
                       <View style={styles.userBadge}>
                         <MaterialCommunityIcons name="account" size={12} color="#EC4899" />
-                        <Text style={styles.userBadgeText}>User</Text>
+                        <Text style={styles.userBadgeText}>{t('User')}</Text>
                       </View>
                     )}
                   </View>
@@ -340,7 +373,7 @@ const PostCard = ({
               {reactionSummary.total > 0 && (
                 <Text style={styles.actionCount}>{reactionSummary.total}</Text>
               )}
-              <Text style={styles.actionText}>Like</Text>
+              <Text style={styles.actionText}>{t('Like')}</Text>
             </TouchableOpacity>
           
             {showReactionDialog && (
@@ -362,7 +395,7 @@ const PostCard = ({
                   style={styles.cancelButton}
                   onPress={() => setShowReactionDialog(false)}
                 >
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={styles.cancelText}>{t('Cancel')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -378,7 +411,7 @@ const PostCard = ({
               {commentsNumber > 0 && (
                 <Text style={styles.actionCount}>{commentsNumber}</Text>
               )}
-              <Text style={styles.actionText}>Comment</Text>
+              <Text style={styles.actionText}>{t('Comment')}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>

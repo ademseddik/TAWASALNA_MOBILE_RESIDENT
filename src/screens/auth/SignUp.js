@@ -157,48 +157,58 @@ const languages = [
   };
   /////////////////////////////////////////////////////////////////////
   const handleSignUp = async () => {
+    // Clear all previous errors
+    setFullNameError("");
+    setEmailError("");
+    setPasswordError("");
+    setConfirmPasswordError("");
+    setTermsPolicyError("");
+    setCommunityError("");
+    
     const passwordValidation = isValidPassword(password);
-if (!fullname.trim()) {
-      setFullNameError("FullName is required!");
+    if (!fullname.trim()) {
+      setFullNameError(t("FullName is required!"));
+      return;
     } else if (!email.trim()) {
-      setEmailError("Email is required!");
+      setEmailError(t("Email is required!"));
       return;
     } else if (!isValidEmail(email)) {
-      setEmailError("Invalid email address!");
+      setEmailError(t("Invalid email address"));
+      return;
+    } else if (!selectedCommunity || selectedCommunity === '') {
+      setCommunityError(t("Please select a community!"));
       return;
     } else if (!password.trim()) {
-      setPasswordError("Password is required");
+      setPasswordError(t("Password is required"));
       return;
     } else if (!passwordValidation.isValid) {
       let errorMessage = "";
 
       if (!passwordValidation.errors.minLength) {
-        errorMessage += "Password must be at least 8 characters long.\n";
+        errorMessage += t("Password must be at least 8 characters long.") + "\n";
       }
       if (!passwordValidation.errors.uppercase) {
-        errorMessage +=
-          "Password must contain at least one uppercase letter.\n";
+        errorMessage += t("Password must contain at least one uppercase letter.") + "\n";
       }
       if (!passwordValidation.errors.lowercase) {
-        errorMessage +=
-          "Password must contain at least one lowercase letter.\n";
+        errorMessage += t("Password must contain at least one lowercase letter.") + "\n";
       }
       if (!passwordValidation.errors.symbol) {
-        errorMessage += "Password must contain at least one symbol.\n";
+        errorMessage += t("Password must contain at least one symbol.") + "\n";
       }
       if (!passwordValidation.errors.number) {
-        errorMessage += "Password must contain at least one number.\n";
+        errorMessage += t("Password must contain at least one number.") + "\n";
       }
 
       setPasswordError(errorMessage);
 
       return;
     } else if (password !== confirmPassword) {
-      setConfirmPasswordError("Passwords do not match!");
+      setConfirmPasswordError(t("Passwords do not match!"));
       return;
     } else if (!isChecked) {
       setTermsPolicyError(
-        "Please accept the Terms of Services and Privacy Policy!"
+        t("Please accept the Terms of Services and Privacy Policy!")
       );
       return;
     } else {
@@ -243,7 +253,7 @@ if (!fullname.trim()) {
     //  console.error('Error during sign-up or fetching user:', error);
       if (error.response) {
 if (error.response.data.error==="User already exists"){
-  setEmailError("Email is already used try another one ");
+  setEmailError(t("Email is already used try another one"));
 }
         console.log('Error response data:', error.response.data);
         console.log('Error status:', error.response.status);
@@ -275,6 +285,18 @@ if (error.response.data.error==="User already exists"){
       style={{ flex: 1, resizeMode: 'cover' }}
     >
       <SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>
+        {/* Header with back arrow */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <MaterialIcons name="arrow-back" size={24} color={Colors.WHITE} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('Create Account')}</Text>
+          <View style={styles.placeholder} />
+        </View>
+        
         <ScrollView style={{ marginTop: 0 }}>
           <View style={{ marginTop: 0 }}>
             <TouchableOpacity
@@ -283,7 +305,38 @@ if (error.response.data.error==="User already exists"){
             >
               <Image source={require('../../../assets/Icons/earth2.png')} style={styles.earthIcon} />
             </TouchableOpacity>
-            {/* Language Picker Modal unchanged */}
+            {/* Language Picker Modal */}
+            {showLanguagePicker && (
+              <Modal
+                transparent={true}
+                visible={showLanguagePicker}
+                onRequestClose={() => setShowLanguagePicker(false)}
+              >
+                <Pressable 
+                  style={styles.modalOverlay} 
+                  onPress={() => setShowLanguagePicker(false)}
+                >
+                  <View style={styles.languageListContainer}>
+                    <FlatList
+                      data={languages}
+                      keyExtractor={(item) => item.code}
+                      renderItem={({ item }) => (
+                        <Pressable
+                          style={styles.languageItem}
+                          onPress={() => {
+                            changeLanguage(item.code);
+                            setShowLanguagePicker(false);
+                          }}
+                        >
+                          <Image source={item.flag} style={styles.flagIcon} />
+                          <Text style={styles.languageText}>{item.name}</Text>
+                        </Pressable>
+                      )}
+                    />
+                  </View>
+                </Pressable>
+              </Modal>
+            )}
             <View style={{
               flexDirection: 'column',
               alignItems: 'flex-start',
@@ -291,21 +344,7 @@ if (error.response.data.error==="User already exists"){
               marginBottom: height * 0.015,
               marginTop: 0
             }}>
-              <View style={{
-               width: width * 1,
-               height: height * 0.08,
-           
-               backgroundColor: Colors.LIGHT_PURPLE,
-               paddingLeft: width * 0.040,
-               justifyContent: 'center',
-               top: 0
-              }}>
-                <Image
-                  source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
-                  style={{ width: width * 0.4, height: height * 0.06, marginRight: width * 0.02 }}
-                  resizeMode="contain"
-                />
-              </View>
+          
               <Text style={{
                 fontSize: width * 0.1,
                 fontWeight: 'bold',
@@ -420,7 +459,7 @@ if (error.response.data.error==="User already exists"){
               }}
             >
               <TextInput
-                placeholder={t("Enter your email address...")}
+                placeholder={t("Enter your email address")}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCompleteType="email"
@@ -437,7 +476,7 @@ if (error.response.data.error==="User already exists"){
             </View>
             {emailError || (!isValidEmail(email) && email.trim().length > 0) ? (
               <Text style={{ color: "red", marginLeft: width * 0.07 }}>
-                {emailError || "Invalid email address"}
+                {emailError || t("Invalid email address")}
               </Text>
             ) : null}
             {/* Password Label */}
@@ -474,7 +513,7 @@ if (error.response.data.error==="User already exists"){
               }}
             >
               <TextInput
-                placeholder="*********"
+                placeholder={t('Password')}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCompleteType="password"
@@ -482,25 +521,35 @@ if (error.response.data.error==="User already exists"){
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
+                  // Real-time validation for confirm password matching
+                  if (confirmPassword.length > 0) {
+                    if (text === confirmPassword) {
+                      setConfirmPasswordError("");
+                    } else {
+                      setConfirmPasswordError(t("Passwords do not match!"));
+                    }
+                  }
+                  
+                  // Password strength validation
                   const passwordValidation = isValidPassword(text);
                   let errorMessage = "";
                   if (!text.trim()) {
-                    errorMessage = "Password is required";
+                    errorMessage = t("Password is required");
                   } else if (!passwordValidation.errors.minLength) {
                     errorMessage =
-                      "Password must be at least 8 characters long.\n";
+                      t("Password must be at least 8 characters long.") + "\n";
                   } else if (!passwordValidation.errors.uppercase) {
                     errorMessage +=
-                      "Password must contain at least one uppercase letter.\n";
+                      t("Password must contain at least one uppercase letter.") + "\n";
                   } else if (!passwordValidation.errors.lowercase) {
                     errorMessage +=
-                      "Password must contain at least one lowercase letter.\n";
+                      t("Password must contain at least one lowercase letter.") + "\n";
                   } else if (!passwordValidation.errors.symbol) {
                     errorMessage +=
-                      "Password must contain at least one symbol(?,!,...).\n";
+                      t("Password must contain at least one symbol(?,!,...).") + "\n";
                   } else if (!passwordValidation.errors.number) {
                     errorMessage +=
-                      "Password must contain at least one number.\n";
+                      t("Password must contain at least one number.") + "\n";
                   }
                   setPasswordError(errorMessage);
                 }}
@@ -557,13 +606,22 @@ if (error.response.data.error==="User already exists"){
               }}
             >
               <TextInput
-                placeholder="*********"
+                placeholder={t('Confirm your password')}
                 secureTextEntry={!showConfirmPassword}
                 autoCapitalize="none"
                 autoCompleteType="password"
                 autoCorrect={false}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(text) => {
+                  setConfirmPassword(text);
+                  // Real-time validation - clear error immediately when passwords match
+                  if (text === password) {
+                    setConfirmPasswordError("");
+                  } else if (text.length > 0 && password.length > 0) {
+                    // Show error in real-time if both fields have content and don't match
+                    setConfirmPasswordError(t("Passwords do not match!"));
+                  }
+                }}
                 style={{ flex: 1, fontSize: width * 0.045 }}
               />
               <TouchableOpacity onPress={toggleShowConfirmPassword}>
@@ -663,7 +721,7 @@ if (error.response.data.error==="User already exists"){
               }}
             >
               <TextInput
-                placeholder="Enter your ID number..."
+                placeholder={t('Enter your ID number')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={residentId}
@@ -815,6 +873,34 @@ if (error.response.data.error==="User already exists"){
   );
 };
 const styles = {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.WHITE,
+    textAlign: 'center',
+    marginHorizontal: 16,
+    textShadowColor: Colors.LIGHT_PURPLE,
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  placeholder: {
+    width: 40,
+  },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Colors from '../../../assets/Colors';
 import { getNeedsByUser, archiveNeed, unArchiveNeed, extendNeedEndDate } from '../../services/marketplaceNeed.service';
@@ -42,6 +42,27 @@ export default function UserNeedsDashboard() {
       fetchUserNeeds(true);
     }
   }, [userId]);
+  
+  // Auto-refresh when returning from AddNeed screen
+  useFocusEffect(
+    useCallback(() => {
+      const checkAndRefresh = async () => {
+        try {
+          const shouldRefresh = await AsyncStorage.getItem('shouldRefreshNeeds');
+          if (shouldRefresh === 'true') {
+            await AsyncStorage.removeItem('shouldRefreshNeeds');
+            if (userId) {
+              fetchUserNeeds(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking refresh flag:', error);
+        }
+      };
+      
+      checkAndRefresh();
+    }, [userId, fetchUserNeeds])
+  );
 
   const loadUserId = async () => {
     try {

@@ -13,8 +13,10 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "../../../assets/Colors";
 import { useResetPassword } from "../../hooks/useResetPassword";
+import { useNavigation } from '@react-navigation/native';
 
 const ResetPassword = () => {
+  const navigation = useNavigation();
   const {
     t,
     email,
@@ -64,11 +66,28 @@ const ResetPassword = () => {
             backgroundColor: Colors.LIGHT_PURPLE,
             paddingLeft: width * 0.040,
             justifyContent: 'center',
+            flexDirection: 'row',
+            alignItems: 'center',
             top: 0
           }}>
+            <TouchableOpacity 
+              style={{
+                position: 'absolute',
+                left: width * 0.040,
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialIcons name="arrow-back" size={24} color={Colors.WHITE} />
+            </TouchableOpacity>
             <Image
               source={require('../../../assets/Icons/TawasalnaLogoW1.png')}
-              style={{ width: width * 0.4, height: height * 0.06, marginRight: width * 0.02 }}
+              style={{ width: width * 0.4, height: height * 0.06 }}
               resizeMode="contain"
             />
           </View>

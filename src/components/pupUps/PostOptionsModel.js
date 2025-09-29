@@ -1,6 +1,7 @@
 import { View, Text, Modal, ScrollView, TouchableOpacity } from 'react-native'
 import React, { useState, useEffect } from "react";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons"; 
+import { useTranslation } from "react-i18next";
 import Colors from '../../../assets/Colors';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ConfirmActionModel from './ConfirmActionModel';
@@ -19,6 +20,7 @@ const PostOptionsModel = ({
   refreshImages,
   refreshProfileStatus,
 }) => {
+  const { t } = useTranslation();
   const [isConfirmLogOutModalVisible, setConfirmLogOutModalVisible] =
     useState(false);
 
@@ -29,7 +31,7 @@ const PostOptionsModel = ({
 const showErroDeletingToast = () => {
   Toast.show({
     type: "info",
-    text1: "You are not authorized to delete this post!",
+    text1: t("You are not authorized to delete this post!"),
     visibilityTime: 3000,
     autoHide: true,
   });
@@ -136,10 +138,10 @@ const showErroDeletingToast = () => {
                     marginTop: 5,
                   }}
                 >
-                  <Text style={{ color: "white" }}>Delete Post</Text>
+                  <Text style={{ color: "white" }}>{t('Delete Post')}</Text>
                 </View>
                 <Text style={{ marginTop: 25, color: "white", marginLeft:"-27%" }}>
-                  You are going to delete this post permanently.
+                  {t('You are going to delete this post permanently.')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -147,8 +149,8 @@ const showErroDeletingToast = () => {
           <ConfirmActionModel
             isVisible={isConfirmLogOutModalVisible}
             onClose={toggleConfirmLogOutModal}
-            message1={"Delete confirmation"}
-            message2={"Do you really want to delete this?"}
+            message1={t("Delete confirmation")}
+            message2={t("Do you really want to delete this?")}
             onConfirm={() => {
               toggleConfirmLogOutModal();
               DeleteProfilePost();

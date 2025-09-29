@@ -26,7 +26,7 @@ const { width, height } = Dimensions.get('window');
 const Notifications = ({ navigation }) => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadingActions, setLoadingActions] = useState(false);
+  const [loadingActions, setLoadingActions] = useState({}); // Changed to object to track individual actions
   const [refreshing, setRefreshing] = useState(false);
   const [socket, setSocket] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -347,31 +347,38 @@ const Notifications = ({ navigation }) => {
   };
 
   const acceptFollowRequest = async (followerUserId) => {
-    setLoadingActions(true);
+    const actionKey = `accept-follow-${followerUserId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       await FollowService.AcceptFollowRequest(followerUserId);
       setNotifications(prev => prev.filter(n => !(n.type === 'follow' && n.userId === followerUserId && n.isRequest)));
     } catch (error) {
       console.error('Error accepting follow request:', error);
     } finally {
-      setLoadingActions(false);
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
   const rejectFollowRequest = async (followerUserId) => {
-    setLoadingActions(true);
+    const actionKey = `reject-follow-${followerUserId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       await FollowService.RejectFollowRequest(followerUserId);
       setNotifications(prev => prev.filter(n => !(n.type === 'follow' && n.userId === followerUserId && n.isRequest)));
     } catch (error) {
       console.error('Error rejecting follow request:', error);
     } finally {
-      setLoadingActions(false);
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
   const acceptGroupInvitation = async (groupId) => {
-    setLoadingActions(true);
+    const actionKey = `accept-group-${groupId}`;
+    console.log('Accept group invitation called:', { groupId, actionKey });
+    setLoadingActions(prev => {
+      console.log('Setting loading for:', actionKey, 'Current state:', prev);
+      return { ...prev, [actionKey]: true };
+    });
     try {
       const userId = await AsyncStorage.getItem("userId");
       await Axios.post(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/acceptgroupinvitation/${groupId}/${userId}`);
@@ -379,12 +386,16 @@ const Notifications = ({ navigation }) => {
     } catch (error) {
       console.error('Error accepting group invitation:', error);
     } finally {
-      setLoadingActions(false);
+      setLoadingActions(prev => {
+        console.log('Clearing loading for:', actionKey);
+        return { ...prev, [actionKey]: false };
+      });
     }
   };
 
   const rejectGroupInvitation = async (groupId) => {
-    setLoadingActions(true);
+    const actionKey = `reject-group-${groupId}`;
+    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
       const userId = await AsyncStorage.getItem("userId");
       await Axios.post(`${APP_ENV.SOCIAL_PORT}/tawasalna-community/group/regetGroupInvitation/${groupId}/${userId}`);
@@ -392,7 +403,7 @@ const Notifications = ({ navigation }) => {
     } catch (error) {
       console.error('Error rejecting group invitation:', error);
     } finally {
-      setLoadingActions(false);
+      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
     }
   };
 
@@ -419,7 +430,7 @@ const Notifications = ({ navigation }) => {
         navigation.navigate("UsersProfile", { userId: item.userId });
         break;
       case 'like':
-        navigation.navigate("PostDetail", {
+        navigation.navigate("Post Detail", {
           postId: item.postInfo?.postId || item.postId,
         });
         break;
@@ -435,7 +446,7 @@ const Notifications = ({ navigation }) => {
         if (commentId) {
           navigationParams.highlightCommentId = commentId;
         }
-        navigation.navigate("PostDetail", navigationParams);
+        navigation.navigate("Post Detail", navigationParams);
         break;
       case 'group':
         navigation.navigate("GroupDetails", {
@@ -527,21 +538,40 @@ const Notifications = ({ navigation }) => {
                   style={[styles.actionButton, styles.acceptButton]}
                   onPress={(e) => {
                     e.stopPropagation();
-                    item.type === 'follow' 
-                      ? acceptFollowRequest(item.userId) 
-                      : acceptGroupInvitation(item.groupId);
+                    if (item.type === 'follow') {
+                      acceptFollowRequest(item.userId);
+                    } else {
+                      console.log('Accepting group invitation for:', item.groupId, item);
+                      acceptGroupInvitation(item.groupId);
+                    }
                   }}
-                  disabled={loadingActions}
+                  disabled={item.type === 'follow' 
+                    ? loadingActions[`accept-follow-${item.userId}`] 
+                    : loadingActions[`accept-group-${item.groupId}`]}
                   activeOpacity={0.8}
                 >
-                  {loadingActions ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Icon name="check" size={12} color="#fff" />
-                      <Text style={styles.actionButtonText}>Accept</Text>
-                    </>
-                  )}
+                  {(() => {
+                    const isLoading = item.type === 'follow' 
+                      ? loadingActions[`accept-follow-${item.userId}`] 
+                      : loadingActions[`accept-group-${item.groupId}`];
+                    console.log('Accept button render:', {
+                      itemId: item.id,
+                      type: item.type,
+                      groupId: item.groupId,
+                      userId: item.userId,
+                      loadingKey: item.type === 'follow' ? `accept-follow-${item.userId}` : `accept-group-${item.groupId}`,
+                      isLoading,
+                      allLoadingActions: loadingActions
+                    });
+                    return isLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Icon name="check" size={12} color="#fff" />
+                        <Text style={styles.actionButtonText}>Accept</Text>
+                      </>
+                    );
+                  })()}
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -552,10 +582,14 @@ const Notifications = ({ navigation }) => {
                       ? rejectFollowRequest(item.userId) 
                       : rejectGroupInvitation(item.groupId);
                   }}
-                  disabled={loadingActions}
+                  disabled={item.type === 'follow' 
+                    ? loadingActions[`reject-follow-${item.userId}`] 
+                    : loadingActions[`reject-group-${item.groupId}`]}
                   activeOpacity={0.8}
                 >
-                  {loadingActions ? (
+                  {(item.type === 'follow' 
+                    ? loadingActions[`reject-follow-${item.userId}`] 
+                    : loadingActions[`reject-group-${item.groupId}`]) ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>

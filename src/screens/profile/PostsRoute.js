@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Animated, TouchableOpacity, Image } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 import { APP_ENV } from '../../utils/BaseUrl';
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -8,6 +8,7 @@ import loadingAnimation from '../../../assets/animations/LoadingAnimatoion3.json
 import PostCard from '../../components/PostCard';
 import CommentModel from '../../components/pupUps/CommentModel';
 import ConfirmActionModel from '../../components/pupUps/ConfirmActionModel';
+import EditPostModal from '../../components/pupUps/EditPostModal';
 import Axios from 'axios';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Colors from '../../../assets/Colors';
@@ -23,6 +24,8 @@ function PostsRoute({ userId }) {
   const [isCommentModalVisible, setCommentModalVisible] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState(null);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -88,7 +91,7 @@ function PostsRoute({ userId }) {
   const renderEmptyState = () => (
     <Animated.View style={[styles.emptyContainer, { opacity: fadeAnim }]}>
       <View style={styles.emptyIconContainer}>
-        <MaterialCommunityIcons name="post-outline" size={48} color={Colors.LIGHT_PURPLE} />
+      <Image source={require('../../../assets/Icons/postiCOn.png')} style={styles.emptyLogo} resizeMode="contain" />
       </View>
       <Text style={styles.emptyTitle}>No posts yet</Text>
       <Text style={styles.emptySubtitle}>
@@ -132,17 +135,33 @@ function PostsRoute({ userId }) {
           hideUserGroupBadge
         />
 
-        {/* Close icon for delete - only in PostsRoute */}
-        <TouchableOpacity
-          style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 6 }}
-          onPress={() => {
-            setSelectedPostId(item.id);
-            setIsDeleteModalVisible(true);
-          }}
-          activeOpacity={0.8}
-        >
-          <MaterialCommunityIcons name="close" size={18} color="#fff" />
-        </TouchableOpacity>
+        {/* Action buttons - Edit and Delete */}
+        <View style={{ position: 'absolute', top: 10, right: 10, flexDirection: 'row', gap: 8 }}>
+          {/* Edit button */}
+          <TouchableOpacity
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 6 }}
+            onPress={() => {
+              setSelectedPost(item);
+              setSelectedPostId(item.id);
+              setIsEditModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="pencil" size={18} color="#fff" />
+          </TouchableOpacity>
+          
+          {/* Delete button */}
+          <TouchableOpacity
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 6 }}
+            onPress={() => {
+              setSelectedPostId(item.id);
+              setIsDeleteModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="close" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -197,6 +216,26 @@ function PostsRoute({ userId }) {
           isVisible={isCommentModalVisible}
           onClose={() => setCommentModalVisible(false)}
           postId={selectedPostId}
+        />
+      )}
+
+      {/* Edit Post Modal */}
+      {isEditModalVisible && selectedPost && (
+        <EditPostModal
+          visible={isEditModalVisible}
+          onClose={() => {
+            setIsEditModalVisible(false);
+            setSelectedPost(null);
+            setSelectedPostId(null);
+          }}
+          onPostUpdated={() => {
+            // Refresh posts after successful update
+            setPage(0);
+            fetchPosts(true);
+          }}
+          postId={selectedPost.id}
+          initialCaption={selectedPost.caption || ''}
+          initialPhotos={selectedPost.photos || []}
         />
       )}
 

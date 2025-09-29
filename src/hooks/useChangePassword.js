@@ -34,11 +34,11 @@ export const useChangePassword = () => {
     };
 
     let errorMessage = "";
-    if (!errors.minLength) errorMessage += t("password_min_length");
-    if (!errors.uppercase) errorMessage += t("password_uppercase");
-    if (!errors.lowercase) errorMessage += t("password_lowercase");
-    if (!errors.symbol) errorMessage += t("Ajoutez un symbole (@...!)");
-    if (!errors.number) errorMessage += t("password_number");
+    if (!errors.minLength) errorMessage += t("password min length") + "\n";
+    if (!errors.uppercase) errorMessage += t("password uppercase") + "\n";
+    if (!errors.lowercase) errorMessage += t("password lowercase") + "\n";
+    if (!errors.symbol) errorMessage += t("Ajoutez un symbole (@...!)") + "\n";
+    if (!errors.number) errorMessage += t("password number") + "\n";
 
     return { isValid: Object.values(errors).every(v => v), errorMessage };
   };
@@ -53,7 +53,7 @@ export const useChangePassword = () => {
     };
 
     if (!state.currentpassword) {
-      newErrors.currentPasswordError = t("current_password_required");
+      newErrors.currentPasswordError = t("current password required");
       isValid = false;
     }
 
@@ -64,7 +64,7 @@ export const useChangePassword = () => {
     }
 
     if (state.newPassword !== state.confirmPassword) {
-      newErrors.confirmPasswordError = t("passwords_not_match");
+      newErrors.confirmPasswordError = t("passwords not match");
       isValid = false;
     }
 
@@ -124,13 +124,13 @@ export const useChangePassword = () => {
       case "Current password is incorrect":
         setState(prev => ({
           ...prev,
-          currentPasswordError: t("incorrect_current_password")
+          currentPasswordError: t("incorrect current password")
         }));
         break;
       case "You've already used this password":
         setState(prev => ({
           ...prev,
-          newPasswordError: t("password_already_used")
+          newPasswordError: t("password already used")
         }));
         break;
       default:

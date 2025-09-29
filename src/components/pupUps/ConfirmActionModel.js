@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Modal, TouchableOpacity, StyleSheet,Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import Colors from "../../../assets/Colors";
 const { width, height } = Dimensions.get("window");
 
@@ -11,6 +12,7 @@ const ConfirmActionModel = ({
   message2,
   onConfirm,
 }) => {
+  const { t } = useTranslation();
   return (
     <Modal
       animationType="fade"
@@ -28,10 +30,10 @@ const ConfirmActionModel = ({
 
           <View style={styles.buttonsContainer}>
             <TouchableOpacity onPress={onClose} style={styles.cancelButton}>
-              <Text style={styles.cancelButtonText}>No</Text>
+              <Text style={styles.cancelButtonText}>{t('No')}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={onConfirm} style={styles.confirmButton}>
-              <Text style={styles.confirmButtonText}>Yes</Text>
+              <Text style={styles.confirmButtonText}>{t('Yes')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -84,7 +86,7 @@ const styles = StyleSheet.create({
   confirmButton: {
     height:height*0.05,
     width:width*0.24,
-    backgroundColor: Colors.PURPLE,
+    backgroundColor: Colors.LIGHT_PURPLE,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 10,

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View, Text, Image, ActivityIndicator, TouchableOpacity, Modal, StyleSheet,
-    ScrollView, TextInput, TouchableWithoutFeedback, Animated, FlatList, Dimensions
+    ScrollView, TextInput, TouchableWithoutFeedback, Animated, FlatList, Dimensions,
+    SafeAreaView
 } from "react-native";
+import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import Axios from 'axios';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { encode } from "base64-arraybuffer";
@@ -32,6 +35,8 @@ import { PostService, addReactionToPost, dislikePost } from '../services/post.se
 
 
 const PostDetail = ({ route }) => {
+    const navigation = useNavigation();
+    const { t } = useTranslation();
     const { postId, highlightCommentId } = route.params;
     const commentInputRef = useRef(null); // Fix for 'this.commentInputRef'
     const replyInputRef = useRef(null);
@@ -343,25 +348,25 @@ const PostDetail = ({ route }) => {
         if (diffMs < 0) diffMs = 0;
 
         const seconds = Math.floor(diffMs / 1000);
-        if (seconds < 1) return "just now";
-        if (seconds < 60) return `${seconds}s`;
+        if (seconds < 1) return t('just now');
+        if (seconds < 60) return `${seconds}${t('s')}`;
 
         const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return `${minutes}m`;
+        if (minutes < 60) return `${minutes}${t('m')}`;
 
         const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours}h`;
+        if (hours < 24) return `${hours}${t('h')}`;
 
         const days = Math.floor(hours / 24);
-        if (days < 7) return `${days}d`;
+        if (days < 7) return `${days}${t('d')}`;
 
         const weeks = Math.floor(days / 7);
-        if (weeks < 4) return `${weeks}w`;
+        if (weeks < 4) return `${weeks}${t('w')}`;
 
         const months = Math.floor(days / 30);
-        if (months < 12) return `${months}mo`;
+        if (months < 12) return `${months}${t('mo')}`;
 
-        return `${Math.floor(months / 12)}y`;
+        return `${Math.floor(months / 12)}${t('y')}`;
     };
 
     const fetchMentionUsers = async (query) => {
@@ -424,7 +429,7 @@ const PostDetail = ({ route }) => {
     
     const handleAddCommentToPost = async () => {
         if (!commentText.trim()) {
-            Toast.show({ type: "info", text1: "Please write a comment" });
+            Toast.show({ type: "info", text1: t("Please write a comment") });
             return;
         }
         setIsAddingComment(true);
@@ -451,12 +456,12 @@ const PostDetail = ({ route }) => {
             const Token = await AsyncStorage.getItem("USER_ACCESS");
             const mentionedUserIds = mentionedUsers.map(u => u.id);
             await PostService.addComment(postId, userId, tempComment.text, mentionedUserIds, Token);
-            Toast.show({ type: "success", text1: "Comment added" });
+            Toast.show({ type: "success", text1: t("Comment added") });
             success = true;
             refetchCommentsPost();
         } catch (error) {
             console.error("Error adding comment:", error);
-            Toast.show({ type: "error", text1: "Failed to add comment" });
+            Toast.show({ type: "error", text1: t("Failed to add comment") });
             setPagedData(prev => ({
                 ...prev,
                 content: prev.content.filter(c => c.commentId !== tempId),
@@ -537,15 +542,7 @@ const PostDetail = ({ route }) => {
         actionDialogOpacity.value = 1;
     }, []);
 
-    // Focus reply input when it's shown
-    useEffect(() => {
-        if (showReplyInput && replyInputRef.current) {
-            const timer = setTimeout(() => {
-                replyInputRef.current?.focus();
-            }, 150);
-            return () => clearTimeout(timer);
-        }
-    }, [showReplyInput]);
+
 
     const cancelEdit = () => {
         resetEditState();
@@ -586,19 +583,19 @@ const PostDetail = ({ route }) => {
 
     const updateComment = async () => {
         if (!editCommentText.trim()) {
-            Toast.show({ type: "info", text1: "Comment cannot be empty", visibilityTime: 3000 });
+            Toast.show({ type: "info", text1: t("Comment cannot be empty"), visibilityTime: 3000 });
             return;
         }
         setIsUpdatingComment(true);
         try {
             const Token = await AsyncStorage.getItem("USER_ACCESS");
             await PostService.editComment(editingComment.commentId, userId, editCommentText, Token);
-            Toast.show({ type: "success", text1: "Comment updated successfully", visibilityTime: 3000 });
+            Toast.show({ type: "success", text1: t("Comment updated successfully"), visibilityTime: 3000 });
             refetchCommentsPost();
             resetEditState();
         } catch (error) {
             console.error('Error updating comment:', error);
-            Toast.show({ type: "error", text1: "Failed to update comment", visibilityTime: 3000 });
+            Toast.show({ type: "error", text1: t("Failed to update comment"), visibilityTime: 3000 });
         } finally {
             setIsUpdatingComment(false);
         }
@@ -609,7 +606,7 @@ const PostDetail = ({ route }) => {
             const Token = await AsyncStorage.getItem("USER_ACCESS");
             await PostService.deleteComment(commentId, userId, postId, Token);
             refetchCommentsPost();
-            Toast.show({ type: 'success', text1: 'Comment deleted successfully' });
+            Toast.show({ type: 'success', text1: t('Comment deleted successfully') });
         } catch (error) {
             console.error('Error deleting comment:', error);
         }
@@ -617,7 +614,7 @@ const PostDetail = ({ route }) => {
 
     const addReplyToComment = async (commentId, text) => {
         if (!text.trim()) {
-            Toast.show({ type: "info", text1: "Please write a reply", visibilityTime: 3000 });
+            Toast.show({ type: "info", text1: t("Please write a reply"), visibilityTime: 3000 });
             return;
         }
         setAddingReply(commentId);
@@ -660,19 +657,21 @@ const PostDetail = ({ route }) => {
 
     const handleReplyButtonPress = (commentId, userName) => {
         if (showReplyInput === commentId) {
-            setShowReplyInput(null);
-            setShowReplyOverlay(false);
+            // Close the current reply input
+            handleCloseReply();
         } else {
+            // Close any existing reply input first
+            if (showReplyInput) {
+                handleCloseReply();
+            }
+            
             setShowReplyInput(commentId);
             setReplyingToCommentId(commentId);
             setReplyingToUserName(userName);
             setReplyText("");
             setShowReplyOverlay(true);
             
-            // Focus the input after a short delay to ensure the component is rendered
-            setTimeout(() => {
-                replyInputRef.current?.focus();
-            }, 100);
+            // Let the useEffect handle the focus
         }
     };
 
@@ -681,6 +680,9 @@ const PostDetail = ({ route }) => {
         setShowReplyOverlay(false);
         setReplyingToCommentId(null);
         setReplyingToUserName("");
+        setReplyText(""); // Reset reply text when closing
+        // Dismiss keyboard
+        replyInputRef.current?.blur();
     };
 
     const handleReplyTextChange = useCallback((text) => {
@@ -790,7 +792,7 @@ const PostDetail = ({ route }) => {
     }
 
     if (!post) {
-        return <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}><Text>Post not found.</Text></View>;
+        return <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}><Text>{t('Post not found.')}</Text></View>;
     }
     
     // --- JSX FOR SUB-COMPONENTS ---
@@ -836,7 +838,7 @@ const PostDetail = ({ route }) => {
                             }}
                         />
                         <View style={styles.imageCountOverlay}>
-                            <Text style={styles.imageCountText}>{imageUris.length} photos</Text>
+                            <Text style={styles.imageCountText}>{imageUris.length} {t('photos')}</Text>
                         </View>
                         {renderReactionOverlay()}
                         {/* Dots indicator */}
@@ -875,7 +877,7 @@ const PostDetail = ({ route }) => {
                         {reactionSummary.total > 0 && (
                             <Text style={styles.actionCount}>{reactionSummary.total}</Text>
                         )}
-                        <Text style={styles.actionText}>Like</Text>
+                        <Text style={styles.actionText}>{t('Like')}</Text>
                     </TouchableOpacity>
                     {showReactionDialog && (
                         <View style={[styles.reactionDialog, { zIndex: 3 }]}> 
@@ -896,7 +898,7 @@ const PostDetail = ({ route }) => {
                                 style={styles.cancelButton}
                                 onPress={() => setShowReactionDialog(false)}
                             >
-                                <Text style={styles.cancelText}>Cancel</Text>
+                                <Text style={styles.cancelText}>{t('Cancel')}</Text>
                             </TouchableOpacity>
                         </View>
                     )}
@@ -969,17 +971,17 @@ const PostDetail = ({ route }) => {
                                             multiline
                                             style={styles.editInput}
                                             autoFocus
-                                            placeholder="Edit your comment..."
+                                            placeholder={t('Edit your comment...')}
                                         />
                                         <View style={styles.editButtons}>
                                             <TouchableOpacity onPress={cancelEdit} disabled={isUpdatingComment}>
-                                                <Text style={styles.cancelEditButton}>Cancel</Text>
+                                                <Text style={styles.cancelEditButton}>{t('Cancel')}</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity onPress={updateComment} disabled={isUpdatingComment}>
                                                 {isUpdatingComment ? (
                                                     <ActivityIndicator size="small" color={Colors.PURPLE} />
                                                 ) : (
-                                                    <Text style={styles.saveEditButton}>Save</Text>
+                                                    <Text style={styles.saveEditButton}>{t('Save')}</Text>
                                                 )}
                                             </TouchableOpacity>
                                         </View>
@@ -1026,14 +1028,14 @@ const PostDetail = ({ route }) => {
                                             : <Ionicons name="heart-outline" size={16} color={Colors.LIGHT_PURPLE} />
                                         }
                                     </Text>
-                                    <Text style={styles.actionButtonLabel}>Like</Text>
+                                    <Text style={styles.actionButtonLabel}>{t('Like')}</Text>
                                 </TouchableOpacity>
                                 
                                 <TouchableOpacity 
                                     onPress={() => handleReplyButtonPress(comment.commentId, comment.userName)}
                                     style={styles.actionButton}
                                 >
-                                    <Text style={styles.actionButtonLabel}>Reply</Text>
+                                    <Text style={styles.actionButtonLabel}>{t('Reply')}</Text>
                                 </TouchableOpacity>
 
                                 {hasReplies && (
@@ -1047,7 +1049,7 @@ const PostDetail = ({ route }) => {
                                         }}
                                     >
                                         <Text style={styles.repliesText}>
-                                            {parseInt(comment.numberOfReplies)} replies
+                                            {parseInt(comment.numberOfReplies)} {t('replies')}
                                         </Text>
                                         <FontAwesome
                                             name={isExpanded ? "chevron-up" : "chevron-down"}
@@ -1097,13 +1099,6 @@ const PostDetail = ({ route }) => {
                             </View>
                         )}
 
-                        {/* Reply overlay */}
-                        {showReplyOverlay && showReplyInput === comment.commentId && (
-                            <TouchableWithoutFeedback onPress={handleCloseReply}>
-                                <View style={styles.replyOverlay} />
-                            </TouchableWithoutFeedback>
-                        )}
-
                         {/* Reply input */}
                         {showReplyInput === comment.commentId && (
                             <View style={styles.replyInputContainer}>
@@ -1116,30 +1111,46 @@ const PostDetail = ({ route }) => {
                                 </View>
                                 <View style={styles.replyInputWrapper}>
                                     <TextInput
+                                        key={`reply-${comment.commentId}`}
                                         ref={replyInputRef}
                                         style={styles.replyInput}
-                                        placeholder={`Reply to ${comment.userName}...`}
+                                        placeholder={`${t('Reply to')} ${comment.userName}...`}
                                         value={replyText}
                                         onChangeText={handleReplyTextChange}
                                         multiline
                                         editable={addingReply !== comment.commentId}
                                         keyboardShouldPersistTaps="handled"
+                                        returnKeyType="send"
+                                        onSubmitEditing={() => {
+                                            if (replyText.trim()) {
+                                                addReplyToComment(comment.commentId, replyText);
+                                            }
+                                        }}
+                                        blurOnSubmit={false}
                                     />
-                                    <TouchableOpacity
-                                        onPress={() => addReplyToComment(comment.commentId, replyText)}
-                                        style={styles.sendReplyButton}
-                                        disabled={!replyText.trim() || addingReply === comment.commentId}
-                                    >
-                                        {addingReply === comment.commentId ? (
-                                            <ActivityIndicator size="small" color={Colors.PURPLE} />
-                                        ) : (
-                                            <FontAwesome
-                                                name="send"
-                                                size={16}
-                                                color={replyText.trim() ? Colors.PURPLE : Colors.GRAY}
-                                            />
-                                        )}
-                                    </TouchableOpacity>
+                                    <View style={styles.replyInputActions}>
+                                        <TouchableOpacity
+                                            onPress={handleCloseReply}
+                                            style={styles.cancelReplyButton}
+                                        >
+                                            <Text style={styles.cancelReplyText}>{t('Cancel')}</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => addReplyToComment(comment.commentId, replyText)}
+                                            style={styles.sendReplyButton}
+                                            disabled={!replyText.trim() || addingReply === comment.commentId}
+                                        >
+                                            {addingReply === comment.commentId ? (
+                                                <ActivityIndicator size="small" color={Colors.PURPLE} />
+                                            ) : (
+                                                <FontAwesome
+                                                    name="send"
+                                                    size={16}
+                                                    color={replyText.trim() ? Colors.PURPLE : Colors.GRAY}
+                                                />
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
                         )}
@@ -1163,24 +1174,24 @@ const PostDetail = ({ route }) => {
                                     {selectedComment.residentId === userId ? (
                                         <>
                                             <ActionButton onPress={() => handleCommentAction("edit", selectedComment)}>
-                                                <ActionButtonText>Edit</ActionButtonText>
+                                                <ActionButtonText>{t('Edit')}</ActionButtonText>
                                             </ActionButton>
                                             <ActionButton onPress={() => handleCommentAction("delete", selectedComment)}>
-                                                <ActionButtonText>Delete</ActionButtonText>
+                                                <ActionButtonText>{t('Delete')}</ActionButtonText>
                                             </ActionButton>
                                         </>
                                     ) : (
                                         <>
                                             <ActionButton onPress={() => handleCommentAction("report", selectedComment)}>
-                                                <ActionButtonText>Report</ActionButtonText>
+                                                <ActionButtonText>{t('Report')}</ActionButtonText>
                                             </ActionButton>
                                             <ActionButton onPress={() => handleCommentAction("block", selectedComment)}>
-                                                <ActionButtonText>Block</ActionButtonText>
+                                                <ActionButtonText>{t('Block')}</ActionButtonText>
                                             </ActionButton>
                                         </>
                                     )}
                                     <CancelButton onPress={() => setShowCommentActionDialog(false)}>
-                                        <ActionButtonText>Cancel</ActionButtonText>
+                                        <ActionButtonText>{t('Cancel')}</ActionButtonText>
                                     </CancelButton>
                                 </ActionContainer>
                             </ActionDialog>
@@ -1193,7 +1204,20 @@ const PostDetail = ({ route }) => {
 
     // --- MAIN RENDER ---
     return (
-        <View style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            {/* Header with back arrow */}
+            <View style={styles.header}>
+                <TouchableOpacity 
+                    style={styles.backButton}
+                    onPress={() => navigation.goBack()}
+                >
+                    <Ionicons name="arrow-back" size={24} color={Colors.LIGHT_PURPLE} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>{t('Post')}</Text>
+                <View style={styles.placeholder} />
+            </View>
+            
+            <View style={{ flex: 1 }}>
             <FlatList
                 ref={commentsFlatListRef}
                 data={Array.from(new Map(pagedData.content.map(c => [c.commentId, c])).values())}
@@ -1229,7 +1253,7 @@ const PostDetail = ({ route }) => {
                 }
                 ListEmptyComponent={!isLoading && (
                     <View style={styles.noCommentsContainer}>
-                        <Text>No comments yet</Text>
+                        <Text>{t('No comments yet')}</Text>
                     </View>
                 )}
                 style={{ flex: 1 }}
@@ -1244,7 +1268,7 @@ const PostDetail = ({ route }) => {
                 <Image source={userprofilePic ? { uri: userprofilePic } : require('../../assets/default-avatar.jpg')} style={styles.userProfileImage} />
                 <TextInput
                     ref={commentInputRef}
-                    placeholder={`Add a comment as ${userFullname}`}
+                    placeholder={`${t('Add a comment as')} ${userFullname}`}
                     value={commentText}
                     onChangeText={handleCommentChange}
                     style={styles.commentInput}
@@ -1280,10 +1304,46 @@ const PostDetail = ({ route }) => {
                 )}
             />
         </View>
+        </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        backgroundColor: Colors.WHITE,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1F2937',
+        flex: 1,
+        textAlign: 'center',
+    },
+    placeholder: {
+        width: 44,
+        height: 44,
+        marginLeft: 16,
+    },
     container: {
         flex: 1,
         backgroundColor: '#fff',
@@ -1592,8 +1652,6 @@ const styles = StyleSheet.create({
     },
     replyInputWrapper: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
         backgroundColor: '#fff',
         borderRadius: 16,
         paddingHorizontal: 12,
@@ -1607,8 +1665,25 @@ const styles = StyleSheet.create({
         maxHeight: 80,
         color: '#34495e',
     },
+    replyInputActions: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginTop: 8,
+        gap: 12,
+    },
+    cancelReplyButton: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: '#f8f9fa',
+    },
+    cancelReplyText: {
+        color: Colors.GRAY,
+        fontSize: 12,
+        fontWeight: '500',
+    },
     sendReplyButton: {
-        marginLeft: 8,
         padding: 6,
         borderRadius: 12,
         backgroundColor: '#f8f9fa',

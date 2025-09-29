@@ -32,11 +32,11 @@ export const useResetPassword = () => {
     };
   
     let errorMessage = "";
-    if (!errors.minLength) errorMessage += "Password must be at least 8 characters long.\n";
-    else if (!errors.uppercase) errorMessage += "Password must contain one uppercase letter.\n";
-    else if (!errors.lowercase) errorMessage += "Password must contain one lowercase letter.\n";
-    else if (!errors.symbol) errorMessage += "Password must contain one symbol.\n";
-    else if (!errors.number) errorMessage += "Password must contain one number.\n";
+    if (!errors.minLength) errorMessage += "- Password must be at least 8 characters long.\n";
+    else if (!errors.uppercase) errorMessage += "- Password must contain one uppercase letter.\n";
+    else if (!errors.lowercase) errorMessage += "- Password must contain one lowercase letter.\n";
+    else if (!errors.symbol) errorMessage += "- Password must contain one symbol.\n";
+    else if (!errors.number) errorMessage += "- Password must contain one number.\n";
   
     return { isValid: Object.values(errors).every(v => v), errorMessage };
   };

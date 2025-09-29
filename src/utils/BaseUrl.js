@@ -1,6 +1,6 @@
 
-const IP_ADDRESS = `192.168.1.124`;
-
+const IP_ADDRESS = `192.168.1.20`;
+ 
 export const APP_ENV = {
   // BUSINESS_PORT: `http://157.173.196.161:31195/tawasalna-business`,
   // AUTH_PORT: "http://157.173.196.161:30265",

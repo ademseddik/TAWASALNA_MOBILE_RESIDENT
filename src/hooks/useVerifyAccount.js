@@ -47,6 +47,11 @@ export const useVerifyAccount = () => {
 
 
   const handleCodeChange = async (text, index) => {
+    // Prevent input when code is expired
+    if (isExpired) {
+      return;
+    }
+    
     const newCode = [...state.code];
     
     // Handle backspace/delete
@@ -102,6 +107,15 @@ export const useVerifyAccount = () => {
 
     try {
       await AuthService.ResendCode({ email: state.email });
+      // Restart timer and re-enable inputs
+      setTimeLeft(120); // Reset to 2 minutes
+      setIsExpired(false);
+      // Clear the code inputs
+      setState((prev) => ({ ...prev, code: ["", "", "", "", "", ""], codeError: "" }));
+      // Focus on first input
+      setTimeout(() => {
+        codeInputRefs.current[0]?.focus();
+      }, 100);
     } catch (error) {
       setState((prev) => ({
         ...prev,

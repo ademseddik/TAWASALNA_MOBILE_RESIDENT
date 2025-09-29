@@ -5,11 +5,10 @@ import {
     Text,
     TouchableOpacity,
     Dimensions,
-    Image,
-    TextInput,
     ActivityIndicator
   } from "react-native";
-  import React, { useState } from "react";
+  import React from "react";
+  import { useTranslation } from "react-i18next";
   import Colors from "../../../assets/Colors";
   const { width, height } = Dimensions.get("window");
   
@@ -20,6 +19,7 @@ import {
     onConfirm,
     isSubmitting,
   }) => {
+    const { t } = useTranslation();
     return (
       <View>
         <Modal
@@ -34,7 +34,7 @@ import {
               <View style={styles.TextContainer}>
                 <View style={styles.contText}>
                   <Text style={styles.text1}>
-                    Are you sure you want to save your changes?
+                    {t('Are you sure you want to save your changes?')}
                   </Text>
                 </View>
               </View>
@@ -43,7 +43,7 @@ import {
                   style={styles.cancelbtn}
                   onPress={() => handleCloseSubmit()}
                 >
-                  <Text style={styles.textCancel}>Cancel</Text>
+                  <Text style={styles.textCancel}>{t('Cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
           style={styles.submitbtn} 
@@ -63,7 +63,7 @@ import {
           {isSubmitting ? (
             <ActivityIndicator size="small" color="white" />
           ) : (
-            <Text style={styles.textSubmit}>Submit</Text>
+            <Text style={styles.textSubmit}>{t('Submit')}</Text>
           )}
         </TouchableOpacity>
               </View>
@@ -127,7 +127,7 @@ import {
     submitbtn: {
       height: height*0.05,
       width: width*0.30,
-      backgroundColor: Colors.PURPLE,
+      backgroundColor: Colors.LIGHT_PURPLE,
       justifyContent: "center",
       alignItems: "center",
       borderRadius: 10,
